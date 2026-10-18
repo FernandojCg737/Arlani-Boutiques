@@ -59,6 +59,13 @@ class Usuario(Base):
     sesion_expira_en: Mapped[datetime | None] = mapped_column(DateTime)
     reset_code_hash: Mapped[str | None] = mapped_column(String(255))
     reset_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Intentos fallidos del codigo vigente: al llegar al limite se invalida
+    # (ver MAX_INTENTOS_CODIGO en auth.py), asi no se puede probar el millon
+    # de combinaciones de 6 digitos dentro de los 10 minutos.
+    reset_code_intentos: Mapped[int] = mapped_column(default=0)
+    # jti del reset_token emitido: cada token de recuperacion sirve una sola
+    # vez (se limpia al usarlo en reset-password / login-with-reset-code).
+    reset_token_jti: Mapped[str | None] = mapped_column(String(64))
 
     bitacoras: Mapped[list["Bitacora"]] = relationship(back_populates="usuario")
 

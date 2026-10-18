@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 
 class OrdenPaypalOut(BaseModel):
@@ -95,10 +95,30 @@ class ItemVentaPresencialCreate(BaseModel):
     cantidad: int = Field(ge=1)
 
 
+def rechazar_items_repetidos(items: list) -> list:
+    """Cada combinacion producto/talla/color debe venir una sola vez: si se
+    repite, cada linea se valida contra el stock por separado y en conjunto
+    se descuenta mas de lo que hay (stock negativo)."""
+    vistos: set[tuple[int, int, int]] = set()
+    for item in items:
+        clave = (item.producto_id, item.talla_id, item.color_id)
+        if clave in vistos:
+            raise ValueError(
+                "Hay productos repetidos con la misma talla y color: junta las cantidades en una sola linea."
+            )
+        vistos.add(clave)
+    return items
+
+
 class VentaPresencialCreate(BaseModel):
     cliente_id: int
     sucursal_id: int
     items: list[ItemVentaPresencialCreate] = Field(min_length=1)
+
+    @field_validator("items")
+    @classmethod
+    def _sin_items_repetidos(cls, value: list[ItemVentaPresencialCreate]) -> list[ItemVentaPresencialCreate]:
+        return rechazar_items_repetidos(value)
 
 
 class VentaEditIn(BaseModel):
@@ -106,3 +126,8 @@ class VentaEditIn(BaseModel):
     items: list[ItemVentaPresencialCreate] = Field(min_length=1)
     metodo_pago: str
     estado_pago: str = Field(pattern="^(pendiente|verificando|completado|rechazado)$")
+
+    @field_validator("items")
+    @classmethod
+    def _sin_items_repetidos(cls, value: list[ItemVentaPresencialCreate]) -> list[ItemVentaPresencialCreate]:
+        return rechazar_items_repetidos(value)

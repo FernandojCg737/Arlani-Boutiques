@@ -2,7 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import require_permiso, require_permiso_cliente
+from app.api.deps import (
+    require_permiso,
+    require_permiso_cliente,
+    sucursal_restringida,
+    verificar_acceso_sucursal,
+)
 from app.core.audit import log_bitacora
 from app.db.session import get_db
 from app.models import (
@@ -36,6 +41,10 @@ def disponibilidad_producto(producto_id: int, db: Session = Depends(get_db)) -> 
     """Combinaciones talla/color/sucursal con stock real para este producto,
     para que el cliente elija una opcion valida al reservar (publico, no
     requiere sesion: es solo para armar el formulario)."""
+    # Antes de mostrar stock, liberar lo que tengan retenido reservas ya
+    # vencidas: si no, el producto figuraria agotado hasta que alguien abra
+    # el listado de reservas.
+    _vencer_reservas_expiradas(db)
     filas = (
         db.query(Inventario)
         .options(joinedload(Inventario.sucursal), joinedload(Inventario.talla), joinedload(Inventario.color))
@@ -165,6 +174,8 @@ def crear_reserva(
     if sucursal is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sucursal no encontrada.")
 
+    _vencer_reservas_expiradas(db)
+
     # Al reservar se retiene el stock de una (no es solo un chequeo de
     # disponibilidad): mientras la reserva siga viva, esa cantidad no la
     # puede tomar otro cliente. Se libera sola si vence sin pagar, o al
@@ -259,11 +270,14 @@ def listar_reservas(
     estado: str | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _usuario: Usuario = Depends(require_permiso("CU10", "CU11", "CU14")),
+    usuario: Usuario = Depends(require_permiso("CU10", "CU11")),
 ) -> ReservaPage:
     _vencer_reservas_expiradas(db)
 
     query = _query_con_detalles(db)
+    restringida = sucursal_restringida(usuario)
+    if restringida is not None:
+        query = query.filter(Reserva.sucursal_id == restringida)
     if estado:
         query = query.filter(Reserva.estado == estado)
     if sucursal_id:
@@ -288,6 +302,7 @@ def cambiar_estado_reserva(
     admin: Usuario = Depends(require_permiso("CU10")),
 ) -> ReservaAdminOut:
     reserva = _get_reserva_or_404(db, reserva_id)
+    verificar_acceso_sucursal(admin, reserva.sucursal_id)
     if reserva.estado not in ("pendiente", "confirmada"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta reserva ya esta cerrada.")
 
@@ -310,7 +325,7 @@ def completar_reserva(
     reserva_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    admin: Usuario = Depends(require_permiso("CU10", "CU11", "CU14")),
+    admin: Usuario = Depends(require_permiso("CU10", "CU11")),
 ) -> ReservaAdminOut:
     """Marca la reserva como pagada/entregada -- "atender la reserva" en
     sucursal (CU11): el cliente paga en efectivo al recogerla, asi que esto
@@ -319,6 +334,7 @@ def completar_reserva(
     retuvo al reservar (ver crear_reserva), asi que aca no se vuelve a
     tocar inventario."""
     reserva = _get_reserva_or_404(db, reserva_id)
+    verificar_acceso_sucursal(admin, reserva.sucursal_id)
     if reserva.estado not in ("pendiente", "confirmada"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta reserva ya esta cerrada o vencida.")
 
@@ -355,6 +371,8 @@ def editar_reserva(
     (completada/cancelada/vencida) no se toca inventario: esa parte ya
     quedo resuelta, esto solo corrige los datos."""
     reserva = _get_reserva_or_404(db, reserva_id)
+    verificar_acceso_sucursal(admin, reserva.sucursal_id)
+    verificar_acceso_sucursal(admin, payload.sucursal_id)
     activa = reserva.estado in ("pendiente", "confirmada")
 
     if activa:
@@ -418,6 +436,7 @@ def eliminar_reserva(
     cantidad quedaria retenida para siempre sin ninguna reserva real
     detras."""
     reserva = _get_reserva_or_404(db, reserva_id)
+    verificar_acceso_sucursal(admin, reserva.sucursal_id)
     if reserva.estado in ("pendiente", "confirmada"):
         _mover_stock_reserva(db, reserva, "entrada", None, "liberado, la reserva se elimino")
 

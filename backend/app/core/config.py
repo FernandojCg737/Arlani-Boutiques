@@ -3,6 +3,7 @@ import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:4200", "http://127.0.0.1:4200"]
+DEFAULT_SECRET_KEY = "change-this-secret-key-in-production"
 
 
 class Settings(BaseSettings):
@@ -14,7 +15,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql://atelier_user:atelier_pass@db:5432/atelieraranier"
 
-    SECRET_KEY: str = "change-this-secret-key-in-production"
+    SECRET_KEY: str = DEFAULT_SECRET_KEY
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ALGORITHM: str = "HS256"
 
@@ -62,5 +63,17 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "no-reply@atelieraranier.com"
     SMTP_USE_TLS: bool = False
 
+    @property
+    def es_produccion(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in ("production", "produccion", "prod")
+
 
 settings = Settings()
+
+# Con la clave por defecto cualquiera puede firmar JWT validos (es publica en
+# el repo). En desarrollo se tolera; en produccion el backend no arranca.
+if settings.es_produccion and (settings.SECRET_KEY == DEFAULT_SECRET_KEY or len(settings.SECRET_KEY) < 32):
+    raise RuntimeError(
+        "SECRET_KEY no configurada (o demasiado corta) en produccion. "
+        "Defini una clave aleatoria de al menos 32 caracteres en las variables de entorno."
+    )

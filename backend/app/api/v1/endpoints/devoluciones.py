@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_user, require_permiso, require_permiso_cliente
+from app.api.deps import (
+    require_encargado_o_admin,
+    require_permiso,
+    require_permiso_cliente,
+    sucursal_restringida,
+    verificar_acceso_sucursal,
+)
 from app.core.audit import log_bitacora
 from app.db.session import get_db
 from app.models import (
@@ -29,6 +35,11 @@ from app.models.p4_ventas import DetalleDevolucion, Devolucion
 from app.schemas.devoluciones import DevolucionAdminOut, DevolucionCreate, DevolucionOut, DetalleDevolucionOut
 
 router = APIRouter()
+
+# Plazo maximo para que el CLIENTE solicite una devolucion (regla del CU11).
+PLAZO_DEVOLUCION_HORAS = 24.0
+# Estados que bloquean abrir otra devolucion sobre la misma venta.
+ESTADOS_DEVOLUCION_VIGENTE = ("solicitada", "aprobada", "completada")
 
 
 # ---------------------------------------------------------------- helpers --
@@ -59,15 +70,31 @@ def _query_devolucion(db: Session):
     )
 
 
-def _get_precio_unitario(item: ItemLinea) -> Decimal:
-    """Obtiene el precio unitario del detalle de venta original."""
-    if hasattr(item, "detalle_venta_presencial") and item.detalle_venta_presencial:
-        return item.detalle_venta_presencial[0].precio_unitario
-    if hasattr(item, "detalle_venta_digital") and item.detalle_venta_digital:
-        return item.detalle_venta_digital[0].precio_unitario
-    # Fallback: buscar en la subclase via query
-    dvp = getattr(item, "precio_unitario", None)
-    return dvp if dvp else Decimal("0")
+def _get_devolucion_bloqueada(db: Session, devolucion_id: int) -> Devolucion:
+    """Bloquea la fila (FOR UPDATE) antes de leerla: si dos empleados
+    completan/rechazan la misma devolucion a la vez, el segundo espera y ve
+    el estado ya actualizado -- en vez de reingresar el stock dos veces.
+    El lock va en una consulta aparte porque Postgres no permite FOR UPDATE
+    sobre el lado opcional de los LEFT JOIN que arma el joinedload."""
+    bloqueada = db.query(Devolucion.id).filter(Devolucion.id == devolucion_id).with_for_update().first()
+    if bloqueada is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Devolucion no encontrada.")
+    return _query_devolucion(db).filter(Devolucion.id == devolucion_id).populate_existing().first()
+
+
+def _query_venta_con_detalles(db: Session):
+    return db.query(Venta).options(
+        joinedload(Venta.sucursal),
+        joinedload(Venta.cliente),
+        joinedload(Venta.pago),
+        joinedload(Venta.devoluciones),
+        joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.producto),
+        joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.talla),
+        joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.color),
+        joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.producto),
+        joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.talla),
+        joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.color),
+    )
 
 
 def _precio_unitario_desde_item(db: Session, item_linea_id: int) -> Decimal:
@@ -84,6 +111,98 @@ def _precio_unitario_desde_item(db: Session, item_linea_id: int) -> Decimal:
         {"id": item_linea_id},
     ).scalar()
     return Decimal(str(row))
+
+
+def _armar_detalles(db: Session, venta: Venta, payload: DevolucionCreate) -> tuple[Decimal, list[DetalleDevolucion]]:
+    """Valida los items contra la venta y calcula el monto a reembolsar.
+    Compartido por la solicitud del cliente y el registro del staff (antes
+    estaba duplicado en ambos endpoints)."""
+    detalles_venta = getattr(venta, "detalles", [])
+    por_id = {d.id: d for d in detalles_venta}
+
+    monto_total = Decimal("0")
+    detalles_devolucion = []
+    for item_in in payload.items:
+        detalle_original = por_id.get(item_in.item_linea_id)
+        if detalle_original is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"El item {item_in.item_linea_id} no pertenece a esta compra.",
+            )
+        if item_in.cantidad_devuelta > detalle_original.cantidad:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f'No puedes devolver {item_in.cantidad_devuelta} unidades de "{detalle_original.producto.nombre}" '
+                f"({detalle_original.talla.codigo}, {detalle_original.color.nombre}) — "
+                f"solo se compraron {detalle_original.cantidad}.",
+            )
+        precio = _precio_unitario_desde_item(db, item_in.item_linea_id)
+        monto_total += precio * item_in.cantidad_devuelta
+        detalles_devolucion.append(
+            DetalleDevolucion(
+                item_linea_id=item_in.item_linea_id,
+                cantidad_devuelta=item_in.cantidad_devuelta,
+            )
+        )
+
+    if payload.tipo == "total":
+        pedidos = {i.item_linea_id: i.cantidad_devuelta for i in payload.items}
+        if any(pedidos.get(d.id) != d.cantidad for d in detalles_venta):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Una devolucion total debe incluir todos los items con sus cantidades completas.",
+            )
+
+    return monto_total, detalles_devolucion
+
+
+def _rechazar_si_hay_devolucion_vigente(venta: Venta) -> None:
+    vigentes = [d for d in venta.devoluciones if d.estado in ESTADOS_DEVOLUCION_VIGENTE]
+    if vigentes:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Esta compra ya cuenta con una devolucion en estado '{vigentes[-1].estado}'.",
+        )
+
+
+def _inventario_de(db: Session, item: ItemLinea, sucursal_id: int) -> Inventario | None:
+    return (
+        db.query(Inventario)
+        .filter(
+            Inventario.producto_id == item.producto_id,
+            Inventario.talla_id == item.talla_id,
+            Inventario.color_id == item.color_id,
+            Inventario.sucursal_id == sucursal_id,
+        )
+        .with_for_update()
+        .first()
+    )
+
+
+def _registrar_movimiento(db: Session, inventario_id: int, empleado_id: int, tipo: str, cantidad: int, doc: str) -> None:
+    db.execute(
+        text(
+            "INSERT INTO movimiento_inventario "
+            "(inventario_id, empleado_id, tipo, cantidad, fecha, documento_referencia) "
+            "VALUES (:inv_id, :emp_id, :tipo, :cant, now(), :doc)"
+        ),
+        {"inv_id": inventario_id, "emp_id": empleado_id, "tipo": tipo, "cant": cantidad, "doc": doc},
+    )
+
+
+def _notificar(db: Session, cliente_id: int, tipo_evento: str, mensaje: str, devolucion_id: int) -> None:
+    db.add(
+        Notificacion(
+            cliente_id=cliente_id,
+            canal="sistema",
+            tipo_evento=tipo_evento,
+            mensaje=mensaje,
+            estado="enviada",
+            leida=False,
+            entidad_tipo="devolucion",
+            entidad_id=devolucion_id,
+        )
+    )
 
 
 def _to_detalle_out(d: DetalleDevolucion, db: Session) -> DetalleDevolucionOut:
@@ -135,9 +254,12 @@ def listar_devoluciones(
     estado: str | None = Query(default=None),
     venta_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _empleado: Usuario = Depends(require_permiso("CU11")),
+    empleado: Usuario = Depends(require_permiso("CU11")),
 ) -> list[DevolucionAdminOut]:
     query = _query_devolucion(db)
+    restringida = sucursal_restringida(empleado)
+    if restringida is not None:
+        query = query.join(Venta, Venta.id == Devolucion.venta_id).filter(Venta.sucursal_id == restringida)
     if estado:
         query = query.filter(Devolucion.estado == estado)
     if venta_id:
@@ -150,11 +272,12 @@ def listar_devoluciones(
 def obtener_devolucion(
     devolucion_id: int,
     db: Session = Depends(get_db),
-    _empleado: Usuario = Depends(require_permiso("CU11")),
+    empleado: Usuario = Depends(require_permiso("CU11")),
 ) -> DevolucionAdminOut:
     dev = _query_devolucion(db).filter(Devolucion.id == devolucion_id).first()
     if dev is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Devolucion no encontrada.")
+    verificar_acceso_sucursal(empleado, dev.venta.sucursal_id)
     return _to_admin_out(dev, db)
 
 
@@ -171,82 +294,22 @@ def solicitar_devolucion_cliente(
     de realizada la compra."""
     cliente = _get_cliente_o_403(db, usuario)
 
-    venta = (
-        db.query(Venta)
-        .options(
-            joinedload(Venta.sucursal),
-            joinedload(Venta.cliente),
-            joinedload(Venta.pago),
-            joinedload(Venta.devoluciones),
-            joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.producto),
-            joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.talla),
-            joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.color),
-            joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.producto),
-            joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.talla),
-            joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.color),
-        )
-        .filter(Venta.id == venta_id, Venta.cliente_id == cliente.id)
-        .first()
-    )
+    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id, Venta.cliente_id == cliente.id).first()
     if venta is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada.")
 
     if venta.estado != "pagada":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Solo se pueden solicitar devoluciones de compras pagadas.")
 
-    # Validar plazo maximo de 24 horas
-    ahora = datetime.utcnow()
-    horas_transcurridas = (ahora - venta.fecha).total_seconds() / 3600.0 if venta.fecha else 999.0
-    if horas_transcurridas > 24.0:
+    horas_transcurridas = (datetime.utcnow() - venta.fecha).total_seconds() / 3600.0 if venta.fecha else 999.0
+    if horas_transcurridas > PLAZO_DEVOLUCION_HORAS:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "El plazo maximo de 24 horas para solicitar una devolucion ha vencido.",
         )
 
-    # Validar que no tenga devolucion activa o completada
-    devs_activas = [d for d in venta.devoluciones if d.estado in ("solicitada", "aprobada", "completada")]
-    if devs_activas:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            f"Esta compra ya cuenta con una devolucion en estado '{devs_activas[-1].estado}'.",
-        )
-
-    detalles_venta = getattr(venta, "detalles", [])
-    ids_detalles = {d.id for d in detalles_venta}
-
-    monto_total = Decimal("0")
-    detalles_devolucion = []
-    for item_in in payload.items:
-        if item_in.item_linea_id not in ids_detalles:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"El item {item_in.item_linea_id} no pertenece a esta compra.",
-            )
-        detalle_original = next(d for d in detalles_venta if d.id == item_in.item_linea_id)
-        if item_in.cantidad_devuelta > detalle_original.cantidad:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f'No puedes devolver {item_in.cantidad_devuelta} unidades de "{detalle_original.producto.nombre}" '
-                f"({detalle_original.talla.codigo}, {detalle_original.color.nombre}) — "
-                f"solo compraste {detalle_original.cantidad}.",
-            )
-        precio = _precio_unitario_desde_item(db, item_in.item_linea_id)
-        monto_total += precio * item_in.cantidad_devuelta
-        detalles_devolucion.append(
-            DetalleDevolucion(
-                item_linea_id=item_in.item_linea_id,
-                cantidad_devuelta=item_in.cantidad_devuelta,
-            )
-        )
-
-    if payload.tipo == "total":
-        for det in detalles_venta:
-            match = next((d for d in payload.items if d.item_linea_id == det.id), None)
-            if match is None or match.cantidad_devuelta != det.cantidad:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    "Una devolucion total debe incluir todos los items con sus cantidades completas.",
-                )
+    _rechazar_si_hay_devolucion_vigente(venta)
+    monto_total, detalles_devolucion = _armar_detalles(db, venta, payload)
 
     devolucion = Devolucion(
         venta_id=venta_id,
@@ -260,27 +323,22 @@ def solicitar_devolucion_cliente(
         detalles=detalles_devolucion,
     )
     db.add(devolucion)
+    db.flush()
+    _notificar(
+        db,
+        cliente.id,
+        "devolucion_solicitada",
+        f"Has solicitado una devolucion {payload.tipo} para tu compra #{venta_id} "
+        f"por {monto_total} Bs. Nuestro personal la revisara a la brevedad.",
+        devolucion.id,
+    )
     db.commit()
-    db.refresh(devolucion)
 
     log_bitacora(
         db, usuario, "CREAR", "devolucion", devolucion.id,
         f"Cliente #{cliente.id} solicito devolucion {payload.tipo} para compra #{venta_id} por {monto_total} Bs (plazo 24h)",
         request,
     )
-
-    db.add(Notificacion(
-        cliente_id=cliente.id,
-        canal="sistema",
-        tipo_evento="devolucion_solicitada",
-        mensaje=f"Has solicitado una devolucion {payload.tipo} para tu compra #{venta_id} "
-                f"por {monto_total} Bs. Nuestro personal la revisara a la brevedad.",
-        estado="enviada",
-        leida=False,
-        entidad_tipo="devolucion",
-        entidad_id=devolucion.id,
-    ))
-    db.commit()
 
     dev = _query_devolucion(db).filter(Devolucion.id == devolucion.id).first()
     return _to_out(dev, db)
@@ -297,68 +355,21 @@ def registrar_devolucion(
     """Registra una devolucion para una venta pagada. El empleado selecciona
     los items y cantidades a devolver. La devolucion queda en estado
     'solicitada' hasta que se complete (se aprueba y reingresa el stock en
-    un solo paso, ver completar_devolucion)."""
+    un solo paso, ver completar_devolucion). El plazo de 24h es una regla
+    para la solicitud del cliente; el staff puede registrar una fuera de
+    plazo (ej. producto con defecto), pero tampoco puede abrir una segunda
+    devolucion sobre la misma venta."""
     empleado = _get_empleado_o_403(db, usuario)
 
-    venta = (
-        db.query(Venta)
-        .options(
-            joinedload(Venta.sucursal),
-            joinedload(Venta.cliente),
-            joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.producto),
-            joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.talla),
-            joinedload(VentaDigital.detalles).joinedload(DetalleVentaDigital.color),
-            joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.producto),
-            joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.talla),
-            joinedload(VentaPresencial.detalles).joinedload(DetalleVentaPresencial.color),
-        )
-        .filter(Venta.id == venta_id)
-        .first()
-    )
+    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
     if venta is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
-    if venta.estado not in ("pagada",):
+    verificar_acceso_sucursal(usuario, venta.sucursal_id)
+    if venta.estado != "pagada":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Solo se pueden devolver ventas pagadas.")
 
-    # Validar que todos los items existen y pertenecen a esta venta
-    detalles_venta = getattr(venta, "detalles", [])
-    ids_detalles = {d.id for d in detalles_venta}
-
-    monto_total = Decimal("0")
-    detalles_devolucion = []
-    for item_in in payload.items:
-        if item_in.item_linea_id not in ids_detalles:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"El item {item_in.item_linea_id} no pertenece a esta venta.",
-            )
-        # Verificar que no se devuelva mas de lo comprado
-        detalle_original = next(d for d in detalles_venta if d.id == item_in.item_linea_id)
-        if item_in.cantidad_devuelta > detalle_original.cantidad:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f'No puedes devolver {item_in.cantidad_devuelta} unidades de "{detalle_original.producto.nombre}" '
-                f"({detalle_original.talla.codigo}, {detalle_original.color.nombre}) — "
-                f"solo se compraron {detalle_original.cantidad}.",
-            )
-        precio = _precio_unitario_desde_item(db, item_in.item_linea_id)
-        monto_total += precio * item_in.cantidad_devuelta
-        detalles_devolucion.append(
-            DetalleDevolucion(
-                item_linea_id=item_in.item_linea_id,
-                cantidad_devuelta=item_in.cantidad_devuelta,
-            )
-        )
-
-    # Si es devolucion total, verificar que se devuelven TODOS los items completos
-    if payload.tipo == "total":
-        for det in detalles_venta:
-            match = next((d for d in payload.items if d.item_linea_id == det.id), None)
-            if match is None or match.cantidad_devuelta != det.cantidad:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    "Una devolucion total debe incluir todos los items con sus cantidades completas.",
-                )
+    _rechazar_si_hay_devolucion_vigente(venta)
+    monto_total, detalles_devolucion = _armar_detalles(db, venta, payload)
 
     devolucion = Devolucion(
         venta_id=venta_id,
@@ -372,28 +383,22 @@ def registrar_devolucion(
         detalles=detalles_devolucion,
     )
     db.add(devolucion)
+    db.flush()
+    _notificar(
+        db,
+        venta.cliente_id,
+        "devolucion_registrada",
+        f"Se ha registrado una devolucion {payload.tipo} para tu compra #{venta_id} "
+        f"por {monto_total} Bs. Te avisaremos cuando se procese.",
+        devolucion.id,
+    )
     db.commit()
-    db.refresh(devolucion)
 
     log_bitacora(
         db, usuario, "CREAR", "devolucion", devolucion.id,
         f"Devolucion {payload.tipo} registrada para venta #{venta_id} por {monto_total} Bs",
         request,
     )
-
-    # Notificar al cliente
-    db.add(Notificacion(
-        cliente_id=venta.cliente_id,
-        canal="sistema",
-        tipo_evento="devolucion_registrada",
-        mensaje=f"Se ha registrado una devolucion {payload.tipo} para tu compra #{venta_id} "
-                f"por {monto_total} Bs. Te avisaremos cuando se procese.",
-        estado="enviada",
-        leida=False,
-        entidad_tipo="devolucion",
-        entidad_id=devolucion.id,
-    ))
-    db.commit()
 
     dev = _query_devolucion(db).filter(Devolucion.id == devolucion.id).first()
     return _to_admin_out(dev, db)
@@ -411,54 +416,52 @@ def completar_devolucion(
     queda como 'devuelto'; si se devuelve parcialmente, 'devuelto_parcial'."""
     empleado = _get_empleado_o_403(db, usuario)
 
-    dev = _query_devolucion(db).filter(Devolucion.id == devolucion_id).first()
-    if dev is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Devolucion no encontrada.")
+    dev = _get_devolucion_bloqueada(db, devolucion_id)
+    verificar_acceso_sucursal(usuario, dev.venta.sucursal_id)
     if dev.estado != "solicitada":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta devolucion ya fue procesada.")
 
     venta = dev.venta
     sucursal_id = venta.sucursal_id
 
-    # Reingresar stock al inventario
+    # Reingresar stock al inventario. Si la combinacion ya no tiene fila en
+    # esa sucursal (ej. se borro del inventario), se crea: antes el stock
+    # devuelto simplemente se perdia sin aviso.
     for detalle in dev.detalles:
         item = detalle.item_linea
-        inventario = (
-            db.query(Inventario)
-            .filter(
-                Inventario.producto_id == item.producto_id,
-                Inventario.talla_id == item.talla_id,
-                Inventario.color_id == item.color_id,
-                Inventario.sucursal_id == sucursal_id,
+        inventario = _inventario_de(db, item, sucursal_id)
+        if inventario is None:
+            inventario = Inventario(
+                producto_id=item.producto_id,
+                talla_id=item.talla_id,
+                color_id=item.color_id,
+                sucursal_id=sucursal_id,
+                cantidad=0,
             )
-            .first()
-        )
-        if inventario is not None:
-            inventario.cantidad += detalle.cantidad_devuelta
+            db.add(inventario)
             db.flush()
-            db.execute(
-                text(
-                    "INSERT INTO movimiento_inventario "
-                    "(inventario_id, empleado_id, tipo, cantidad, fecha, documento_referencia) "
-                    "VALUES (:inv_id, :emp_id, 'entrada', :cant, now(), :doc)"
-                ),
-                {
-                    "inv_id": inventario.id,
-                    "emp_id": empleado.id,
-                    "cant": detalle.cantidad_devuelta,
-                    "doc": f"Devolucion #{dev.id} de venta #{venta.id}",
-                },
-            )
+        inventario.cantidad += detalle.cantidad_devuelta
+        db.flush()
+        _registrar_movimiento(
+            db, inventario.id, empleado.id, "entrada", detalle.cantidad_devuelta,
+            f"Devolucion #{dev.id} de venta #{venta.id}",
+        )
 
-    # Actualizar estado de la devolucion
     dev.empleado_id = empleado.id
     dev.estado = "completada"
     dev.fecha_resolucion = datetime.utcnow()
 
-    # Actualizar estado de la venta
     nuevo_estado = "devuelto" if dev.tipo == "total" else "devuelto_parcial"
     venta.estado = nuevo_estado
 
+    _notificar(
+        db,
+        venta.cliente_id,
+        "devolucion_completada",
+        f"Tu devolucion para la compra #{venta.id} fue aprobada. "
+        f"Se te reembolsaran {dev.monto_reembolso} Bs via {dev.metodo_reembolso.replace('_', ' ')}.",
+        dev.id,
+    )
     db.commit()
 
     log_bitacora(
@@ -466,20 +469,6 @@ def completar_devolucion(
         f"Devolucion #{dev.id} completada — stock reingresado, venta #{venta.id} marcada como {nuevo_estado}",
         request,
     )
-
-    # Notificar al cliente
-    db.add(Notificacion(
-        cliente_id=venta.cliente_id,
-        canal="sistema",
-        tipo_evento="devolucion_completada",
-        mensaje=f"Tu devolucion para la compra #{venta.id} fue aprobada. "
-                f"Se te reembolsaran {dev.monto_reembolso} Bs via {dev.metodo_reembolso.replace('_', ' ')}.",
-        estado="enviada",
-        leida=False,
-        entidad_tipo="devolucion",
-        entidad_id=dev.id,
-    ))
-    db.commit()
 
     dev = _query_devolucion(db).filter(Devolucion.id == dev.id).first()
     return _to_admin_out(dev, db)
@@ -496,15 +485,21 @@ def rechazar_devolucion(
     de la venta."""
     empleado = _get_empleado_o_403(db, usuario)
 
-    dev = _query_devolucion(db).filter(Devolucion.id == devolucion_id).first()
-    if dev is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Devolucion no encontrada.")
+    dev = _get_devolucion_bloqueada(db, devolucion_id)
+    verificar_acceso_sucursal(usuario, dev.venta.sucursal_id)
     if dev.estado != "solicitada":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta devolucion ya fue procesada.")
 
     dev.empleado_id = empleado.id
     dev.estado = "rechazada"
     dev.fecha_resolucion = datetime.utcnow()
+    _notificar(
+        db,
+        dev.venta.cliente_id,
+        "devolucion_rechazada",
+        f"Tu solicitud de devolucion para la compra #{dev.venta_id} fue rechazada.",
+        dev.id,
+    )
     db.commit()
 
     log_bitacora(
@@ -512,19 +507,6 @@ def rechazar_devolucion(
         f"Devolucion #{dev.id} rechazada para venta #{dev.venta_id}",
         request,
     )
-
-    # Notificar al cliente
-    db.add(Notificacion(
-        cliente_id=dev.venta.cliente_id,
-        canal="sistema",
-        tipo_evento="devolucion_rechazada",
-        mensaje=f"Tu solicitud de devolucion para la compra #{dev.venta_id} fue rechazada.",
-        estado="enviada",
-        leida=False,
-        entidad_tipo="devolucion",
-        entidad_id=dev.id,
-    ))
-    db.commit()
 
     dev = _query_devolucion(db).filter(Devolucion.id == dev.id).first()
     return _to_admin_out(dev, db)
@@ -539,49 +521,39 @@ def eliminar_devolucion(
 ):
     """Elimina una devolucion. Si la devolucion estaba completada, se revierte
     el reingreso de stock en el inventario y se restaura el estado de la venta
-    a 'pagada'. Registra la accion en la bitacora."""
+    a 'pagada'. Solo Administrador o Encargado (el Cajero no borra registros
+    financieros). Registra la accion en la bitacora."""
+    require_encargado_o_admin(usuario)
     empleado = _get_empleado_o_403(db, usuario)
 
-    dev = _query_devolucion(db).filter(Devolucion.id == devolucion_id).first()
-    if dev is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Devolucion no encontrada.")
+    dev = _get_devolucion_bloqueada(db, devolucion_id)
+    verificar_acceso_sucursal(usuario, dev.venta.sucursal_id)
 
     venta = dev.venta
     estado_previo = dev.estado
 
-    # Si estaba completada, revertir el reingreso de stock en la sucursal de la venta
+    # Si estaba completada, revertir el reingreso de stock en la sucursal de
+    # la venta. Si esas unidades ya se volvieron a vender, no alcanza el
+    # stock para revertir: antes se recortaba a 0 en silencio (descuadrando
+    # el inventario); ahora se rechaza.
     if estado_previo == "completada":
-        sucursal_id = venta.sucursal_id
         for detalle in dev.detalles:
             item = detalle.item_linea
-            inventario = (
-                db.query(Inventario)
-                .filter(
-                    Inventario.producto_id == item.producto_id,
-                    Inventario.talla_id == item.talla_id,
-                    Inventario.color_id == item.color_id,
-                    Inventario.sucursal_id == sucursal_id,
+            inventario = _inventario_de(db, item, venta.sucursal_id)
+            if inventario is None or inventario.cantidad < detalle.cantidad_devuelta:
+                db.rollback()
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f'No se puede revertir: el stock devuelto de "{item.producto.nombre}" '
+                    f"({item.talla.codigo}, {item.color.nombre}) ya no esta disponible en la sucursal.",
                 )
-                .first()
+            inventario.cantidad -= detalle.cantidad_devuelta
+            db.flush()
+            _registrar_movimiento(
+                db, inventario.id, empleado.id, "salida", detalle.cantidad_devuelta,
+                f"Reversion Devolucion #{dev.id} de venta #{venta.id}",
             )
-            if inventario is not None:
-                inventario.cantidad = max(0, inventario.cantidad - detalle.cantidad_devuelta)
-                db.flush()
-                db.execute(
-                    text(
-                        "INSERT INTO movimiento_inventario "
-                        "(inventario_id, empleado_id, tipo, cantidad, fecha, documento_referencia) "
-                        "VALUES (:inv_id, :emp_id, 'salida', :cant, now(), :doc)"
-                    ),
-                    {
-                        "inv_id": inventario.id,
-                        "emp_id": empleado.id,
-                        "cant": detalle.cantidad_devuelta,
-                        "doc": f"Reversion Devolucion #{dev.id} de venta #{venta.id}",
-                    },
-                )
 
-        # Restaurar venta a 'pagada' si no existen otras devoluciones completadas
         otras_completadas = (
             db.query(Devolucion)
             .filter(
@@ -608,4 +580,3 @@ def eliminar_devolucion(
     )
 
     return {"message": f"Devolucion #{devolucion_id} eliminada exitosamente."}
-

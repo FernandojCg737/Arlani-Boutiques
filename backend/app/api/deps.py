@@ -100,6 +100,31 @@ def require_administrador(usuario: Usuario = Depends(require_staff)) -> Usuario:
     return usuario
 
 
+def sucursal_restringida(usuario: Usuario) -> int | None:
+    """Sucursal a la que queda limitado un empleado, o None si puede operar
+    sobre todas. El Administrador ve todo; Encargado y Cajero solo su propia
+    sucursal (asi un cajero de la sucursal A no aprueba, edita ni borra
+    ventas/devoluciones/reservas de la sucursal B)."""
+    if usuario.tipo == "administrador":
+        return None
+    return getattr(usuario, "sucursal_id", None)
+
+
+def verificar_acceso_sucursal(usuario: Usuario, sucursal_id: int | None) -> None:
+    restringida = sucursal_restringida(usuario)
+    if restringida is not None and restringida != sucursal_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo puedes operar sobre tu propia sucursal.")
+
+
+def require_encargado_o_admin(usuario: Usuario) -> None:
+    """Acciones destructivas (borrar ventas/devoluciones) quedan fuera del
+    alcance del Cajero aunque su rol tenga el permiso del CU."""
+    if usuario.tipo not in ("administrador", "encargado_sucursal"):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Solo el Administrador o el Encargado de Sucursal pueden eliminar registros."
+        )
+
+
 def require_permiso(*codigos: str) -> Callable[[Usuario], Usuario]:
     # Administrador es superusuario por diseno: no depende de la tabla
     # rol_permiso, para que nunca pueda quedar sin acceso al panel por un

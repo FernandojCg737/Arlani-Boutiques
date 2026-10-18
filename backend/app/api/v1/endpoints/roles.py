@@ -44,6 +44,17 @@ def actualizar_permisos_rol(
     if rol is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Rol no encontrado.")
 
+    # Un no-admin con CU02 no puede escalar privilegios: ni editar su propio
+    # rol, ni otorgar permisos que el mismo no tiene.
+    if admin.tipo != "administrador":
+        if admin.rol_id == rol_id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No puedes modificar los permisos de tu propio rol.")
+        propios = {p.id for p in admin.rol.permisos} if admin.rol else set()
+        actuales = {p.id for p in rol.permisos}
+        agregados = set(payload.permiso_ids) - actuales
+        if not agregados <= propios:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No puedes otorgar permisos que tu rol no tiene.")
+
     db.execute(
         text("SELECT sp_reemplazar_permisos_rol(:rol_id, :permiso_ids)"),
         {"rol_id": rol_id, "permiso_ids": payload.permiso_ids},

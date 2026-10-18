@@ -20,6 +20,7 @@ from app.core.decart import (
     enviar_trabajo_foto_ar,
     obtener_resultado_trabajo_foto,
 )
+from app.core.security import create_ar_job_token, decode_ar_job_token
 from app.core.storage import (
     MAX_IMAGE_BYTES,
     delete_prenda_ar_imagen,
@@ -363,14 +364,31 @@ async def crear_ar_foto(
 
     job_id = enviar_trabajo_foto_ar(content, imagen_url, construir_prompt_ar(producto))
     _registrar_uso_ar(db, usuario, producto_id, "virtual")
-    return ArFotoTrabajoOut(job_id=job_id)
+    # El cliente nunca ve el job_id real de Decart: recibe un token firmado
+    # que lo envuelve junto con su usuario (ver create_ar_job_token). Para
+    # el frontend sigue siendo un "job_id" opaco, asi que no cambia nada ahi.
+    return ArFotoTrabajoOut(job_id=create_ar_job_token(job_id, usuario.id))
+
+
+def _job_id_real(job_token: str) -> tuple[str, int]:
+    datos = decode_ar_job_token(job_token)
+    if datos is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "El resultado no existe o ya vencio.")
+    return datos
 
 
 @router.get("/ar-foto/{job_id}", response_model=ArFotoEstadoOut)
-def estado_ar_foto(job_id: str) -> ArFotoEstadoOut:
+def estado_ar_foto(
+    job_id: str,
+    usuario: Usuario = Depends(require_permiso_cliente("CU09")),
+) -> ArFotoEstadoOut:
     """Estado del trabajo en cola (modo VIRTUAL). El frontend hace polling
-    a este endpoint hasta que "listo" sea true, y ahi pide el resultado."""
-    datos = consultar_estado_trabajo_foto(job_id)
+    a este endpoint hasta que "listo" sea true, y ahi pide el resultado.
+    Solo lo consulta quien creo el trabajo."""
+    job_real, duenio_id = _job_id_real(job_id)
+    if duenio_id != usuario.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "El resultado no existe o ya vencio.")
+    datos = consultar_estado_trabajo_foto(job_real)
     estado = str(datos.get("status", "desconocido"))
     return ArFotoEstadoOut(
         estado=estado,
@@ -381,8 +399,12 @@ def estado_ar_foto(job_id: str) -> ArFotoEstadoOut:
 
 @router.get("/ar-foto/{job_id}/resultado")
 def resultado_ar_foto(job_id: str) -> Response:
-    contenido, content_type = obtener_resultado_trabajo_foto(job_id)
-    return Response(content=contenido, media_type=content_type)
+    """Sin header de Authorization a proposito: lo carga un <img src> (web)
+    o Image.network (movil). La proteccion es el token firmado del path:
+    solo lo tiene quien creo el trabajo, y vence a los 30 minutos."""
+    job_real, _ = _job_id_real(job_id)
+    contenido, content_type = obtener_resultado_trabajo_foto(job_real)
+    return Response(content=contenido, media_type=content_type, headers={"Cache-Control": "private, no-store"})
 
 
 @router.get("", response_model=list[ProductoOut])

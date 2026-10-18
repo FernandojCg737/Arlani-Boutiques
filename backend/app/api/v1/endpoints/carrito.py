@@ -39,7 +39,11 @@ def _get_carrito_activo(db: Session, cliente_id: int) -> Carrito:
 
 
 def _to_detalle_out(d: DetalleCarrito) -> DetalleCarritoOut:
-    subtotal = d.precio_unitario * d.cantidad
+    # Precio VIGENTE del producto, no el guardado al agregarlo: es el que
+    # usan el checkout (orden de PayPal) y sp_crear_venta_digital_* al
+    # cobrar, asi que el total que ve el cliente es el que se le cobra.
+    precio = d.producto.precio
+    subtotal = precio * d.cantidad
     return DetalleCarritoOut(
         id=d.id,
         producto_id=d.producto_id,
@@ -52,7 +56,7 @@ def _to_detalle_out(d: DetalleCarrito) -> DetalleCarritoOut:
         sucursal_id=d.sucursal_id,
         sucursal_nombre=d.sucursal.nombre,
         cantidad=d.cantidad,
-        precio_unitario=d.precio_unitario,
+        precio_unitario=precio,
         subtotal=subtotal,
     )
 
@@ -110,13 +114,24 @@ def agregar_item(
         )
         .first()
     )
-    if inventario is None or inventario.cantidad < payload.cantidad:
+    carrito = _get_carrito_activo(db, cliente.id)
+
+    # sp_agregar_item_carrito SUMA a la linea existente si ya esta la misma
+    # combinacion: el stock se valida contra el total resultante, no solo
+    # contra lo que se agrega ahora.
+    ya_en_carrito = sum(
+        d.cantidad
+        for d in carrito.detalles
+        if (d.producto_id, d.talla_id, d.color_id, d.sucursal_id)
+        == (payload.producto_id, payload.talla_id, payload.color_id, payload.sucursal_id)
+    )
+    if inventario is None or inventario.cantidad < ya_en_carrito + payload.cantidad:
+        disponible = inventario.cantidad if inventario else 0
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            f'No hay suficiente stock de "{producto.nombre}" ({talla.codigo}, {color.nombre}) en {sucursal.nombre}.',
+            f'No hay suficiente stock de "{producto.nombre}" ({talla.codigo}, {color.nombre}) en {sucursal.nombre}'
+            + (f" (ya tienes {ya_en_carrito} en tu carrito, quedan {disponible})." if ya_en_carrito else "."),
         )
-
-    carrito = _get_carrito_activo(db, cliente.id)
 
     # sp_agregar_item_carrito ya resuelve el "sumar si es la misma
     # combinacion producto/talla/color/sucursal" (UX estandar de carrito).

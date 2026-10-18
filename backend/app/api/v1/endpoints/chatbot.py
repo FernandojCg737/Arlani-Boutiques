@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_permiso, require_permiso_cliente
 from app.core.gemini import generar_respuesta_chat
+from app.core.rate_limit import verificar_limite
 from app.db.session import get_db
 from app.models import Chatbot, ChatbotMensaje, Cliente, Usuario
 from app.schemas.chatbot import ChatbotUsuarioOut, MensajeIn, MensajeOut
@@ -143,18 +144,25 @@ def enviar_mensaje(
     usuario: Usuario = Depends(require_permiso_cliente("CU19")),
 ) -> MensajeOut:
     cliente = _get_cliente_o_403(db, usuario)
+    # Cada mensaje es una llamada paga a Gemini: tope por cliente para que
+    # un script no dispare la factura.
+    verificar_limite("chatbot-min", str(cliente.id), maximo=15, segundos=60)
+    verificar_limite("chatbot-dia", str(cliente.id), maximo=300, segundos=86_400)
     sesion = _get_or_create_sesion(db, cliente.id)
 
     db.add(ChatbotMensaje(chatbot_id=sesion.id, remitente="cliente", mensaje=payload.mensaje))
     db.commit()
 
-    historial = [
-        (m.remitente, m.mensaje)
-        for m in db.query(ChatbotMensaje)
+    # Solo los ultimos mensajes (Gemini usa los 10 previos al actual): antes
+    # se cargaba la conversacion entera en cada mensaje.
+    ultimos = (
+        db.query(ChatbotMensaje)
         .filter(ChatbotMensaje.chatbot_id == sesion.id)
-        .order_by(ChatbotMensaje.fecha)
+        .order_by(ChatbotMensaje.fecha.desc(), ChatbotMensaje.id.desc())
+        .limit(11)
         .all()
-    ][:-1]
+    )
+    historial = [(m.remitente, m.mensaje) for m in reversed(ultimos)][:-1]
 
     contexto = _construir_contexto(db, payload.mensaje)
     respuesta = generar_respuesta_chat(historial, contexto, payload.mensaje)

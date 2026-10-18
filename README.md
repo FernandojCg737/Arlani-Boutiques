@@ -51,6 +51,15 @@ copy .env.example .env   # y apuntar POSTGRES_HOST a localhost si Postgres corre
 uvicorn app.main:app --reload
 ```
 
+### Pruebas (pytest)
+
+Con el stack levantado (las de integracion usan la base local; el envio de correos se intercepta, no sale ninguno):
+
+```bash
+docker compose exec backend pip install -r requirements-dev.txt
+docker compose exec backend pytest
+```
+
 ### Migraciones (Alembic)
 
 ```bash

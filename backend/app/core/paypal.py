@@ -80,6 +80,49 @@ def crear_orden(
     return resp.json()
 
 
+def obtener_orden(order_id: str) -> dict:
+    """Detalle de una orden (sin cobrar nada): se usa ANTES de capturar para
+    confirmar que la orden es de este carrito y por el monto vigente -- si
+    no, el cliente podria crear una orden barata, agregar mas cosas al
+    carrito y recien despues aprobar/capturar."""
+    token = _obtener_token_acceso()
+    resp = requests.get(
+        f"{_paypal_base_url()}/v2/checkout/orders/{order_id}",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        timeout=15,
+    )
+    if resp.status_code == 404:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La orden de PayPal no existe.")
+    if not resp.ok:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "No se pudo consultar la orden en PayPal.")
+    return resp.json()
+
+
+def reembolsar_captura(capture_id: str) -> bool:
+    """Devuelve el cobro completo de una captura. Se usa como compensacion
+    si PayPal ya cobro pero la venta no se pudo guardar. Best effort: si
+    falla, queda en el log para resolverlo a mano."""
+    try:
+        token = _obtener_token_acceso()
+        resp = requests.post(
+            f"{_paypal_base_url()}/v2/payments/captures/{capture_id}/refund",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={},
+            timeout=15,
+        )
+        return resp.ok
+    except Exception:
+        return False
+
+
+def captura_de(resultado: dict) -> dict | None:
+    """Primera captura de una orden capturada (id, amount, status)."""
+    try:
+        return resultado["purchase_units"][0]["payments"]["captures"][0]
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
 def capturar_orden(order_id: str) -> dict:
     """Confirma (cobra) una orden que el cliente ya aprobo en el checkout de
     PayPal. Si nunca la aprobo o la orden no existe, PayPal responde con

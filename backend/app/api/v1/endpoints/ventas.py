@@ -1,14 +1,29 @@
 from datetime import datetime
 import json
-from decimal import Decimal
+import logging
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_user, require_permiso, require_permiso_cliente
+from app.api.deps import (
+    require_encargado_o_admin,
+    require_permiso,
+    require_permiso_cliente,
+    sucursal_restringida,
+    verificar_acceso_sucursal,
+)
 from app.core.audit import log_bitacora
-from app.core.paypal import capturar_orden, crear_orden
+from app.core.paypal import (
+    PAYPAL_CURRENCY,
+    captura_de,
+    capturar_orden,
+    crear_orden,
+    obtener_orden,
+    reembolsar_captura,
+)
 from app.core.storage import upload_comprobante_pago
 from app.db.session import get_db
 from app.models import (
@@ -42,6 +57,27 @@ from app.schemas.ventas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Mensajes de las RAISE EXCEPTION de las funciones sp_* que tienen sentido
+# para el usuario (el resto se responde como error generico).
+_ERRORES_SP = {
+    "stock_insuficiente": "No hay suficiente stock para completar la operacion. Revisa las cantidades.",
+    "producto_no_encontrado": "Uno de los productos ya no existe.",
+    "venta_no_encontrada": "Venta no encontrada.",
+    "pago_no_pendiente": "Esta venta no tiene un pago QR pendiente de verificacion.",
+}
+
+
+def _error_sp(exc: DBAPIError) -> HTTPException:
+    mensaje = str(getattr(exc, "orig", exc))
+    for codigo, texto in _ERRORES_SP.items():
+        if codigo in mensaje:
+            return HTTPException(status.HTTP_400_BAD_REQUEST, texto)
+    if "ck_inventario_cantidad_no_negativa" in mensaje:
+        return HTTPException(status.HTTP_400_BAD_REQUEST, _ERRORES_SP["stock_insuficiente"])
+    logger.exception("Error inesperado de la base de datos en ventas")
+    return HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo completar la operacion.")
 
 
 def _get_cliente_o_403(db: Session, usuario: Usuario) -> Cliente:
@@ -76,7 +112,11 @@ def _get_carrito_activo_no_vacio(db: Session, cliente_id: int) -> Carrito:
 
 
 def _calcular_total(carrito: Carrito) -> Decimal:
-    return sum((d.precio_unitario * d.cantidad for d in carrito.detalles), Decimal("0"))
+    """Total con el precio VIGENTE de cada producto -- el mismo que usan
+    sp_crear_venta_digital_* para registrar la venta. Si se usara el precio
+    guardado al agregar al carrito, un cambio de precio en el medio haria
+    que PayPal cobre un monto y la venta quede registrada con otro."""
+    return sum((d.producto.precio * d.cantidad for d in carrito.detalles), Decimal("0")).quantize(Decimal("0.01"))
 
 
 def _agrupar_por_sucursal(detalles: list["DetalleCarrito"]) -> dict[int, list["DetalleCarrito"]]:
@@ -105,6 +145,25 @@ def _items_json(items) -> str:
             for i in items
         ]
     )
+
+
+def _monto_coincide(amount: dict | None, total: Decimal) -> bool:
+    if not amount or amount.get("currency_code") != PAYPAL_CURRENCY:
+        return False
+    try:
+        return Decimal(str(amount.get("value"))).quantize(Decimal("0.01")) == total
+    except (InvalidOperation, TypeError):
+        return False
+
+
+def _reembolsar_o_loguear(captura: dict, order_id: str, motivo: str) -> None:
+    capture_id = captura.get("id")
+    if capture_id and reembolsar_captura(capture_id):
+        logger.warning("Captura PayPal %s (orden %s) reembolsada: %s", capture_id, order_id, motivo)
+    else:
+        logger.error(
+            "REVISAR A MANO: no se pudo reembolsar la captura %s (orden %s) -- %s", capture_id, order_id, motivo
+        )
 
 
 def _verificar_stock_carrito(db: Session, carrito: Carrito) -> None:
@@ -298,29 +357,70 @@ def capturar_orden_paypal(
     cada una)."""
     cliente = _get_cliente_o_403(db, usuario)
     carrito = _get_carrito_activo_no_vacio(db, cliente.id)
+    total = _calcular_total(carrito)
 
     _verificar_stock_carrito(db, carrito)
 
-    resultado = capturar_orden(order_id)
-    if resultado.get("status") != "COMPLETED":
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayPal no confirmo el pago.")
-
-    venta_ids = []
-    for sucursal_id, detalles in _agrupar_por_sucursal(carrito.detalles).items():
-        result = db.execute(
-            text(
-                "SELECT sp_crear_venta_digital_paypal(:cliente_id, :sucursal_id, :carrito_id, CAST(:items AS JSONB), :referencia)"
-            ),
-            {
-                "cliente_id": cliente.id,
-                "sucursal_id": sucursal_id,
-                "carrito_id": carrito.id,
-                "items": _items_json(detalles),
-                "referencia": order_id,
-            },
+    # 1) Antes de cobrar: la orden tiene que ser de ESTE carrito y por el
+    # total vigente. Sin esto se podia crear la orden con un carrito barato,
+    # agregar productos y capturar -- se registraban ventas por todo el
+    # carrito pero PayPal cobraba solo el monto original.
+    orden = obtener_orden(order_id)
+    unidad = (orden.get("purchase_units") or [{}])[0]
+    if unidad.get("reference_id") != f"carrito-{carrito.id}" or not _monto_coincide(unidad.get("amount"), total):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Tu carrito cambio desde que iniciaste el pago. Vuelve a iniciar el pago con PayPal.",
         )
-        venta_ids.append(result.scalar_one())
-    db.commit()
+
+    # 2) Se registran las ventas SIN confirmar la transaccion: si falta stock
+    # (sp_* valida con FOR UPDATE) se aborta aca, antes de cobrar nada.
+    venta_ids = []
+    try:
+        for sucursal_id, detalles in _agrupar_por_sucursal(carrito.detalles).items():
+            result = db.execute(
+                text(
+                    "SELECT sp_crear_venta_digital_paypal(:cliente_id, :sucursal_id, :carrito_id, CAST(:items AS JSONB), :referencia)"
+                ),
+                {
+                    "cliente_id": cliente.id,
+                    "sucursal_id": sucursal_id,
+                    "carrito_id": carrito.id,
+                    "items": _items_json(detalles),
+                    "referencia": order_id,
+                },
+            )
+            venta_ids.append(result.scalar_one())
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
+
+    # 3) Recien ahora se cobra. Si PayPal falla, se deshacen las ventas.
+    try:
+        resultado = capturar_orden(order_id)
+    except HTTPException:
+        db.rollback()
+        raise
+    captura = captura_de(resultado)
+    if resultado.get("status") != "COMPLETED" or captura is None:
+        db.rollback()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayPal no confirmo el pago.")
+    if not _monto_coincide(captura.get("amount"), total):
+        db.rollback()
+        _reembolsar_o_loguear(captura, order_id, "el monto cobrado no coincide con el carrito")
+        raise HTTPException(status.HTTP_409_CONFLICT, "El monto cobrado no coincide con tu carrito. Se revirtio el cobro.")
+
+    # 4) Confirmar. Si justo aca falla la base, el cobro ya ocurrio: se
+    # devuelve para no dejar un pago sin venta.
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        _reembolsar_o_loguear(captura, order_id, "no se pudo guardar la venta")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "No se pudo registrar tu compra. El cobro fue revertido; intenta de nuevo.",
+        )
 
     for venta_id in venta_ids:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta digital pagada con PayPal (orden {order_id})", request)
@@ -352,19 +452,23 @@ async def checkout_qr(
     comprobante_url = upload_comprobante_pago(cliente.id, content, file.content_type or "")
 
     venta_ids = []
-    for sucursal_id, detalles in _agrupar_por_sucursal(carrito.detalles).items():
-        result = db.execute(
-            text("SELECT sp_crear_venta_digital_qr(:cliente_id, :sucursal_id, :carrito_id, CAST(:items AS JSONB), :comprobante)"),
-            {
-                "cliente_id": cliente.id,
-                "sucursal_id": sucursal_id,
-                "carrito_id": carrito.id,
-                "items": _items_json(detalles),
-                "comprobante": comprobante_url,
-            },
-        )
-        venta_ids.append(result.scalar_one())
-    db.commit()
+    try:
+        for sucursal_id, detalles in _agrupar_por_sucursal(carrito.detalles).items():
+            result = db.execute(
+                text("SELECT sp_crear_venta_digital_qr(:cliente_id, :sucursal_id, :carrito_id, CAST(:items AS JSONB), :comprobante)"),
+                {
+                    "cliente_id": cliente.id,
+                    "sucursal_id": sucursal_id,
+                    "carrito_id": carrito.id,
+                    "items": _items_json(detalles),
+                    "comprobante": comprobante_url,
+                },
+            )
+            venta_ids.append(result.scalar_one())
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
 
     for venta_id in venta_ids:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, "Venta digital con comprobante QR pendiente de verificacion", request)
@@ -411,10 +515,22 @@ def mi_venta_detalle(
 # CU11 "Gestion de Ventas": panel financiero de staff -- reune las ventas
 # digitales (PayPal y QR) y las de mostrador en un solo lugar, deja aprobar
 # o rechazar los comprobantes QR pendientes, y permite registrar una venta
-# presencial en efectivo. Se usa el permiso CU14 (Registrar Venta
-# Presencial) porque ya lo tienen exactamente Administrador/Encargado/Cajero,
-# y CU11 (Atender Reservas en Sucursal) porque asi esta etiquetado el item
-# del menu -- ver la migracion que le otorga CU11 tambien al Cajero.
+# presencial en efectivo. Permiso CU11 ("Gestion de Ventas" despues de la
+# renumeracion de a1c5f7e93d02 -- antes era CU14, que ahora es "Enviar
+# Notificaciones" y por eso ya no se acepta aca). Encargado y Cajero solo
+# operan sobre ventas de SU sucursal (ver deps.sucursal_restringida).
+
+
+def _get_venta_staff_o_404(db: Session, usuario: Usuario, venta_id: int) -> Venta:
+    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
+    if venta is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
+    verificar_acceso_sucursal(usuario, venta.sucursal_id)
+    return venta
+
+
+def _tiene_devoluciones_vigentes(venta: Venta) -> bool:
+    return any(d.estado != "rechazada" for d in venta.devoluciones)
 
 
 @router.get("", response_model=VentaPage)
@@ -426,11 +542,14 @@ def listar_ventas(
     estado_pago: str | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _empleado: Usuario = Depends(require_permiso("CU11", "CU14")),
+    empleado: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaPage:
     query = _query_venta_con_detalles(db)
     if tipo:
         query = query.filter(Venta.tipo == tipo)
+    restringida = sucursal_restringida(empleado)
+    if restringida is not None:
+        query = query.filter(Venta.sucursal_id == restringida)
     if sucursal_id:
         query = query.filter(Venta.sucursal_id == sucursal_id)
     if metodo or estado_pago:
@@ -449,14 +568,12 @@ def listar_ventas(
 def obtener_venta(
     venta_id: int,
     db: Session = Depends(get_db),
-    _empleado: Usuario = Depends(require_permiso("CU11", "CU14")),
+    empleado: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaAdminOut:
-    """Detalle de cualquier venta (no solo las propias) -- usado por la
-    pantalla de factura/comprobante que ve el staff desde el panel de
-    Gestion de Ventas."""
-    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
-    if venta is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
+    """Detalle de una venta (no solo las propias) -- usado por la pantalla
+    de factura/comprobante que ve el staff desde el panel de Gestion de
+    Ventas."""
+    venta = _get_venta_staff_o_404(db, empleado, venta_id)
     return _to_admin_out(venta)
 
 
@@ -465,12 +582,10 @@ def aprobar_pago_qr(
     venta_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaAdminOut:
     empleado = _get_empleado_o_403(db, usuario)
-    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
-    if venta is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
+    venta = _get_venta_staff_o_404(db, usuario, venta_id)
     if venta.pago is None or venta.pago.metodo != "qr" or venta.pago.estado != "verificando":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta venta no tiene un pago QR pendiente de verificacion.")
 
@@ -491,8 +606,14 @@ def aprobar_pago_qr(
                 f'No hay suficiente stock de "{d.producto.nombre}" ({d.talla.codigo}, {d.color.nombre}) para aprobar esta venta.',
             )
 
-    db.execute(text("SELECT sp_aprobar_pago_qr(:venta_id, :empleado_id)"), {"venta_id": venta_id, "empleado_id": empleado.id})
-    db.commit()
+    try:
+        db.execute(
+            text("SELECT sp_aprobar_pago_qr(:venta_id, :empleado_id)"), {"venta_id": venta_id, "empleado_id": empleado.id}
+        )
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
 
     log_bitacora(db, usuario, "ACTUALIZAR", "venta", venta.id, "Pago QR aprobado", request)
 
@@ -505,17 +626,21 @@ def rechazar_pago_qr(
     venta_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(get_current_user),
+    usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaAdminOut:
     empleado = _get_empleado_o_403(db, usuario)
-    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
-    if venta is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
+    venta = _get_venta_staff_o_404(db, usuario, venta_id)
     if venta.pago is None or venta.pago.metodo != "qr" or venta.pago.estado != "verificando":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta venta no tiene un pago QR pendiente de verificacion.")
 
-    db.execute(text("SELECT sp_rechazar_pago_qr(:venta_id, :empleado_id)"), {"venta_id": venta_id, "empleado_id": empleado.id})
-    db.commit()
+    try:
+        db.execute(
+            text("SELECT sp_rechazar_pago_qr(:venta_id, :empleado_id)"), {"venta_id": venta_id, "empleado_id": empleado.id}
+        )
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
 
     log_bitacora(db, usuario, "ACTUALIZAR", "venta", venta.id, "Pago QR rechazado", request)
 
@@ -527,7 +652,7 @@ def rechazar_pago_qr(
 def buscar_clientes_para_venta(
     buscar: str = Query(min_length=1),
     db: Session = Depends(get_db),
-    _empleado: Usuario = Depends(require_permiso("CU11", "CU14")),
+    _empleado: Usuario = Depends(require_permiso("CU11")),
 ) -> list[ClienteBusquedaOut]:
     like = f"%{buscar}%"
     clientes = (
@@ -545,11 +670,12 @@ def registrar_venta_presencial(
     payload: VentaPresencialCreate,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(require_permiso("CU11", "CU14")),
+    usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaAdminOut:
     """Venta de mostrador cobrada en efectivo -- el staff arma la venta ahi
     mismo (sin pasar por un carrito) y se cobra al instante."""
     empleado = _get_empleado_o_403(db, usuario)
+    verificar_acceso_sucursal(usuario, payload.sucursal_id)
 
     cliente = db.query(Cliente).filter(Cliente.id == payload.cliente_id).first()
     if cliente is None:
@@ -580,17 +706,21 @@ def registrar_venta_presencial(
                 f'No hay suficiente stock de "{producto.nombre}" ({talla.codigo}, {color.nombre}) en esa sucursal.',
             )
 
-    result = db.execute(
-        text("SELECT sp_crear_venta_presencial(:cliente_id, :sucursal_id, :empleado_id, CAST(:items AS JSONB))"),
-        {
-            "cliente_id": cliente.id,
-            "sucursal_id": payload.sucursal_id,
-            "empleado_id": empleado.id,
-            "items": _items_json(payload.items),
-        },
-    )
-    venta_id = result.scalar_one()
-    db.commit()
+    try:
+        result = db.execute(
+            text("SELECT sp_crear_venta_presencial(:cliente_id, :sucursal_id, :empleado_id, CAST(:items AS JSONB))"),
+            {
+                "cliente_id": cliente.id,
+                "sucursal_id": payload.sucursal_id,
+                "empleado_id": empleado.id,
+                "items": _items_json(payload.items),
+            },
+        )
+        venta_id = result.scalar_one()
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
 
     log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta presencial en efectivo a {cliente.nombre}", request)
 
@@ -604,7 +734,7 @@ def editar_venta(
     payload: VentaEditIn,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(require_permiso("CU11", "CU14")),
+    usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaAdminOut:
     """Edicion completa (CU11): productos, cantidades, sucursal y estado del
     pago -- por esta misma via se puede "completar" un pago QR o en
@@ -613,9 +743,18 @@ def editar_venta(
     la venta ya estaba pagada) y retiene el nuevo dentro de la misma
     transaccion -- si no alcanza, no se confirma nada."""
     empleado = _get_empleado_o_403(db, usuario)
-    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
-    if venta is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
+    venta = _get_venta_staff_o_404(db, usuario, venta_id)
+    verificar_acceso_sucursal(usuario, payload.sucursal_id)
+
+    # sp_editar_venta solo libera el stock viejo si la venta estaba 'pagada';
+    # con una devolucion de por medio (devuelto/devuelto_parcial) volveria a
+    # descontar stock sin liberar el anterior, y ademas borraria los
+    # item_linea a los que apuntan los detalles de la devolucion.
+    if _tiene_devoluciones_vigentes(venta):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Esta venta tiene una devolucion registrada y ya no se puede editar.",
+        )
 
     sucursal = db.query(Sucursal).filter(Sucursal.id == payload.sucursal_id).first()
     if sucursal is None:
@@ -628,20 +767,24 @@ def editar_venta(
         if producto is None or talla is None or color is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Producto, talla o color no encontrado.")
 
-    db.execute(
-        text(
-            "SELECT sp_editar_venta(:venta_id, :sucursal_id, CAST(:items AS JSONB), :metodo_pago, :estado_pago, :empleado_id)"
-        ),
-        {
-            "venta_id": venta_id,
-            "sucursal_id": payload.sucursal_id,
-            "items": _items_json(payload.items),
-            "metodo_pago": payload.metodo_pago,
-            "estado_pago": payload.estado_pago,
-            "empleado_id": empleado.id,
-        },
-    )
-    db.commit()
+    try:
+        db.execute(
+            text(
+                "SELECT sp_editar_venta(:venta_id, :sucursal_id, CAST(:items AS JSONB), :metodo_pago, :estado_pago, :empleado_id)"
+            ),
+            {
+                "venta_id": venta_id,
+                "sucursal_id": payload.sucursal_id,
+                "items": _items_json(payload.items),
+                "metodo_pago": payload.metodo_pago,
+                "estado_pago": payload.estado_pago,
+                "empleado_id": empleado.id,
+            },
+        )
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
 
     log_bitacora(db, usuario, "ACTUALIZAR", "venta", venta_id, "Venta editada", request)
 
@@ -654,17 +797,28 @@ def eliminar_venta(
     venta_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(require_permiso("CU11", "CU14")),
+    usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> None:
     """Borra la venta por completo. sp_eliminar_venta devuelve el stock al
-    inventario si estaba retenido (estado 'pagada') antes de borrar."""
+    inventario si estaba retenido (estado 'pagada') antes de borrar. El
+    Cajero no puede borrar ventas (solo Administrador o Encargado)."""
+    require_encargado_o_admin(usuario)
     empleado = _get_empleado_o_403(db, usuario)
-    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
-    if venta is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Venta no encontrada.")
+    venta = _get_venta_staff_o_404(db, usuario, venta_id)
+    if _tiene_devoluciones_vigentes(venta):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Esta venta tiene una devolucion registrada: elimina primero la devolucion.",
+        )
 
     cliente_nombre = venta.cliente.nombre
-    db.execute(text("SELECT sp_eliminar_venta(:venta_id, :empleado_id)"), {"venta_id": venta_id, "empleado_id": empleado.id})
-    db.commit()
+    try:
+        db.execute(
+            text("SELECT sp_eliminar_venta(:venta_id, :empleado_id)"), {"venta_id": venta_id, "empleado_id": empleado.id}
+        )
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
 
     log_bitacora(db, usuario, "ELIMINAR", "venta", venta_id, f"Venta de {cliente_nombre} eliminada", request)

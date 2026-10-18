@@ -8,7 +8,10 @@ from app.core.ar_embed import render_ar_embed_html
 from app.core.config import settings
 from app.core.paypal_embed import render_paypal_embed_html, render_paypal_retorno_html
 
-app = FastAPI(title=settings.PROJECT_NAME)
+# En produccion no se publica la documentacion interactiva (/docs, /redoc,
+# /openapi.json): expone el mapa completo de la API a cualquiera.
+_docs = {} if not settings.es_produccion else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title=settings.PROJECT_NAME, **_docs)
 
 # Render (como la mayoria de PaaS) termina el https en su proxy y nos
 # reenvia por http puro adentro -- sin esto, `request.base_url` (usado para

@@ -1,3 +1,4 @@
+import html
 import logging
 import secrets
 import uuid
@@ -11,9 +12,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.audit import log_bitacora, set_client_ip_for_trigger
+from app.core.audit import client_ip, log_bitacora, set_client_ip_for_trigger
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.rate_limit import verificar_limite
 from app.core.security import create_access_token, create_reset_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import Cliente, Usuario
@@ -34,6 +36,18 @@ from app.services.usuarios import to_usuario_out
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Codigo de recuperacion de 6 digitos: tras MAX_INTENTOS_CODIGO fallos se
+# invalida y hay que pedir uno nuevo.
+MAX_INTENTOS_CODIGO = 5
+
+# Respuesta identica exista o no la cuenta: si "no existe" devolviera otra
+# cosa, cualquiera podria averiguar que correos estan registrados.
+_MENSAJE_CODIGO_ENVIADO = "Si el correo esta registrado, te enviamos un codigo de verificacion."
+
+
+def _limitar_por_ip(request: Request, alcance: str, maximo: int, segundos: int) -> None:
+    verificar_limite(alcance, client_ip(request) or "desconocida", maximo, segundos)
 
 
 def _log_sesion_bitacora(db: Session, usuario: Usuario, accion: str, request: Request) -> None:
@@ -60,22 +74,32 @@ def _issue_token(usuario: Usuario, db: Session, request: Request) -> TokenRespon
 
 
 def _usuario_from_reset_token(reset_token: str, db: Session) -> Usuario:
+    """Valida el reset_token y lo CONSUME (un solo uso): despues de esto el
+    mismo token ya no sirve ni para reset-password ni para
+    login-with-reset-code."""
+    invalido = HTTPException(status.HTTP_400_BAD_REQUEST, "Token de recuperacion invalido o expirado.")
     try:
         payload = jwt.decode(reset_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Token de recuperacion invalido o expirado.")
+        raise invalido
 
-    if payload.get("scope") != "password_reset":
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Token de recuperacion invalido.")
+    if payload.get("scope") != "password_reset" or not payload.get("jti"):
+        raise invalido
 
     usuario = db.query(Usuario).filter(Usuario.id == int(payload.get("sub", 0))).first()
-    if usuario is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Token de recuperacion invalido.")
+    if usuario is None or not usuario.reset_token_jti or usuario.reset_token_jti != payload["jti"]:
+        raise invalido
+    if usuario.estado != "activo":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Esta cuenta esta desactivada.")
+
+    usuario.reset_token_jti = None
     return usuario
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: ClienteRegister, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    _limitar_por_ip(request, "register", maximo=10, segundos=3600)
+
     existing = db.query(Usuario).filter(Usuario.email == payload.email).first()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe una cuenta con ese correo.")
@@ -99,16 +123,17 @@ def register(payload: ClienteRegister, request: Request, db: Session = Depends(g
 
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
 
+    # Nunca se manda la contrasena por correo: el cliente la acaba de elegir
+    # y el correo viaja/queda guardado en texto plano.
     try:
         send_email(
             to=cliente.email,
             subject="Bienvenido a Atelier Aranier",
             html_body=(
-                f"<p>Hola {cliente.nombre},</p>"
+                f"<p>Hola {html.escape(cliente.nombre)},</p>"
                 "<p>Gracias por registrarte en <strong>Atelier Aranier</strong>. "
                 "Ya sos parte de nuestra tienda como cliente.</p>"
-                "<p>Estos son tus datos de acceso:</p>"
-                f"<p>Correo: {cliente.email}<br>Contrasena: {payload.password}</p>"
+                f"<p>Tu cuenta quedo registrada con el correo {html.escape(cliente.email)}.</p>"
                 "<p>Ya podes iniciar sesion cuando quieras en nuestra tienda.</p>"
             ),
         )
@@ -120,6 +145,8 @@ def register(payload: ClienteRegister, request: Request, db: Session = Depends(g
 
 @router.post("/google", response_model=TokenResponse)
 def google_auth(payload: GoogleAuthPayload, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    _limitar_por_ip(request, "google", maximo=30, segundos=300)
+
     try:
         idinfo = google_id_token.verify_oauth2_token(
             payload.credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID
@@ -161,10 +188,10 @@ def google_auth(payload: GoogleAuthPayload, request: Request, db: Session = Depe
                 to=cliente.email,
                 subject="Bienvenido a Atelier Aranier",
                 html_body=(
-                    f"<p>Hola {cliente.nombre},</p>"
+                    f"<p>Hola {html.escape(cliente.nombre)},</p>"
                     "<p>Gracias por registrarte en <strong>Atelier Aranier</strong> con tu cuenta de Google. "
                     "Ya sos parte de nuestra tienda como cliente.</p>"
-                    f"<p>Iniciaste sesion con tu cuenta de Google ({cliente.email}), "
+                    f"<p>Iniciaste sesion con tu cuenta de Google ({html.escape(cliente.email)}), "
                     "asi que podes volver a entrar en cualquier momento con el boton "
                     "\"Continuar con Google\".</p>"
                 ),
@@ -180,6 +207,11 @@ def google_auth(payload: GoogleAuthPayload, request: Request, db: Session = Depe
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: ClienteLogin, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    # Por cuenta (frena fuerza bruta contra un correo concreto aunque el
+    # atacante rote IPs) y por IP (frena barridos de muchos correos).
+    verificar_limite("login-email", payload.email, maximo=10, segundos=900)
+    _limitar_por_ip(request, "login-ip", maximo=30, segundos=300)
+
     usuario = db.query(Usuario).filter(Usuario.email == payload.email).first()
     if not usuario or not verify_password(payload.password, usuario.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Correo o contrasena incorrectos.")
@@ -209,47 +241,77 @@ def logout(
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> MessageResponse:
+def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+    verificar_limite("forgot-email", payload.email, maximo=3, segundos=900)
+    _limitar_por_ip(request, "forgot-ip", maximo=10, segundos=900)
+
     usuario = db.query(Usuario).filter(Usuario.email == payload.email).first()
-    if usuario is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No existe una cuenta con ese correo.")
+    if usuario is None or usuario.estado != "activo":
+        return MessageResponse(message=_MENSAJE_CODIGO_ENVIADO)
 
     code = f"{secrets.randbelow(1_000_000):06d}"
     usuario.reset_code_hash = hash_password(code)
     usuario.reset_code_expires_at = datetime.utcnow() + timedelta(minutes=10)
+    usuario.reset_code_intentos = 0
+    usuario.reset_token_jti = None
     db.commit()
 
-    send_email(
-        to=usuario.email,
-        subject="Codigo de verificacion - Atelier Aranier",
-        html_body=(
-            f"<p>Hola {usuario.nombre},</p>"
-            "<p>Tu codigo de verificacion para recuperar tu contrasena es:</p>"
-            f"<h2>{code}</h2>"
-            "<p>Vence en 10 minutos. Si no fuiste vos, ignora este correo.</p>"
-        ),
-    )
-    return MessageResponse(message="Codigo enviado a tu correo.")
+    try:
+        send_email(
+            to=usuario.email,
+            subject="Codigo de verificacion - Atelier Aranier",
+            html_body=(
+                f"<p>Hola {html.escape(usuario.nombre)},</p>"
+                "<p>Tu codigo de verificacion para recuperar tu contrasena es:</p>"
+                f"<h2>{code}</h2>"
+                "<p>Vence en 10 minutos. Si no fuiste vos, ignora este correo.</p>"
+            ),
+        )
+    except Exception:
+        logger.exception("No se pudo enviar el codigo de recuperacion a %s", usuario.email)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "No pudimos enviar el correo en este momento. Intenta de nuevo."
+        )
+    return MessageResponse(message=_MENSAJE_CODIGO_ENVIADO)
 
 
 @router.post("/verify-reset-code", response_model=ResetTokenResponse)
-def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get_db)) -> ResetTokenResponse:
+def verify_reset_code(
+    payload: VerifyResetCodeRequest, request: Request, db: Session = Depends(get_db)
+) -> ResetTokenResponse:
+    _limitar_por_ip(request, "verify-code-ip", maximo=20, segundos=900)
+
+    invalido = HTTPException(status.HTTP_400_BAD_REQUEST, "Codigo invalido o expirado.")
     usuario = db.query(Usuario).filter(Usuario.email == payload.email).first()
     if (
         usuario is None
         or usuario.reset_code_hash is None
         or usuario.reset_code_expires_at is None
         or usuario.reset_code_expires_at < datetime.utcnow()
-        or not verify_password(payload.code, usuario.reset_code_hash)
     ):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Codigo invalido o expirado.")
+        raise invalido
 
-    # codigo de un solo uso
+    if not verify_password(payload.code, usuario.reset_code_hash):
+        usuario.reset_code_intentos = (usuario.reset_code_intentos or 0) + 1
+        if usuario.reset_code_intentos >= MAX_INTENTOS_CODIGO:
+            usuario.reset_code_hash = None
+            usuario.reset_code_expires_at = None
+            db.commit()
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "Demasiados intentos fallidos. Solicita un codigo nuevo."
+            )
+        db.commit()
+        raise invalido
+
+    # codigo de un solo uso; el reset_token que se emite tambien (via jti)
+    jti = uuid.uuid4().hex
     usuario.reset_code_hash = None
     usuario.reset_code_expires_at = None
+    usuario.reset_code_intentos = 0
+    usuario.reset_token_jti = jti
     db.commit()
 
-    return ResetTokenResponse(reset_token=create_reset_token(subject=str(usuario.id)))
+    return ResetTokenResponse(reset_token=create_reset_token(subject=str(usuario.id), jti=jti))
 
 
 @router.post("/reset-password", response_model=TokenResponse)
@@ -267,6 +329,5 @@ def login_with_reset_code(
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     usuario = _usuario_from_reset_token(payload.reset_token, db)
-    if usuario.estado != "activo":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Esta cuenta esta desactivada.")
+    db.commit()
     return _issue_token(usuario, db, request)

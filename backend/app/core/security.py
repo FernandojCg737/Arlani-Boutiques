@@ -4,7 +4,7 @@ import string
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import jwt
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -23,10 +23,36 @@ def create_access_token(subject: str, session_id: str) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def create_reset_token(subject: str, minutes: int = 10) -> str:
+def create_reset_token(subject: str, jti: str, minutes: int = 10) -> str:
+    # jti se guarda tambien en usuario.reset_token_jti: el token solo vale
+    # mientras coincidan, y se limpia al usarlo -- asi sirve una sola vez.
     expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-    payload = {"sub": subject, "scope": "password_reset", "exp": expire}
+    payload = {"sub": subject, "scope": "password_reset", "jti": jti, "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def create_ar_job_token(job_id: str, usuario_id: int, minutes: int = 30) -> str:
+    """CU09 modo VIRTUAL: envuelve el job_id real de Decart en un token
+    firmado que es lo que ve el cliente. Asi el estado solo lo consulta su
+    duenio, y el resultado (que se pide desde un <img src>, sin header de
+    Authorization) solo lo descarga quien recibio este token."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    payload = {"sub": str(usuario_id), "scope": "ar_job", "job": job_id, "exp": expire}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_ar_job_token(token: str) -> tuple[str, int] | None:
+    """(job_id, usuario_id) si el token es valido y vigente; None si no."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("scope") != "ar_job" or not payload.get("job"):
+        return None
+    try:
+        return payload["job"], int(payload.get("sub", 0))
+    except (TypeError, ValueError):
+        return None
 
 
 def validate_password_strength(password: str) -> str:

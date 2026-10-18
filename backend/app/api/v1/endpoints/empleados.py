@@ -1,3 +1,4 @@
+import html
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -76,6 +77,12 @@ def create_empleado(
     db: Session = Depends(get_db),
     admin: Usuario = Depends(require_permiso("CU02")),
 ) -> EmpleadoOut:
+    # El Administrador es superusuario por tipo (ver deps.require_permiso):
+    # si un no-admin con CU02 pudiera crear administradores, CU02 equivaldria
+    # a poder convertirse en Administrador.
+    if payload.tipo == "administrador" and admin.tipo != "administrador":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo el Administrador puede crear otros administradores.")
+
     existing = db.query(Usuario).filter(Usuario.email == payload.email).first()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya existe una cuenta con ese correo.")
@@ -111,11 +118,11 @@ def create_empleado(
             to=empleado.email,
             subject="Bienvenido al equipo - Atelier Aranier",
             html_body=(
-                f"<p>Hola {empleado.nombre},</p>"
+                f"<p>Hola {html.escape(empleado.nombre)},</p>"
                 f"<p>Se creo tu cuenta de <strong>{empleado.tipo.replace('_', ' ')}</strong> en el panel de "
                 "administracion de Atelier Aranier.</p>"
                 "<p>Estos son tus datos de acceso:</p>"
-                f"<p>Correo: {empleado.email}<br>Contrasena temporal: {password_temporal}</p>"
+                f"<p>Correo: {html.escape(empleado.email)}<br>Contrasena temporal: {password_temporal}</p>"
                 "<p>Te recomendamos cambiar la contrasena desde tu perfil apenas inicies sesion.</p>"
             ),
         )
@@ -135,6 +142,12 @@ def update_empleado(
     admin: Usuario = Depends(require_permiso("CU02")),
 ) -> EmpleadoOut:
     empleado = _get_empleado_or_404(db, empleado_id)
+
+    if admin.tipo != "administrador":
+        if empleado.tipo == "administrador":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo el Administrador puede editar a otro administrador.")
+        if empleado.id == admin.id:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No puedes cambiar tu propio rol ni tu estado.")
 
     if empleado.tipo in TIPOS_CON_SUCURSAL and payload.sucursal_id is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Selecciona una sucursal para este cargo.")

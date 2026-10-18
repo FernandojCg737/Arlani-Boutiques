@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 
 class ItemDevolucionIn(BaseModel):
@@ -18,8 +18,19 @@ class DevolucionCreate(BaseModel):
     motivo: str = Field(pattern="^(defecto|talla_incorrecta|insatisfaccion|otro)$")
     tipo: str = Field(pattern="^(total|parcial)$")
     metodo_reembolso: str = Field(pattern="^(mismo_medio|credito_tienda|efectivo)$")
-    observaciones: str | None = None
+    observaciones: str | None = Field(default=None, max_length=1000)
     items: list[ItemDevolucionIn] = Field(min_length=1)
+
+    @field_validator("items")
+    @classmethod
+    def _sin_items_repetidos(cls, value: list[ItemDevolucionIn]) -> list[ItemDevolucionIn]:
+        # Si un mismo item_linea_id viniera dos veces, cada linea pasaria
+        # sola la validacion "no devolver mas de lo comprado", pero juntas
+        # reembolsarian (y reingresarian al stock) el doble.
+        ids = [i.item_linea_id for i in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Cada producto de la compra puede aparecer una sola vez en la devolucion.")
+        return value
 
 
 class DetalleDevolucionOut(BaseModel):

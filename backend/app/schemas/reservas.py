@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
+
+from app.schemas.ventas import rechazar_items_repetidos
 
 
 class ItemReservaCreate(BaseModel):
@@ -14,6 +16,11 @@ class ReservaCreate(BaseModel):
     sucursal_id: int
     horario_atencion: datetime
     items: list[ItemReservaCreate] = Field(min_length=1)
+
+    @field_validator("items")
+    @classmethod
+    def _sin_items_repetidos(cls, value: list[ItemReservaCreate]) -> list[ItemReservaCreate]:
+        return rechazar_items_repetidos(value)
 
 
 class DetalleReservaOut(BaseModel):
