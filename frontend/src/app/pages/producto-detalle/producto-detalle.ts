@@ -12,6 +12,7 @@ import { ReservaForm } from '../../components/reserva-form/reserva-form';
 import { Product } from '../../data/products';
 import { Auth } from '../../services/auth';
 import { isAgotado, toArPrenda } from '../../services/catalogo-publico';
+import { LoginRequerido } from '../../services/login-requerido';
 
 interface PrendaArApi {
   url: string;
@@ -82,6 +83,7 @@ export class ProductoDetalle implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly auth = inject(Auth);
+  private readonly loginRequerido = inject(LoginRequerido);
 
   protected readonly product = signal<Product | undefined>(undefined);
   protected readonly isAgotado = isAgotado;
@@ -138,12 +140,18 @@ export class ProductoDetalle implements OnInit {
     else if (intent === 'ar') this.arMenuAbierto.set(true);
   }
 
-  // Arma la URL de vuelta (con el intent) para pasarsela a /login como
-  // `returnUrl` -- ver `redirectAfterLogin()` en login.ts.
-  private irALoginConIntento(intent: 'carrito' | 'reserva' | 'ar'): void {
+  // Sin sesion: en vez de mandar directo a /login, avisa que hace falta
+  // iniciar sesion (modal global LoginRequerido) con la opcion de entrar o
+  // crear una cuenta. La URL de vuelta lleva el intent, asi al volver se
+  // retoma la misma accion (ver continuarIntentoPendiente).
+  private pedirLoginConIntento(intent: 'carrito' | 'reserva' | 'ar'): void {
     const id = this.product()?.id ?? this.route.snapshot.paramMap.get('id');
-    const returnUrl = `/producto/${id}?intent=${intent}`;
-    void this.router.navigate(['/login'], { queryParams: { returnUrl } });
+    const acciones = {
+      carrito: 'para anadir productos a tu carrito',
+      reserva: 'para reservar este producto',
+      ar: 'para probarte esta prenda con realidad aumentada',
+    };
+    this.loginRequerido.pedir(acciones[intent], `/producto/${id}?intent=${intent}`);
   }
 
   protected selectColor(name: string): void {
@@ -160,7 +168,7 @@ export class ProductoDetalle implements OnInit {
     // administracion (P4 > CU09). Si no hay sesion, manda a loguearse (o
     // registrarse, desde ahi) en vez de abrir el menu de opciones.
     if (!this.auth.currentUser()) {
-      this.irALoginConIntento('ar');
+      this.pedirLoginConIntento('ar');
       return;
     }
     this.arMenuAbierto.set(!this.arMenuAbierto());
@@ -188,7 +196,7 @@ export class ProductoDetalle implements OnInit {
     // CU10: igual que probarse la prenda, reservar requiere sesion
     // iniciada (la reserva queda ligada al cliente que la hizo).
     if (!this.auth.currentUser()) {
-      this.irALoginConIntento('reserva');
+      this.pedirLoginConIntento('reserva');
       return;
     }
     this.reservaAbierta.set(true);
@@ -209,7 +217,7 @@ export class ProductoDetalle implements OnInit {
     // CU11: el carrito ahora es real (backend), asociado al cliente -- igual
     // que probarse la prenda o reservar, hace falta sesion iniciada.
     if (!this.auth.currentUser()) {
-      this.irALoginConIntento('carrito');
+      this.pedirLoginConIntento('carrito');
       return;
     }
     this.carritoAbierto.set(true);

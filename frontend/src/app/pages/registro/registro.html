@@ -150,7 +150,7 @@
 
       <p class="auth-form__switch">
         Ya tienes cuenta?
-        <a routerLink="/login">Inicia sesion aqui</a>
+        <a routerLink="/login" [queryParams]="returnUrl ? { returnUrl } : {}">Inicia sesion aqui</a>
       </p>
 
       <div class="auth-mobile-badges">

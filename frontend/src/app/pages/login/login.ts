@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthShowcase } from '../../components/auth-showcase/auth-showcase';
 import { Auth } from '../../services/auth';
 import { GoogleIdentity } from '../../services/google-identity';
+import { esRutaInterna } from '../../services/login-requerido';
 
 @Component({
   selector: 'app-login',
@@ -66,8 +67,12 @@ export class Login implements AfterViewInit {
     // valida que sea una ruta interna (empiece con "/") para no abrir una
     // URL externa arbitraria.
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    this.router.navigateByUrl(returnUrl?.startsWith('/') ? returnUrl : this.auth.landingRoute());
+    this.router.navigateByUrl(esRutaInterna(returnUrl) ? returnUrl : this.auth.landingRoute());
   }
+
+  // Se pasa el mismo returnUrl a /registro: si el visitante no tenia cuenta,
+  // al registrarse tambien vuelve a la accion que estaba intentando.
+  protected readonly returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
 
   private extractError(err: unknown): string {
     if (err instanceof HttpErrorResponse) {

@@ -1,9 +1,10 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { AfterViewInit, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthShowcase } from '../../components/auth-showcase/auth-showcase';
 import { Auth } from '../../services/auth';
 import { GoogleIdentity } from '../../services/google-identity';
+import { esRutaInterna } from '../../services/login-requerido';
 import { checkPassword, isPasswordValid } from '../../utils/password';
 
 @Component({
@@ -15,6 +16,7 @@ import { checkPassword, isPasswordValid } from '../../utils/password';
 export class Registro implements AfterViewInit {
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly googleIdentity = inject(GoogleIdentity);
 
   protected readonly nombre = signal('');
@@ -28,6 +30,7 @@ export class Registro implements AfterViewInit {
   protected readonly showConfirmPassword = signal(false);
   protected readonly passwordTouched = signal(false);
   protected readonly passwordChecks = computed(() => checkPassword(this.password()));
+  protected readonly returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
 
   ngAfterViewInit(): void {
     this.googleIdentity.renderButton('googleBtnRegistro', (credential) => this.handleGoogleCredential(credential));
@@ -60,7 +63,7 @@ export class Registro implements AfterViewInit {
         password: this.password(),
         telefono: this.telefono() || undefined,
       });
-      this.router.navigateByUrl('/');
+      this.irDespuesDeEntrar();
     } catch (err) {
       this.error.set(this.extractError(err));
     } finally {
@@ -68,12 +71,19 @@ export class Registro implements AfterViewInit {
     }
   }
 
+  // Igual que login: si llego aca desde "inicia sesion para anadir al
+  // carrito/reservar/probarte", vuelve a esa accion en vez de al inicio.
+  private irDespuesDeEntrar(): void {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    this.router.navigateByUrl(esRutaInterna(returnUrl) ? returnUrl : '/');
+  }
+
   private async handleGoogleCredential(credential: string): Promise<void> {
     this.error.set('');
     this.loading.set(true);
     try {
       await this.auth.loginWithGoogle(credential);
-      this.router.navigateByUrl('/');
+      this.irDespuesDeEntrar();
     } catch (err) {
       this.error.set(this.extractError(err));
     } finally {

@@ -58,6 +58,15 @@ export class Auth {
     return this.currentUser()?.permisos.includes(codigo) ?? false;
   }
 
+  // Acciones de cliente (carrito, reservar, probador de RA): un visitante sin
+  // sesion SI las ve -- al usarlas se le pide iniciar sesion (ver
+  // LoginRequerido). Con sesion, se muestran solo si su rol tiene ese CU
+  // habilitado (CU02, pestana Cliente).
+  mostrarAccionCliente(codigo: string): boolean {
+    if (!this.currentUser()) return true;
+    return this.hasPermiso(codigo) || this.isAdmin();
+  }
+
   // A donde mandar al usuario justo despues de iniciar sesion. Quien tiene
   // permiso de Bitacora (CU17) - tipicamente el Administrador - cae directo
   // ahi; el resto del personal cae en la landing del panel (accesos rapidos

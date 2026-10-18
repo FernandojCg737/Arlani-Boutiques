@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../models/carrito.dart';
 import '../auth/auth_provider.dart';
+import '../auth/login_requerido.dart';
 import 'cart_provider.dart';
 import 'reserva_form_screen.dart';
 import 'reservar_carrito_screen.dart';
@@ -19,6 +20,10 @@ class CarritoScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
+    // Sin sesion: la pestana se sigue viendo, pero explica que el carrito
+    // se guarda en la cuenta e invita a iniciar sesion (antes decia "no esta
+    // disponible por el momento", que confundia a los visitantes).
+    if (!auth.isAuthenticated) return const _CarritoSinSesion();
     if (!auth.hasPermiso('CU13')) {
       return const Center(
         child: Padding(
@@ -90,6 +95,52 @@ class CarritoScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CarritoSinSesion extends ConsumerWidget {
+  const _CarritoSinSesion();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Container(
+          width: double.infinity,
+          color: const Color(0xFFF7F7F5),
+          padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const EyebrowText('Carrito', color: Color(0xFF9AA5AC)),
+              const SizedBox(height: 12),
+              const Text(
+                'INICIA SESION PARA VER TU CARRITO',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.brandDark),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Tu carrito se guarda en tu cuenta: inicia sesion o crea una cuenta para agregar productos y comprar.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: AppColors.grayTextDark),
+              ),
+              const SizedBox(height: 28),
+              ElevatedButton(
+                onPressed: () => asegurarSesion(context, ref, accion: 'para ver tu carrito de compras'),
+                child: const Text('INICIAR SESION'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => context.go('/tienda'),
+                child: const Text('Seguir viendo la tienda', style: TextStyle(color: AppColors.grayText)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

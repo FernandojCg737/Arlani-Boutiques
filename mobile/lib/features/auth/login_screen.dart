@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import 'auth_provider.dart';
 import 'google_auth.dart';
 import 'google_auth_button.dart';
+import 'registro_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key, this.onSuccess});
@@ -85,6 +86,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  // Si esta pantalla vino de una accion que pedia sesion, el registro
+  // tambien tiene que volver a esa accion: se abre empujado (no por el
+  // router) y, al registrarse, cierra registro + login y llama a onSuccess.
+  void _irARegistro() {
+    final onSuccess = widget.onSuccess;
+    if (onSuccess == null) {
+      context.push('/registro');
+      return;
+    }
+    final navigator = Navigator.of(context);
+    navigator.push(
+      MaterialPageRoute(
+        builder: (_) => RegistroScreen(
+          onSuccess: () {
+            navigator.pop();
+            onSuccess();
+          },
+          onIrALogin: () => navigator.pop(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -148,12 +172,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text('No tenes cuenta?', style: TextStyle(color: AppColors.grayTextDark)),
-                    TextButton(onPressed: () => context.push('/registro'), child: const Text('Crear una cuenta')),
+                    TextButton(onPressed: _irARegistro, child: const Text('Crear una cuenta')),
                   ],
                 ),
                 TextButton(
-                  onPressed: () => context.go('/'),
-                  child: const Text('Volver al inicio', style: TextStyle(color: AppColors.grayText)),
+                  // Abierta desde una accion (onSuccess): "volver" regresa a
+                  // donde estaba el cliente, no al inicio.
+                  onPressed: widget.onSuccess != null ? () => Navigator.of(context).pop() : () => context.go('/'),
+                  child: Text(
+                    widget.onSuccess != null ? 'Volver' : 'Volver al inicio',
+                    style: const TextStyle(color: AppColors.grayText),
+                  ),
                 ),
               ],
             ),

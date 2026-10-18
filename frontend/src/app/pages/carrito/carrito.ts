@@ -41,7 +41,7 @@ export class Carrito implements OnInit {
   protected readonly minDatetime = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16);
 
   ngOnInit(): void {
-    void this.cart.cargar();
+    if (this.auth.currentUser()) void this.cart.cargar();
   }
 
   protected decrease(id: number, currentQuantity: number): void {

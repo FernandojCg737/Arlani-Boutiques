@@ -117,8 +117,8 @@
           </div>
         }
       </div>
-      @if (auth.hasPermiso('CU13')) {
-      <a class="icon-btn icon-btn--cart" routerLink="/carrito" aria-label="Carrito">
+      @if (auth.mostrarAccionCliente('CU13')) {
+      <a class="icon-btn icon-btn--cart" routerLink="/carrito" aria-label="Carrito" (click)="abrirCarrito($event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M6 6h15l-1.5 9h-12z" />
           <path d="M6 6 5 3H2" />
@@ -133,8 +133,8 @@
     </div>
 
     <div class="mobile-actions">
-      @if (auth.hasPermiso('CU13')) {
-      <a class="icon-btn icon-btn--cart" routerLink="/carrito" aria-label="Carrito">
+      @if (auth.mostrarAccionCliente('CU13')) {
+      <a class="icon-btn icon-btn--cart" routerLink="/carrito" aria-label="Carrito" (click)="abrirCarrito($event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M6 6h15l-1.5 9h-12z" />
           <path d="M6 6 5 3H2" />
@@ -180,8 +180,8 @@
       <a [routerLink]="link.path" [queryParams]="link.queryParams" (click)="closeMobileMenu()">{{ link.label }}</a>
     }
 
-    @if (auth.hasPermiso('CU13')) {
-    <a routerLink="/carrito" (click)="closeMobileMenu()" class="mobile-nav-icon-link">
+    @if (auth.mostrarAccionCliente('CU13')) {
+    <a routerLink="/carrito" (click)="abrirCarrito($event)" class="mobile-nav-icon-link">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
         <path d="M6 6h15l-1.5 9h-12z" />
         <path d="M6 6 5 3H2" />

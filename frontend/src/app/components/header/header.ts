@@ -16,6 +16,7 @@ import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Auth } from '../../services/auth';
 import { Cart } from '../../services/cart';
+import { LoginRequerido } from '../../services/login-requerido';
 import { Notificaciones, type Notificacion } from '../../services/notificaciones';
 
 const INTERVALO_NOTIFICACIONES_MS = 30000;
@@ -38,6 +39,7 @@ export class Header implements OnInit, OnDestroy {
   protected readonly cart = inject(Cart);
   protected readonly auth = inject(Auth);
   protected readonly notificaciones = inject(Notificaciones);
+  private readonly loginRequerido = inject(LoginRequerido);
 
   // Paginas sin ".hero" (fondo oscuro a pantalla completa) no tienen contra
   // que contrastar un header transparente: quedaria blanco sobre blanco. En
@@ -146,6 +148,15 @@ export class Header implements OnInit, OnDestroy {
   protected enlaceNotif(n: Notificacion): unknown[] {
     if (n.entidad_tipo === 'venta' && n.entidad_id) return ['/mis-compras', n.entidad_id];
     return ['/perfil'];
+  }
+
+  // El icono del carrito se ve siempre; sin sesion, en vez de abrir un
+  // carrito vacio, avisa que hay que iniciar sesion.
+  protected abrirCarrito(event: Event): void {
+    this.closeMobileMenu();
+    if (this.auth.currentUser()) return;
+    event.preventDefault();
+    this.loginRequerido.pedir('para ver tu carrito de compras', '/carrito');
   }
 
   protected async logout(): Promise<void> {

@@ -12,7 +12,23 @@
     <p>Revisa tus articulos seleccionados antes de finalizar la compra.</p>
   </div>
 
-  @if (cart.items().length === 0) {
+  @if (!auth.currentUser()) {
+    <div class="carrito-empty">
+      <span class="carrito-empty__eyebrow">Carrito</span>
+      <h2>Inicia sesion para ver tu carrito</h2>
+      <p>Tu carrito se guarda en tu cuenta: inicia sesion o crea una cuenta para agregar productos y comprar.</p>
+      <a class="carrito-empty__btn" routerLink="/login" [queryParams]="{ returnUrl: '/carrito' }">
+        <span>Iniciar sesion</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </a>
+      <a class="carrito-empty__registro" routerLink="/registro" [queryParams]="{ returnUrl: '/carrito' }">
+        Crear una cuenta
+      </a>
+    </div>
+  } @else if (cart.items().length === 0) {
     <div class="carrito-empty">
       <span class="carrito-empty__eyebrow">Carrito</span>
       <h2>Tu carrito esta vacio</h2>

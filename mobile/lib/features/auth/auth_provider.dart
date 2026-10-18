@@ -19,6 +19,11 @@ class AuthState {
 
   bool hasPermiso(String codigo) => usuario?.hasPermiso(codigo) ?? false;
 
+  /// Acciones de cliente (carrito, reservar, probador AR): un visitante sin
+  /// sesion SI las ve -- al usarlas se le pide iniciar sesion (ver
+  /// `asegurarSesion`). Con sesion, solo si su rol tiene ese CU (CU02).
+  bool mostrarAccionCliente(String codigo) => !isAuthenticated || hasPermiso(codigo);
+
   AuthState copyWith({Usuario? usuario, bool clearUsuario = false, bool? bootstrapping, String? sessionMessage, bool clearMessage = false}) {
     return AuthState(
       usuario: clearUsuario ? null : (usuario ?? this.usuario),

@@ -105,6 +105,15 @@
   }
 }
 
+.carrito-empty__registro {
+  display: block;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-dark);
+  text-decoration: underline;
+}
+
 .carrito-content {
   display: flex;
   flex-direction: column;

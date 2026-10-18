@@ -10,7 +10,16 @@ import 'google_auth.dart';
 import 'google_auth_button.dart';
 
 class RegistroScreen extends ConsumerStatefulWidget {
-  const RegistroScreen({super.key});
+  const RegistroScreen({super.key, this.onSuccess, this.onIrALogin});
+
+  /// Igual que en LoginScreen: si se abrio empujada desde una accion que
+  /// necesitaba sesion (carrito, reservar, probador AR), al registrarse
+  /// vuelve y retoma esa accion en vez de ir al inicio.
+  final VoidCallback? onSuccess;
+
+  /// "Ya tenes cuenta? Inicia sesion" cuando esta pantalla se abrio fuera
+  /// del router (ver `asegurarSesion`); por defecto hace pop.
+  final VoidCallback? onIrALogin;
 
   @override
   ConsumerState<RegistroScreen> createState() => _RegistroScreenState();
@@ -62,11 +71,19 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
         telefono: _telefonoCtrl.text.trim().isEmpty ? null : _telefonoCtrl.text.trim(),
       );
       if (!mounted) return;
-      context.go('/');
+      _irDespuesDeEntrar();
     } catch (e) {
       setState(() => _error = extractErrorMessage(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _irDespuesDeEntrar() {
+    if (widget.onSuccess != null) {
+      widget.onSuccess!();
+    } else {
+      context.go('/');
     }
   }
 
@@ -80,7 +97,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
       if (resultado.cancelled) return;
       await ref.read(authProvider.notifier).loginWithGoogle(resultado.idToken!);
       if (!mounted) return;
-      context.go('/');
+      _irDespuesDeEntrar();
     } catch (e) {
       setState(() => _error = extractErrorMessage(e));
     } finally {
@@ -144,7 +161,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
               const SizedBox(height: 16),
               Center(
                 child: TextButton(
-                  onPressed: () => context.pop(),
+                  onPressed: widget.onIrALogin ?? () => context.pop(),
                   child: const Text('Ya tenes cuenta? Inicia sesion'),
                 ),
               ),

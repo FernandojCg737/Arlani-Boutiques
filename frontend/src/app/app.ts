@@ -5,12 +5,13 @@ import { filter } from 'rxjs/operators';
 import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
 import { Footer } from './components/footer/footer';
 import { Header } from './components/header/header';
+import { LoginRequeridoModal } from './components/login-requerido/login-requerido';
 import { WhatsappFloat } from './components/whatsapp-float/whatsapp-float';
 import { Auth } from './services/auth';
 import { InactivitySession } from './services/inactivity-session';
 
 @Component({
-  imports: [RouterOutlet, Header, Footer, WhatsappFloat, ChatbotWidget],
+  imports: [RouterOutlet, Header, Footer, WhatsappFloat, ChatbotWidget, LoginRequeridoModal],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',

@@ -1,0 +1,25 @@
+@if (loginRequerido.pedido(); as pedido) {
+  <div class="login-req-overlay" (click)="loginRequerido.cerrar()">
+    <div
+      class="login-req-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="login-req-titulo"
+      (click)="$event.stopPropagation()"
+    >
+      <button type="button" class="login-req-cerrar" (click)="loginRequerido.cerrar()" aria-label="Cerrar">&times;</button>
+
+      <svg class="login-req-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="4" y="11" width="16" height="10" rx="1" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </svg>
+
+      <h2 id="login-req-titulo">Inicia sesion</h2>
+      <p class="login-req-texto">Necesitas iniciar sesion {{ pedido.accion }}.</p>
+
+      <button type="button" class="login-req-principal" (click)="ir('/login')">Iniciar sesion</button>
+      <button type="button" class="login-req-secundario" (click)="ir('/registro')">Crear una cuenta</button>
+      <button type="button" class="login-req-ahora-no" (click)="loginRequerido.cerrar()">Ahora no</button>
+    </div>
+  </div>
+}

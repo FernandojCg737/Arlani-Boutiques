@@ -1,0 +1,92 @@
+// Mismo lenguaje visual que los modales de reserva / agregar al carrito.
+.login-req-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-req-modal {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  padding: 36px 28px 24px;
+  text-align: center;
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--brand-dark);
+  }
+}
+
+.login-req-icono {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 12px;
+  color: var(--brand-dark);
+}
+
+.login-req-texto {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+}
+
+.login-req-cerrar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--brand-dark);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+%login-req-boton {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.login-req-principal {
+  @extend %login-req-boton;
+  border: none;
+  background: var(--brand-dark);
+  color: #fff;
+}
+
+.login-req-secundario {
+  @extend %login-req-boton;
+  margin-top: 10px;
+  border: 1px solid var(--brand-dark);
+  background: #fff;
+  color: var(--brand-dark);
+}
+
+.login-req-ahora-no {
+  margin-top: 14px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -90,7 +90,7 @@
           </div>
         }
 
-        @if (auth.hasPermiso('CU13')) {
+        @if (auth.mostrarAccionCliente('CU13')) {
         <button
           type="button"
           class="producto-info__add-to-cart"
@@ -105,7 +105,7 @@
         </button>
         }
 
-        @if (p.hasPhotos && auth.hasPermiso('CU09')) {
+        @if (p.hasPhotos && auth.mostrarAccionCliente('CU09')) {
           <div class="producto-info__ar-group">
             <button type="button" class="producto-info__ar" (click)="toggleArMenu()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -130,7 +130,7 @@
           </div>
         }
 
-        @if (!isAgotado(p) && auth.hasPermiso('CU10')) {
+        @if (!isAgotado(p) && auth.mostrarAccionCliente('CU10')) {
           <button type="button" class="producto-info__ar" (click)="abrirReserva()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="4" width="18" height="18" rx="2" />

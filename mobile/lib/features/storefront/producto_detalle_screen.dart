@@ -7,7 +7,7 @@ import '../../core/theme.dart';
 import '../../models/producto_publico.dart';
 import '../../widgets/product_card.dart';
 import '../auth/auth_provider.dart';
-import '../auth/login_screen.dart';
+import '../auth/login_requerido.dart';
 import 'agregar_carrito_screen.dart';
 import 'ar_foto_screen.dart';
 import 'ar_tryon_screen.dart';
@@ -39,16 +39,10 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
   // Con sesion, se elige entre ONLINE (camara en vivo) y VIRTUAL (subir
   // una foto), tambien igual que en la web.
   Future<void> _abrirProbadorAr(int productoId) async {
-    if (!ref.read(authProvider).isAuthenticated) {
-      // Al loguearse, vuelve (pop) y retoma esta misma accion -- antes
-      // mandaba al Home/Admin y el cliente perdia lo que estaba por hacer
-      // (reportado por testers probando "agregar al carrito"/"reservar").
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => LoginScreen(onSuccess: () => Navigator.of(context).pop())),
-      );
-      if (!mounted || !ref.read(authProvider).isAuthenticated) return;
-      return _abrirProbadorAr(productoId);
-    }
+    // Sin sesion: avisa e invita a iniciar sesion / registrarse; al volver
+    // logueado retoma esta misma accion (ver asegurarSesion).
+    if (!await asegurarSesion(context, ref, accion: 'para probarte esta prenda con realidad aumentada')) return;
+    if (!mounted) return;
 
     final modo = await showModalBottomSheet<String>(
       context: context,
@@ -85,13 +79,8 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
 
   // CU11 requiere sesion iniciada (el carrito queda ligado al cliente).
   Future<void> _abrirAgregarCarrito(int productoId, String productoNombre) async {
-    if (!ref.read(authProvider).isAuthenticated) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => LoginScreen(onSuccess: () => Navigator.of(context).pop())),
-      );
-      if (!mounted || !ref.read(authProvider).isAuthenticated) return;
-      return _abrirAgregarCarrito(productoId, productoNombre);
-    }
+    if (!await asegurarSesion(context, ref, accion: 'para anadir productos a tu carrito')) return;
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => AgregarCarritoScreen(productoId: productoId, productoNombre: productoNombre)),
     );
@@ -100,13 +89,8 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
   // CU10 requiere sesion iniciada (la reserva queda ligada al cliente que
   // la hizo, igual que CU09).
   Future<void> _abrirReserva(int productoId, String productoNombre) async {
-    if (!ref.read(authProvider).isAuthenticated) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => LoginScreen(onSuccess: () => Navigator.of(context).pop())),
-      );
-      if (!mounted || !ref.read(authProvider).isAuthenticated) return;
-      return _abrirReserva(productoId, productoNombre);
-    }
+    if (!await asegurarSesion(context, ref, accion: 'para reservar este producto')) return;
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ReservaFormScreen(productoId: productoId, productoNombre: productoNombre)),
     );
@@ -197,12 +181,12 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
                     const Divider(height: 32),
                     Text(p.descripcion ?? 'Este producto no tiene una descripcion detallada todavia.'),
                     const Divider(height: 32),
-                    if (auth.hasPermiso('CU13'))
+                    if (auth.mostrarAccionCliente('CU13'))
                       ElevatedButton(
                         onPressed: p.agotado ? null : () => _abrirAgregarCarrito(p.id, p.nombre),
                         child: Text(p.agotado ? 'SIN STOCK' : 'ANADIR AL CARRITO'),
                       ),
-                    if (p.hasPhotos && auth.hasPermiso('CU09')) ...[
+                    if (p.hasPhotos && auth.mostrarAccionCliente('CU09')) ...[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: () => _abrirProbadorAr(p.id),
@@ -216,7 +200,7 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
                         ),
                       ),
                     ],
-                    if (!p.agotado && auth.hasPermiso('CU10')) ...[
+                    if (!p.agotado && auth.mostrarAccionCliente('CU10')) ...[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: () => _abrirReserva(p.id, p.nombre),
