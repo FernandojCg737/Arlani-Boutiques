@@ -1,11 +1,28 @@
-<div class="admin-content">
+<div class="admin-content" [class.admin-content--embebido]="embebido()">
   <div class="admin-content__header">
     <div>
-      <span class="admin-content__eyebrow">P2 · CU03</span>
-      <h1>Registrar y Administrar Clientes</h1>
-      <p>
-        Lista de clientes registrados. Podes crear cuentas nuevas, editar sus datos, o activar/desactivar su acceso.
-      </p>
+      @if (embebido()) {
+        <h2>Todos los clientes</h2>
+        <p>
+          Cada cliente tiene una sola cuenta en la plataforma y con ella compra en cualquier boutique. Elige una empresa
+          arriba para ver solo los que trabajaron con ella.
+        </p>
+      } @else {
+        <span class="admin-content__eyebrow">P1 · CU03</span>
+        <h1>Registrar y Administrar Clientes</h1>
+        <p>
+          @if (esSuper && empresaId() !== null) {
+            Clientes que trabajaron con esta empresa: compraron, reservaron, tienen sus prendas en el carrito, usaron el
+            probador o los registró su personal.
+          } @else if (esSuper) {
+            Todos los clientes de la plataforma. Puedes crear cuentas nuevas, editar sus datos o activar/desactivar su
+            acceso.
+          } @else {
+            Clientes que trabajaron con tu tienda: compraron, reservaron, tienen tus prendas en el carrito, usaron el
+            probador o los registró tu personal.
+          }
+        </p>
+      }
     </div>
 
     <form class="admin-search" (submit)="$event.preventDefault(); search()">
@@ -20,8 +37,14 @@
   </div>
 
   <div class="admin-content__header">
-    <span></span>
-    <button type="button" class="admin-search__refresh" (click)="openCreate()">+ Nuevo Cliente</button>
+    <span class="admin-content__total">
+      @if (!loading()) {
+        {{ clientes().length }} {{ clientes().length === 1 ? 'cliente' : 'clientes' }}
+      }
+    </span>
+    @if (puedeCrear()) {
+      <button type="button" class="admin-search__refresh" (click)="openCreate()">+ Nuevo Cliente</button>
+    }
   </div>
 
   @if (error()) {
@@ -36,6 +59,9 @@
           <th>Telefono</th>
           <th>Direccion</th>
           <th>Metodo</th>
+          @if (conRelacion()) {
+            <th>Relación con la tienda</th>
+          }
           <th>Estado</th>
           <th>Registrado</th>
           <th></th>
@@ -44,11 +70,13 @@
       <tbody>
         @if (loading()) {
           <tr>
-            <td colspan="7" class="admin-table__empty">Cargando...</td>
+            <td [attr.colspan]="columnas()" class="admin-table__empty">Cargando...</td>
           </tr>
         } @else if (clientes().length === 0) {
           <tr>
-            <td colspan="7" class="admin-table__empty">No hay clientes registrados.</td>
+            <td [attr.colspan]="columnas()" class="admin-table__empty">
+              {{ conRelacion() ? 'Todavía ningún cliente trabajó con esta tienda.' : 'No hay clientes registrados.' }}
+            </td>
           </tr>
         } @else {
           @for (c of clientes(); track c.id) {
@@ -64,6 +92,16 @@
               <td>
                 <span class="admin-badge is-neutral">{{ metodoLabel(c.metodo_registro) }}</span>
               </td>
+              @if (conRelacion()) {
+                <td>
+                  <div class="relacion">
+                    <span>{{ relacion(c).join(' · ') }}</span>
+                    @if (c.relacion?.ultima_interaccion; as ultima) {
+                      <small>Última vez: {{ ultima | date: 'd MMM y' }}</small>
+                    }
+                  </div>
+                </td>
+              }
               <td>
                 <span class="admin-badge" [class.is-inactive]="c.estado === 'inactivo'">{{ c.estado }}</span>
               </td>

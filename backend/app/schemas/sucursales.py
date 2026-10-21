@@ -41,6 +41,7 @@ class SucursalOut(BaseModel):
     fecha_creacion: date
     latitud: float | None
     longitud: float | None
+    empresa_id: int | None = None
 
     model_config = {"from_attributes": True}
 

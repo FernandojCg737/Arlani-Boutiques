@@ -1,0 +1,64 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      @if (ubicacion(); as u) {
+        <h1>{{ u.caso.nombre }}</h1>
+        <p>Elige la empresa con la que vas a trabajar en el {{ u.caso.codigo }}.</p>
+      } @else {
+        <h1>Caso de uso no encontrado</h1>
+      }
+    </div>
+    <label class="buscar">
+      <input
+        type="search"
+        placeholder="Buscar empresa..."
+        aria-label="Buscar empresa"
+        [value]="busqueda()"
+        (input)="busqueda.set($any($event.target).value)"
+      />
+    </label>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  <div class="cuadros">
+    @if (cargando()) {
+      @for (n of [1, 2, 3]; track n) {
+        <div class="cuadro cuadro--cargando"></div>
+      }
+    }
+    @for (e of visibles(); track e.id; let i = $index) {
+      <button type="button" class="cuadro" [style.--color]="e.colorMarca" [style.--n]="i" (click)="abrir(e)">
+        <span class="cuadro__franja" aria-hidden="true"></span>
+        <span class="cuadro__avatar">{{ inicial(e.nombre) }}</span>
+        <strong>{{ e.nombre }}</strong>
+        <small>/tienda-{{ e.subdominio }}</small>
+        <span class="cuadro__datos">
+          <span class="cuadro__estado" [class.cuadro__estado--suspendida]="e.estado === 'suspendida'">
+            {{ e.estado === 'activa' ? 'Activa' : 'Suspendida' }}
+          </span>
+          <span>{{ e.planNombre ?? 'Sin plan' }}</span>
+          <span>{{ e.sucursalesActivas }} {{ e.sucursalesActivas === 1 ? 'sucursal' : 'sucursales' }}</span>
+          @if (ubicacion()?.caso?.codigo === 'CU03' && clientes()[e.id] !== undefined) {
+            <span>{{ clientes()[e.id] }} {{ clientes()[e.id] === 1 ? 'cliente' : 'clientes' }}</span>
+          }
+        </span>
+        <span class="cuadro__ir" aria-hidden="true">
+          Abrir
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </span>
+      </button>
+    } @empty {
+      @if (!cargando()) {
+        <p class="vacio">No hay empresas que coincidan.</p>
+      }
+    }
+  </div>
+
+  <!-- CU03: los clientes son de la plataforma, asi que debajo de las empresas van todos -->
+  @if (ubicacion()?.caso?.codigo === 'CU03') {
+    <app-admin-clientes [embebido]="true" />
+  }
+</div>

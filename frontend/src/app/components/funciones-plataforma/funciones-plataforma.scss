@@ -1,0 +1,535 @@
+// Funciones de la plataforma: continúa el fondo azul noche de la vitrina.
+// Anillos y brillos en coral / oro rosa (colores del logo de Arlani).
+:host {
+  --fondo: #0b111d;
+  --coral: #e8806b;
+  --oro: #f2b8a6;
+  --linea: rgba(242, 184, 166, 0.16);
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+.funciones {
+  scroll-margin-top: 84px;
+  background: var(--fondo);
+  color: #fff;
+  padding: clamp(24px, 4vw, 48px) 0 clamp(72px, 9vw, 128px);
+}
+
+// Las animaciones solo corren con la sección en pantalla (ver el .ts).
+.funciones:not(.funciones--activa) * {
+  animation-play-state: paused !important;
+}
+
+.funciones__titulo {
+  max-width: 1440px;
+  margin: 0 auto clamp(36px, 5vw, 64px);
+  padding: 0 clamp(20px, 6vw, 120px);
+  font-family: inherit;
+  font-size: clamp(2rem, 4vw, 3.75rem);
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.funciones__grilla {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 6vw, 120px);
+  display: grid;
+  gap: 40px;
+
+  @media (min-width: 960px) {
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 24px;
+  }
+}
+
+// ----------------------------------------------------------------- tarjeta
+
+.funcion {
+  min-width: 0;
+
+  h3 {
+    margin: 24px 0 10px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  p {
+    margin: 0;
+    max-width: 34ch;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.62);
+  }
+
+  a {
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+
+    &:hover {
+      color: #fff;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--oro);
+      outline-offset: 2px;
+    }
+  }
+}
+
+.funcion__lienzo {
+  position: relative;
+  height: clamp(340px, 34vw, 460px);
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(120% 90% at 50% 50%, rgba(62, 76, 109, 0.35) 0%, transparent 70%),
+    #0e1524;
+}
+
+// Anillos concéntricos de fondo (tres circunferencias finas).
+.anillos {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+
+  span {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    border-radius: 50%;
+    border: 1px solid var(--linea);
+    transform: translate(-50%, -50%);
+
+    &:nth-child(1) {
+      width: 220px;
+      height: 220px;
+    }
+
+    &:nth-child(2) {
+      width: 390px;
+      height: 390px;
+    }
+
+    &:nth-child(3) {
+      width: 580px;
+      height: 580px;
+    }
+  }
+}
+
+.anillos--suaves span {
+  border-color: rgba(242, 184, 166, 0.08);
+}
+
+// ---------------------------------------------- 1. tienda con tu marca
+
+.funcion__lienzo--tienda .anillos {
+  left: 0;
+  top: 100%;
+}
+
+.maqueta {
+  position: absolute;
+  left: 15%;
+  top: 12%;
+  width: 160%;
+  border-radius: 8px 0 0 8px;
+  overflow: visible;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7);
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px 0 0 8px;
+  }
+}
+
+// Recuadro de "edición" sobre el título de la tienda, como un editor visual.
+.maqueta__seleccion {
+  position: absolute;
+  left: 33%;
+  top: 16%;
+  width: 34%;
+  height: 16%;
+  border: 2px solid var(--coral);
+  border-radius: 3px;
+  animation: seleccion-respira 4s ease-in-out infinite;
+}
+
+.maqueta__etiqueta {
+  position: absolute;
+  left: -2px;
+  bottom: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 4px 4px 0 0;
+  background: var(--coral);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  svg {
+    width: 11px;
+    height: 11px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+  }
+}
+
+.maqueta__colores {
+  position: absolute;
+  left: 26%;
+  top: 46%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 8px 10px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1e2433;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.55);
+  animation: colores-flota 5s ease-in-out infinite;
+}
+
+.muestra {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  animation: muestra-elegida 6s steps(1, end) infinite;
+
+  &:nth-child(2) {
+    animation-delay: 2s;
+  }
+
+  &:nth-child(3) {
+    animation-delay: 4s;
+  }
+}
+
+@keyframes seleccion-respira {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 128, 107, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(232, 128, 107, 0.18);
+  }
+}
+
+@keyframes colores-flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+// La muestra "elegida" lleva un aro; va pasando de un color al otro.
+@keyframes muestra-elegida {
+  0% {
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.15),
+      0 0 0 2px #fff,
+      0 0 0 4px var(--coral);
+  }
+
+  33.33%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  }
+}
+
+// ------------------------------------------------- 2. panel de sucursales
+
+// Arco de luz que gira sobre los anillos, como un radar.
+.barrido {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 580px;
+  height: 580px;
+  margin: -290px 0 0 -290px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg 250deg, rgba(232, 128, 107, 0.28) 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 109px, #000 110px 111px, transparent 112px 194px, #000 195px 196px, transparent 197px 289px, #000 290px);
+  mask: radial-gradient(circle, transparent 0 109px, #000 110px 111px, transparent 112px 194px, #000 195px 196px, transparent 197px 289px, #000 290px);
+  animation: barrido-gira 9s linear infinite;
+}
+
+.nucleo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 210px;
+  height: 210px;
+  margin: -105px 0 0 -105px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(232, 128, 107, 0.42) 0%, rgba(232, 128, 107, 0.12) 45%, transparent 70%);
+  animation: nucleo-late 5s ease-in-out infinite;
+}
+
+// --x / --y: posición en % (0-100) alrededor del centro. En celular se
+// acercan al centro para que las etiquetas de los bordes no se corten.
+.modulo {
+  --separacion: 0.74%;
+  position: absolute;
+  left: calc(50% + (var(--x) - 50) * var(--separacion));
+  top: calc(50% + (var(--y) - 50) * 1%);
+  transform: translate(-50%, -50%);
+  padding: 7px 13px;
+  font-size: 0.76rem;
+
+  @media (min-width: 600px) {
+    --separacion: 1%;
+    padding: 9px 18px;
+    font-size: 0.88rem;
+  }
+
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(11, 17, 29, 0.75);
+  color: rgba(255, 255, 255, 0.38);
+  font-weight: 600;
+  white-space: nowrap;
+  animation: modulo-enciende 14s var(--salida) infinite;
+  animation-delay: calc(var(--i) * 2s);
+}
+
+@keyframes barrido-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes nucleo-late {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+// Cada módulo se enciende unos segundos y vuelve a apagarse; con el retraso
+// por índice se van turnando alrededor del panel.
+@keyframes modulo-enciende {
+  0%,
+  22%,
+  100% {
+    color: rgba(255, 255, 255, 0.38);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+  }
+
+  4%,
+  16% {
+    color: #fff;
+    border-color: rgba(242, 184, 166, 0.65);
+    box-shadow: 0 0 24px -4px rgba(232, 128, 107, 0.55);
+  }
+}
+
+// ------------------------------------------------ 3. ventas sin internet
+
+.baldosa {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 66px;
+  height: 66px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: baldosa-flota 6s ease-in-out infinite;
+
+  svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  span {
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+  }
+}
+
+.baldosa--centro {
+  left: calc(50% - 40px);
+  top: calc(46% - 40px);
+  width: 80px;
+  height: 80px;
+  border-color: rgba(242, 184, 166, 0.45);
+  background: rgba(232, 128, 107, 0.14);
+  box-shadow: 0 0 40px -6px rgba(232, 128, 107, 0.5);
+  animation: none;
+
+  svg {
+    width: 34px;
+    height: 34px;
+    stroke: var(--oro);
+  }
+}
+
+.baldosa--movil {
+  left: 10%;
+  top: 12%;
+}
+
+.baldosa--caja {
+  right: 9%;
+  top: 22%;
+  animation-delay: -2s;
+}
+
+.baldosa--web {
+  left: 18%;
+  top: 60%;
+  animation-delay: -4s;
+}
+
+@keyframes baldosa-flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+// Estado de conexión: alterna entre "sin internet" y "sincronizado".
+.estado {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  transform: translateX(-50%);
+  display: grid;
+}
+
+.estado__fila {
+  grid-area: 1 / 1;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(11, 17, 29, 0.85);
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+}
+
+.estado__fila--sin {
+  animation: estado-sin 8s ease-in-out infinite;
+
+  i {
+    background: #f2b84b;
+  }
+}
+
+.estado__fila--ok {
+  animation: estado-ok 8s ease-in-out infinite;
+
+  i {
+    background: #5fd39a;
+    box-shadow: 0 0 10px #5fd39a;
+  }
+}
+
+@keyframes estado-sin {
+  0%,
+  45% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  52%,
+  95% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes estado-ok {
+  0%,
+  45% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  52%,
+  95% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+// ------------------------------------------------------- menos movimiento
+
+@media (prefers-reduced-motion: reduce) {
+  .funciones * {
+    animation: none !important;
+  }
+
+  .estado__fila--ok {
+    opacity: 0;
+  }
+}

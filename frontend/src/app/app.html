@@ -6,16 +6,30 @@
 }
 
 @if (!hideChrome()) {
-  <app-header />
+  @if (headerPlataforma()) {
+    <app-header-plataforma [siempreSolido]="encabezadoSolido()" />
+  } @else {
+    <app-header />
+  }
 }
 
 <router-outlet />
 
 @if (!hideChrome()) {
-  <app-footer />
-  <app-whatsapp-float />
-  @if (auth.hasPermiso('CU19')) {
-    <app-chatbot-widget />
+  @if (headerPlataforma()) {
+    <app-footer-plataforma />
+    <!-- En la portada de Arlani, WhatsApp es para consultas sobre planes y soporte -->
+    <app-whatsapp-float
+      phoneNumber="59173766956"
+      message="Hola, quisiera información sobre los planes de suscripción de Arlani Boutiques (o necesito ayuda de soporte)."
+    />
+  } @else {
+    <!-- El asistente es de la tienda Atelier Aranier: no va en la portada de Arlani -->
+    <app-footer />
+    <app-whatsapp-float />
+    @if (auth.hasPermiso('CU19')) {
+      <app-chatbot-widget />
+    }
   }
 }
 

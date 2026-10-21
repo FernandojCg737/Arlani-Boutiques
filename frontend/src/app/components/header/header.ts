@@ -91,10 +91,10 @@ export class Header implements OnInit, OnDestroy {
   }
 
   protected readonly navLinks: NavLink[] = [
-    { label: 'Tienda', path: '/tienda' },
-    { label: 'Poleras', path: '/tienda', queryParams: { categoria: 'poleras' } },
-    { label: 'Pantalones', path: '/tienda', queryParams: { categoria: 'pantalones' } },
-    { label: 'Ofertas', path: '/tienda', queryParams: { filtro: 'ofertas' } },
+    { label: 'Tienda', path: '/tienda-atelier-aranier' },
+    { label: 'Poleras', path: '/tienda-atelier-aranier', queryParams: { categoria: 'poleras' } },
+    { label: 'Pantalones', path: '/tienda-atelier-aranier', queryParams: { categoria: 'pantalones' } },
+    { label: 'Ofertas', path: '/tienda-atelier-aranier', queryParams: { filtro: 'ofertas' } },
     { label: 'Cotizaciones', path: '/cotizaciones' },
     { label: 'Contacto', path: '/contacto' },
   ];
@@ -203,7 +203,7 @@ export class Header implements OnInit, OnDestroy {
     const termino = this.searchQuery().trim();
     if (!termino) return;
 
-    this.router.navigate(['/tienda'], { queryParams: { buscar: termino } });
+    this.router.navigate(['/tienda-atelier-aranier'], { queryParams: { buscar: termino } });
     this.closeSearch();
   }
 }

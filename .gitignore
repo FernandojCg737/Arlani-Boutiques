@@ -33,6 +33,9 @@ Thumbs.db
 
 # Claude Code / documentacion interna (no va al repo)
 .claude/
+.impeccable/
+PRODUCT.md
+skills-lock.json
 docs/*
 !docs/metodos-por-cu/
 !docs/Analisis de clases/

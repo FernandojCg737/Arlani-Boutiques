@@ -1,110 +1,145 @@
-<section class="carrito-page">
-  <a routerLink="/tienda" class="volver-link">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </svg>
-    Volver
-  </a>
-
-  <div class="carrito-page__header">
+<section class="carrito">
+  <header class="carrito__cabecera">
+    <a routerLink="/tienda-atelier-aranier" class="carrito__volver">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+      Seguir comprando
+    </a>
+    <span class="carrito__antetitulo">Tu carrito</span>
     <h1>Carrito de compras</h1>
-    <p>Revisa tus articulos seleccionados antes de finalizar la compra.</p>
-  </div>
+    <p>Revisa las prendas que elegiste antes de finalizar la compra o reservarlas.</p>
+  </header>
 
   @if (!auth.currentUser()) {
-    <div class="carrito-empty">
-      <span class="carrito-empty__eyebrow">Carrito</span>
-      <h2>Inicia sesion para ver tu carrito</h2>
-      <p>Tu carrito se guarda en tu cuenta: inicia sesion o crea una cuenta para agregar productos y comprar.</p>
-      <a class="carrito-empty__btn" routerLink="/login" [queryParams]="{ returnUrl: '/carrito' }">
-        <span>Iniciar sesion</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="5" y1="12" x2="19" y2="12" />
-          <polyline points="12 5 19 12 12 19" />
-        </svg>
-      </a>
-      <a class="carrito-empty__registro" routerLink="/registro" [queryParams]="{ returnUrl: '/carrito' }">
-        Crear una cuenta
-      </a>
+    <div class="vacio">
+      <img class="vacio__bolsa" src="/img/arlani-icono-192.png" alt="" width="96" height="96" />
+      <h2>Inicia sesión para ver tu carrito</h2>
+      <p>Tu carrito se guarda en tu cuenta: inicia sesión o crea una cuenta para agregar prendas y comprar.</p>
+      <div class="vacio__botones">
+        <a class="boton boton--lleno" routerLink="/login" [queryParams]="{ returnUrl: '/carrito' }">Iniciar sesión</a>
+        <a class="boton" routerLink="/registro" [queryParams]="{ returnUrl: '/carrito' }">Crear una cuenta</a>
+      </div>
     </div>
   } @else if (cart.items().length === 0) {
-    <div class="carrito-empty">
-      <span class="carrito-empty__eyebrow">Carrito</span>
-      <h2>Tu carrito esta vacio</h2>
-      <p>Agrega productos a tu carrito para comenzar</p>
-      <a class="carrito-empty__btn" routerLink="/tienda">
-        <span>Continuar comprando</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="5" y1="12" x2="19" y2="12" />
-          <polyline points="12 5 19 12 12 19" />
-        </svg>
-      </a>
+    <div class="vacio">
+      <img class="vacio__bolsa" src="/img/arlani-icono-192.png" alt="" width="96" height="96" />
+      <h2>Tu carrito está vacío</h2>
+      <p>Explora las boutiques de Arlani y agrega las prendas que te gusten.</p>
+      <div class="vacio__botones">
+        <a class="boton boton--lleno" routerLink="/" fragment="boutiques">Explorar boutiques</a>
+        <a class="boton" routerLink="/" fragment="promociones">Ver promociones</a>
+      </div>
     </div>
   } @else {
-    <div class="carrito-content">
-      <ul class="carrito-list">
-        @for (item of cart.items(); track item.id) {
-          <li class="carrito-item">
-            <img [src]="item.producto_imagen_url ?? '/img/productos/producto-1.jpg'" [alt]="item.producto_nombre" />
+    <div class="carrito__contenido">
+      <!-- Prendas agrupadas por la boutique que las vende -->
+      <div class="grupos">
+        @for (grupo of grupos(); track grupo.boutique.id) {
+          <article class="grupo">
+            <header class="grupo__cabecera">
+              <span class="grupo__logo"><img [src]="grupo.boutique.logo" alt="" /></span>
+              <div class="grupo__marca">
+                <small>Vendido por</small>
+                <strong>{{ grupo.boutique.nombre }}</strong>
+              </div>
+              <a class="grupo__catalogo" [routerLink]="grupo.boutique.ruta">Ver catálogo</a>
+            </header>
 
-            <div class="carrito-item__info">
-              <span class="carrito-item__name">{{ item.producto_nombre }}</span>
-              <span class="carrito-item__variante">{{ item.talla_codigo }} · {{ item.color_nombre }}</span>
-              <span class="carrito-item__variante">Retiro en {{ item.sucursal_nombre }}</span>
-              <span class="carrito-item__price">{{ item.precio_unitario | number: '1.2-2' }} Bs</span>
-            </div>
+            <ul class="lista">
+              @for (item of grupo.items; track item.id) {
+                <li class="item">
+                  <img
+                    class="item__foto"
+                    [src]="item.producto_imagen_url ?? '/img/productos/producto-1.jpg'"
+                    [alt]="item.producto_nombre"
+                  />
 
-            <div class="carrito-item__qty">
-              <button type="button" (click)="decrease(item.id, item.cantidad)" aria-label="Restar">−</button>
-              <span>{{ item.cantidad }}</span>
-              <button type="button" (click)="increase(item.id, item.cantidad)" aria-label="Sumar">+</button>
-            </div>
+                  <div class="item__info">
+                    <span class="item__nombre">{{ item.producto_nombre }}</span>
+                    <span class="item__variante">Talla {{ item.talla_codigo }} · {{ item.color_nombre }}</span>
+                    <span class="item__retiro">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 21s7-6.5 7-11.5a7 7 0 1 0-14 0C5 14.5 12 21 12 21Z" />
+                        <circle cx="12" cy="9.5" r="2.5" />
+                      </svg>
+                      Retiro en {{ item.sucursal_nombre }}
+                    </span>
+                    <span class="item__unitario">{{ item.precio_unitario | number: '1.2-2' }} Bs c/u</span>
+                  </div>
 
-            <span class="carrito-item__subtotal">{{ item.subtotal | number: '1.2-2' }} Bs</span>
+                  <div class="item__cantidad" role="group" [attr.aria-label]="'Cantidad de ' + item.producto_nombre">
+                    <button type="button" (click)="decrease(item.id, item.cantidad)" aria-label="Restar uno">−</button>
+                    <span aria-live="polite">{{ item.cantidad }}</span>
+                    <button type="button" (click)="increase(item.id, item.cantidad)" aria-label="Sumar uno">+</button>
+                  </div>
 
-            <button type="button" class="carrito-item__remove" aria-label="Quitar del carrito" (click)="remove(item.id)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <line x1="5" y1="5" x2="19" y2="19" />
-                <line x1="19" y1="5" x2="5" y2="19" />
-              </svg>
-            </button>
-          </li>
+                  <span class="item__subtotal">{{ item.subtotal | number: '1.2-2' }} Bs</span>
+
+                  <button
+                    type="button"
+                    class="item__quitar"
+                    [attr.aria-label]="'Quitar ' + item.producto_nombre + ' del carrito'"
+                    (click)="remove(item.id)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+                    </svg>
+                  </button>
+                </li>
+              }
+            </ul>
+
+            <footer class="grupo__pie">
+              <span>Subtotal en {{ grupo.boutique.nombre }}</span>
+              <strong>{{ grupo.subtotal | number: '1.2-2' }} Bs</strong>
+            </footer>
+          </article>
         }
-      </ul>
+      </div>
 
-      <div class="carrito-summary">
-        <div class="carrito-summary__row">
-          <span>Total ({{ cart.totalItems() }} articulos)</span>
-          <span class="carrito-summary__total">{{ cart.totalPrice() | number: '1.2-2' }} Bs</span>
+      <!-- Resumen y acciones -->
+      <aside class="resumen">
+        <span class="resumen__titulo">Resumen</span>
+        <div class="resumen__fila">
+          <span>{{ cart.totalItems() }} {{ cart.totalItems() === 1 ? 'prenda' : 'prendas' }}</span>
+          <span>{{ cart.totalPrice() | number: '1.2-2' }} Bs</span>
         </div>
+        <div class="resumen__total">
+          <span>Total</span>
+          <strong>{{ cart.totalPrice() | number: '1.2-2' }} Bs</strong>
+        </div>
+
         @if (auth.hasPermiso('CU11')) {
-          <button type="button" class="carrito-summary__checkout" (click)="irACheckout()">Finalizar compra</button>
+          <button type="button" class="boton boton--lleno boton--ancho" (click)="irACheckout()">Finalizar compra</button>
         }
 
         @if (!reservaAbierta() && auth.hasPermiso('CU10')) {
-          <button type="button" class="carrito-summary__reservar" (click)="abrirReserva()">Reservar</button>
+          <button type="button" class="boton boton--ancho" (click)="abrirReserva()">
+            Reservar y pagar en sucursal
+          </button>
         }
 
         @if (reservaAbierta() && auth.hasPermiso('CU10')) {
-          <div class="carrito-reserva">
+          <div class="reserva">
             @if (reservaEstado() === 'listo') {
-              <div class="carrito-reserva__exito">
-                <p>Tu reserva quedo registrada.</p>
-                <p class="carrito-reserva__detalle">
-                  Te esperamos en la sucursal el dia y hora que elegiste para pagar y recoger tu pedido. Podes ver el
+              <div class="reserva__exito">
+                <span class="reserva__check" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7" /></svg>
+                </span>
+                <p><strong>Tu reserva quedó registrada.</strong></p>
+                <p class="reserva__detalle">
+                  Te esperamos en la sucursal el día y la hora que elegiste para pagar y recoger tu pedido. Puedes ver el
                   estado en tu perfil, en "Mis reservas".
                 </p>
-                <button type="button" (click)="cerrarReserva()">Listo</button>
+                <button type="button" class="boton boton--lleno boton--ancho" (click)="cerrarReserva()">Listo</button>
               </div>
             } @else {
-              <p class="carrito-reserva__titulo">Reservar para pagar y recoger en sucursal</p>
+              <p class="reserva__titulo">Reservar para pagar y recoger en sucursal</p>
 
               @if (reservaError()) {
-                <div class="carrito-reserva__error">{{ reservaError() }}</div>
+                <div class="reserva__error" role="alert">{{ reservaError() }}</div>
               }
 
-              <label class="carrito-reserva__campo">
+              <label class="campo">
                 <span>Sucursal</span>
                 <select [value]="sucursalId()" (change)="sucursalId.set(+$any($event.target).value)">
                   @for (s of sucursales(); track s.id) {
@@ -113,8 +148,8 @@
                 </select>
               </label>
 
-              <label class="carrito-reserva__campo">
-                <span>Fecha y hora en que iras a pagar y recoger</span>
+              <label class="campo">
+                <span>Fecha y hora en que irás a pagar y recoger</span>
                 <input
                   type="datetime-local"
                   [min]="minDatetime"
@@ -124,22 +159,35 @@
                 />
               </label>
 
-              <div class="carrito-reserva__acciones">
-                <button type="button" class="is-secondary" (click)="cerrarReserva()">Cancelar</button>
+              <div class="reserva__acciones">
+                <button type="button" class="boton" (click)="cerrarReserva()">Cancelar</button>
                 <button
                   type="button"
+                  class="boton boton--lleno"
                   [disabled]="reservaEstado() === 'enviando' || !horario() || !sucursalId()"
                   (click)="confirmarReserva()"
                 >
-                  {{ reservaEstado() === 'enviando' ? 'Reservando...' : 'Confirmar reserva' }}
+                  {{ reservaEstado() === 'enviando' ? 'Reservando…' : 'Confirmar reserva' }}
                 </button>
               </div>
             }
           </div>
         }
 
-        <a class="carrito-summary__continue" routerLink="/tienda">Continuar comprando</a>
-      </div>
+        <ul class="resumen__garantias">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" /></svg>
+            Pagos con QR, PayPal o en efectivo
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 21s7-6.5 7-11.5a7 7 0 1 0-14 0C5 14.5 12 21 12 21Z" />
+              <circle cx="12" cy="9.5" r="2.5" />
+            </svg>
+            Retiro en la sucursal que elegiste
+          </li>
+        </ul>
+      </aside>
     </div>
   }
 </section>

@@ -1,0 +1,95 @@
+<section class="precios" id="precios" aria-labelledby="precios-titulo">
+  <header class="precios__cabecera">
+    <span class="precios__antetitulo">Precios</span>
+    <h2 class="precios__titulo" id="precios-titulo">Un plan para cada tamaño de boutique.</h2>
+    <p class="precios__bajada">Sin costo de instalación. Cambiás de plan cuando quieras.</p>
+  </header>
+
+  <div class="controles">
+    <!-- Mensual / anual -->
+    <div class="periodo" role="group" aria-label="Período de pago">
+      <span class="periodo__pildora" [class.periodo__pildora--anual]="periodo() === 'anual'"></span>
+      <button type="button" [attr.aria-pressed]="periodo() === 'mensual'" (click)="periodo.set('mensual')">
+        Mensual
+      </button>
+      <button type="button" [attr.aria-pressed]="periodo() === 'anual'" (click)="periodo.set('anual')">
+        Anual <em>2 meses gratis</em>
+      </button>
+    </div>
+
+    <!-- Cuántas sucursales: ilumina el plan recomendado -->
+    <label class="deslizador">
+      <span class="deslizador__texto">
+        ¿Cuántas sucursales tenés?
+        <strong>{{ sucursales() }}</strong>
+      </span>
+      <input
+        type="range"
+        min="1"
+        [max]="maxSucursales"
+        step="1"
+        [value]="sucursales()"
+        [style.--progreso]="((sucursales() - 1) / (maxSucursales - 1)) * 100 + '%'"
+        (input)="alMoverSucursales($event)"
+      />
+    </label>
+  </div>
+
+  <ul class="planes">
+    @for (plan of planes; track plan.id) {
+      <li class="plan" [class.plan--recomendado]="recomendado() === plan.id">
+        @if (recomendado() === plan.id) {
+          <span class="plan__insignia">Recomendado para vos</span>
+        }
+        <h3>{{ plan.nombre }}</h3>
+        <p class="plan__resumen">{{ plan.resumen }}</p>
+
+        @if (esPrueba(plan)) {
+          <div class="plan__precio">
+            <span class="plan__monto">Gratis</span>
+          </div>
+          <p class="plan__detalle">{{ plan.diasPrueba }} días de prueba, sin tarjeta</p>
+        } @else {
+          <div class="plan__precio" aria-live="polite">
+            <span class="plan__moneda">Bs</span>
+            <!-- Se recrea al cambiar el monto, así entra con animación -->
+            @for (monto of [precioPorMes(plan)]; track monto) {
+              <span class="plan__monto">{{ monto }}</span>
+            }
+            <span class="plan__por">/ mes</span>
+          </div>
+          <p class="plan__detalle">
+            @if (periodo() === 'anual') {
+              Bs {{ precioAnual(plan).toLocaleString('es-BO') }} al año
+            } @else {
+              Facturación mensual
+            }
+          </p>
+        }
+
+        <a
+          class="plan__boton"
+          routerLink="/empezar"
+          [queryParams]="{ plan: plan.id, periodo: periodo() }"
+        >
+          {{ esPrueba(plan) ? 'Probar gratis' : 'Elegir ' + plan.nombre }}
+        </a>
+
+        <ul class="plan__incluye">
+          @for (item of plan.incluye; track item) {
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" /></svg>
+              {{ item }}
+            </li>
+          }
+          @for (item of plan.noIncluye; track item) {
+            <li class="plan__falta">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+              <span><span class="solo-lectores">No incluye: </span>{{ item }}</span>
+            </li>
+          }
+        </ul>
+      </li>
+    }
+  </ul>
+</section>

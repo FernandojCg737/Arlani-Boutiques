@@ -1,0 +1,603 @@
+// Mismo esquema visual que el panel de una tienda (admin-layout), con los
+// colores de Arlani. Los tokens heredan a las pantallas hijas.
+:host {
+  // Las pantallas del 1er parcial pintan con --brand-dark: acá pasa a ser
+  // el azul noche de Arlani en vez del verde de Atelier.
+  --brand-dark: #121a2c;
+  --noche: #0b111d;
+  --noche-2: #121a2c;
+  --pizarra: #3e4c6d;
+  --marfil: #f7f4f2;
+  --papel: #ffffff;
+  --tinta: #121a2c;
+  --gris: #5f6779;
+  --gris-2: #8a90a0;
+  --borde: #e7e2dd;
+  --coral: #e8806b;
+  --coral-oscuro: #c4503d;
+  --oro: #f2b8a6;
+  --verde: #1f8a5b;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+// Las pantallas traen su propio "P1 · CU17" con la numeración vieja: la
+// franja de contexto de arriba ya dice el parcial y el CU correctos.
+:host ::ng-deep .admin-content__eyebrow,
+:host ::ng-deep .encabezado__ante--pagina {
+  display: none;
+}
+
+.sa {
+  min-height: 100dvh;
+  background: var(--marfil);
+}
+
+// ------------------------------------------------------------------ barra
+
+.barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 20px;
+  background:
+    radial-gradient(60% 200% at 100% 0%, rgba(232, 128, 107, 0.16), transparent 60%),
+    var(--noche);
+  color: #fff;
+}
+
+.barra__marca {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  img {
+    display: block;
+    height: 38px;
+    width: auto;
+  }
+
+  span {
+    display: none;
+    padding-left: 14px;
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+
+    @media (min-width: 560px) {
+      display: inline;
+    }
+  }
+}
+
+.barra__usuario {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+
+  button {
+    padding: 7px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 999px;
+    background: none;
+    color: #fff;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+  }
+}
+
+.barra__rol {
+  display: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(232, 128, 107, 0.2);
+  color: var(--oro);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  @media (min-width: 760px) {
+    display: inline;
+  }
+}
+
+.barra__nombre {
+  display: none;
+
+  @media (min-width: 640px) {
+    display: inline;
+  }
+}
+
+// -------------------------------------------------------- parciales/paquetes
+
+.navegacion {
+  position: relative;
+  z-index: 15;
+  background: var(--papel);
+  border-bottom: 1px solid var(--borde);
+}
+
+.navegacion__fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 20px;
+}
+
+.parciales {
+  display: flex;
+  gap: 4px;
+
+  // En pantallas angostas los parciales van en su propia fila y los cinco
+  // paquetes juntos debajo.
+  @media (max-width: 640px) {
+    flex-basis: 100%;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+  padding: 4px;
+  border-radius: 14px;
+  background: #f1ede9;
+}
+
+.parcial {
+  height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--gris);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 220ms var(--salida),
+    color 220ms ease,
+    box-shadow 220ms ease;
+
+  &:hover {
+    color: var(--tinta);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 2px;
+  }
+}
+
+.parcial--activo {
+  background: var(--tinta);
+  color: #fff;
+  box-shadow: 0 6px 14px -8px rgba(18, 26, 44, 0.8);
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+.navegacion__separador {
+  @media (max-width: 640px) {
+    display: none;
+  }
+
+  width: 1px;
+  height: 34px;
+  margin: 0 8px;
+  background: var(--borde);
+}
+
+// Cuadros de paquete (igual que en el panel de una tienda).
+.paquete {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--borde);
+  background: var(--marfil);
+  color: var(--tinta);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  animation: paquete-entra 380ms var(--salida) both;
+  animation-delay: calc(var(--n) * 45ms);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s var(--salida);
+
+  &:hover {
+    border-color: #cfc8c1;
+    transform: translateY(-2px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 2px;
+  }
+
+  // Paquete de la pantalla abierta: punto coral.
+  &.paquete--actual::after {
+    content: '';
+    position: absolute;
+    bottom: 6px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--coral);
+  }
+}
+
+.paquete--abierto {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: #fff;
+}
+
+@keyframes paquete-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+}
+
+// Desplegable con los CUs del paquete.
+.desplegable {
+  animation: desplegable-entra 220ms var(--salida);
+
+  @media (max-width: 900px) {
+    padding: 0 20px 16px;
+  }
+
+  @media (min-width: 901px) {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 420px;
+    margin-top: 4px;
+    transform: translateX(-50%);
+    background: var(--papel);
+    border: 1px solid var(--borde);
+    box-shadow: 0 18px 40px -18px rgba(11, 17, 29, 0.35);
+  }
+}
+
+@keyframes desplegable-entra {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+}
+
+.desplegable__cabecera {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1ede9;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gris-2);
+}
+
+.desplegable__lista {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+
+  a {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    padding: 9px 10px;
+    color: var(--tinta);
+    font-size: 12.5px;
+    line-height: 1.4;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+
+    strong {
+      font-weight: 800;
+    }
+
+    span {
+      flex: 1;
+      min-width: 0;
+    }
+
+    &:hover {
+      background: #f4f1ee;
+    }
+
+    &.is-active {
+      background: var(--tinta);
+      color: #fff;
+
+      .etiqueta {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+      }
+    }
+  }
+}
+
+.etiqueta {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #f1ede9;
+  color: var(--gris);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.etiqueta--construir {
+  background: #fdf1dc;
+  color: #8a5a0b;
+}
+
+.etiqueta--empresa {
+  background: rgba(232, 128, 107, 0.15);
+  color: var(--coral-oscuro);
+}
+
+.desplegable__subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 10px 8px 46px;
+
+  a {
+    display: inline-block;
+    padding: 4px 9px;
+    border: 1px solid var(--borde);
+    font-size: 11.5px;
+    color: var(--gris);
+
+    &.is-active {
+      border-color: var(--tinta);
+    }
+  }
+}
+
+.desplegable__vacio {
+  margin: 0;
+  padding: 14px;
+  font-size: 12.5px;
+  color: var(--gris);
+}
+
+.desplegable__movidos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px 8px;
+  border-top: 1px dashed var(--borde);
+
+  > span {
+    padding: 4px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--gris-2);
+  }
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    color: var(--gris);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+
+    s {
+      color: var(--gris-2);
+    }
+
+    strong {
+      color: var(--coral-oscuro);
+    }
+
+    svg {
+      width: 13px;
+      height: 13px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    &:hover {
+      background: #f4f1ee;
+      color: var(--tinta);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- contexto
+
+.contexto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 16px 0;
+  font-size: 11.5px;
+  color: var(--gris);
+  animation: desplegable-entra 300ms var(--salida);
+
+  @media (min-width: 700px) {
+    padding: 22px 32px 0;
+  }
+}
+
+.contexto__ruta {
+  letter-spacing: 0.02em;
+
+  b {
+    color: var(--tinta);
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  i {
+    margin: 0 6px;
+    font-style: normal;
+    color: #cfc8c1;
+  }
+
+  em {
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #f1ede9;
+    font-style: normal;
+    font-size: 10.5px;
+  }
+}
+
+.contexto__empresa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  background: var(--papel);
+
+  b {
+    color: var(--tinta);
+  }
+
+  a {
+    margin-left: 4px;
+    color: var(--coral-oscuro);
+    font-weight: 700;
+  }
+}
+
+.contexto__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.contenido {
+  min-width: 0;
+}
+
+// ------------------------------------------------------------------ avisos
+
+.avisos {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 40px));
+}
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  border-left: 4px solid #2fb36b;
+  background: var(--noche-2);
+  color: #fff;
+  box-shadow: 0 20px 40px -16px rgba(11, 17, 29, 0.6);
+  animation: aviso-entra 380ms var(--salida);
+
+  p {
+    flex: 1;
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  button {
+    display: inline-flex;
+    padding: 2px;
+    border: none;
+    background: none;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+  }
+}
+
+.aviso--error {
+  border-left-color: var(--coral);
+}
+
+@keyframes aviso-entra {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paquete,
+  .desplegable,
+  .contexto,
+  .aviso {
+    animation: none;
+  }
+}

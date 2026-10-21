@@ -1,0 +1,156 @@
+.admin-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+
+  @media (min-width: 700px) {
+    padding: 28px 32px 64px;
+  }
+
+  &__header {
+    margin-bottom: 28px;
+
+    h1 {
+      margin: 4px 0 8px;
+      font-size: clamp(24px, 3vw, 30px);
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--brand-dark);
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #777;
+    }
+  }
+}
+
+.obra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+  padding: 32px;
+  border: 1px dashed #d8d1ca;
+  background: #fff;
+  animation: obra-entra 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.obra__icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  background: #f4f1ee;
+
+  svg {
+    width: 56px;
+    height: 56px;
+  }
+}
+
+// El dibujo de la casa se traza solo, una y otra vez, como "en obra".
+.obra__trazo {
+  fill: none;
+  stroke: var(--brand-dark);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: trazar 3.2s ease-in-out infinite;
+}
+
+@keyframes trazar {
+  45%,
+  70% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -160;
+  }
+}
+
+.obra__texto {
+  flex: 1;
+  min-width: 260px;
+
+  h2 {
+    margin: 10px 0 8px;
+    font-size: 18px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--brand-dark);
+  }
+
+  p {
+    margin: 0;
+    max-width: 60ch;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #666;
+  }
+}
+
+.obra__estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  background: #fdf1dc;
+  color: #8a5a0b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+
+  i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: parpadeo 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes parpadeo {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.obra__plataformas {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+
+  span {
+    padding: 2px 8px;
+    background: #f4f1ee;
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+  }
+}
+
+@keyframes obra-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obra,
+  .obra__trazo,
+  .obra__estado i {
+    animation: none;
+  }
+
+  .obra__trazo {
+    stroke-dashoffset: 0;
+  }
+}

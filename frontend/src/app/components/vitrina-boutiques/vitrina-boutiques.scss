@@ -1,0 +1,285 @@
+// Vitrina de boutiques: fondo azul noche de Arlani, frase grande en gris con
+// el cierre en blanco, y tarjetas con fotos de tiendas reales. Al pasar el
+// cursor, la foto se tapa con el cartel de la marca (logo + dirección).
+:host {
+  --fondo: #0b111d;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+.vitrina {
+  scroll-margin-top: 84px;
+  background: var(--fondo);
+  color: #fff;
+  padding: clamp(64px, 9vw, 128px) 0 clamp(64px, 8vw, 112px);
+}
+
+.vitrina__titulo {
+  max-width: 1440px;
+  margin: 0 auto clamp(40px, 6vw, 80px);
+  padding: 0 clamp(20px, 6vw, 120px);
+  // Grotesca con carácter (remates y curvas propias en tamaños grandes), en
+  // peso liviano y apretada, para que la frase se lea como titular.
+  font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  font-optical-sizing: auto;
+  font-size: clamp(2.2rem, 4.6vw, 4.5rem);
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  text-wrap: pretty;
+}
+
+// Cada frase tiene el degradado de la marca recortado a las letras, pero
+// tapado por el gris; al pasar el cursor el gris se vuelve transparente y la
+// frase entera se "enciende".
+.vitrina__frase {
+  // Gris opaco (no rgba): uno translúcido dejaría ver el degradado de abajo.
+  --apagado: #767b85;
+  color: var(--apagado);
+  background: linear-gradient(90deg, #f7cdbd 0%, #e8806b 50%, #c97bd6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  transition: color 450ms var(--salida);
+}
+
+@media (hover: hover) {
+  .vitrina__frase:hover {
+    color: transparent;
+  }
+}
+
+// Sin cursor (celular) las frases se encienden solas, una tras otra.
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  .vitrina__frase {
+    animation: frase-enciende 12s var(--salida) infinite;
+    animation-delay: calc(var(--i) * 3s);
+  }
+}
+
+@keyframes frase-enciende {
+  0%,
+  26%,
+  100% {
+    color: var(--apagado);
+  }
+
+  5%,
+  21% {
+    color: transparent;
+  }
+}
+
+.vitrina__cierre {
+  font-weight: 400;
+  color: #fff;
+}
+
+// ---------------------------------------------------------------- tarjetas
+
+// Escritorio: una angosta y dos anchas, como una fila de vidriera. En
+// celular pasa a un carrusel horizontal que se desliza con el dedo.
+.vitrina__tarjetas {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 0 clamp(20px, 6vw, 120px);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 20px;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (min-width: 960px) {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 2.3fr 2.3fr;
+    gap: 20px;
+    overflow: visible;
+  }
+}
+
+.tarjeta {
+  flex: 0 0 auto;
+  width: 62vw;
+  aspect-ratio: 3 / 4;
+  scroll-snap-align: start;
+
+  &--ancha {
+    width: 84vw;
+    aspect-ratio: 4 / 3;
+  }
+
+  @media (min-width: 600px) {
+    width: 40vw;
+
+    &--ancha {
+      width: 64vw;
+    }
+  }
+
+  // En escritorio todas comparten alto; el ancho lo da la grilla.
+  @media (min-width: 960px) {
+    width: auto;
+    height: clamp(360px, 36vw, 520px);
+    aspect-ratio: auto;
+
+    &--ancha {
+      width: auto;
+    }
+  }
+}
+
+.tarjeta__enlace {
+  position: relative;
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #1a2233;
+  color: #fff;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid #f2b8a6;
+    outline-offset: 4px;
+  }
+}
+
+.tarjeta__foto {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  transition: transform 700ms var(--salida);
+}
+
+.tarjeta__cartel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 0;
+  transition: opacity 320ms var(--salida);
+}
+
+// El logo va con sus colores originales, como el sello de la marca.
+.tarjeta__logo {
+  display: block;
+  width: min(58%, 220px);
+  height: auto;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+  transform: translateY(8px);
+  transition: transform 420ms var(--salida);
+}
+
+.tarjeta__dominio {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 22px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  // En la tarjeta angosta la dirección no entra en una línea: corta en
+  // cualquier punto en vez de salirse de la tarjeta.
+  overflow-wrap: anywhere;
+
+  svg {
+    display: inline-block;
+    margin-left: 4px;
+    vertical-align: -2px;
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+.tarjeta--ancha .tarjeta__dominio {
+  font-size: 1.05rem;
+}
+
+@media (hover: hover) {
+  .tarjeta__enlace:hover {
+    .tarjeta__cartel {
+      opacity: 1;
+    }
+
+    .tarjeta__logo {
+      transform: none;
+    }
+
+    .tarjeta__foto {
+      transform: scale(1.03);
+    }
+
+    .tarjeta__dominio {
+      text-decoration: underline;
+      text-underline-offset: 4px;
+    }
+  }
+}
+
+.tarjeta__enlace:focus-visible {
+  .tarjeta__cartel {
+    opacity: 1;
+  }
+
+  .tarjeta__logo {
+    transform: none;
+  }
+}
+
+// Pantallas táctiles: no hay cursor, así que el cartel queda como una franja
+// abajo con el logo y la dirección, siempre visible.
+@media (hover: none) {
+  .tarjeta__cartel {
+    inset: auto 0 0 0;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    opacity: 1;
+  }
+
+  .tarjeta__logo {
+    width: 72px;
+    transform: none;
+  }
+
+  .tarjeta__dominio,
+  .tarjeta--ancha .tarjeta__dominio {
+    position: static;
+    min-width: 0;
+    font-size: 0.8rem;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    svg {
+      display: none;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta__foto,
+  .tarjeta__cartel,
+  .tarjeta__logo {
+    transition: none;
+  }
+}

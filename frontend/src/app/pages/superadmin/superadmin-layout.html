@@ -1,0 +1,143 @@
+<div class="sa">
+  <header class="barra">
+    <a class="barra__marca" routerLink="/superadmin/bitacora" aria-label="Arlani Boutiques, panel">
+      <img src="/img/arlani-logo-encabezado.png" alt="Arlani Boutiques" width="129" height="52" />
+      <span>Panel de la Plataforma</span>
+    </a>
+    <div class="barra__usuario">
+      <span class="barra__rol">SuperAdministrador</span>
+      <span class="barra__nombre">{{ auth.currentUser()?.nombre }}</span>
+      <button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <nav class="navegacion" aria-label="Parciales y paquetes">
+    <div class="navegacion__fila">
+      <div class="parciales" role="tablist" aria-label="Parcial">
+        @for (p of parciales; track p.id) {
+          <button
+            type="button"
+            role="tab"
+            class="parcial"
+            [class.parcial--activo]="parcialActivo() === p.id"
+            [attr.aria-selected]="parcialActivo() === p.id"
+            (click)="elegirParcial(p.id)"
+          >
+            {{ p.nombre }}
+          </button>
+        }
+      </div>
+
+      <span class="navegacion__separador" aria-hidden="true"></span>
+
+      <!-- Paquetes del parcial elegido: se re-animan al cambiar de parcial -->
+      @for (pk of paquetes(); track parcialActivo() + pk.codigo; let i = $index) {
+        <button
+          type="button"
+          class="paquete"
+          [class.paquete--abierto]="paqueteAbierto() === pk.codigo"
+          [class.paquete--actual]="ubicacion()?.paquete === pk"
+          [style.--n]="i"
+          [attr.aria-expanded]="paqueteAbierto() === pk.codigo"
+          [title]="pk.nombre"
+          (click)="alternarPaquete(pk.codigo)"
+        >
+          {{ pk.codigo }}
+        </button>
+      }
+    </div>
+
+    @if (paquete(); as pk) {
+      <div class="desplegable" role="menu">
+        <div class="desplegable__cabecera">
+          {{ parcialActivo() === 'p1' ? '1er Parcial' : '2do Parcial' }} · {{ pk.codigo }} · {{ pk.nombre }}
+        </div>
+
+        @if (pk.casos.length) {
+          <ul class="desplegable__lista">
+            @for (c of pk.casos; track c.codigo) {
+              <li>
+                <a [routerLink]="destino(c)" [class.is-active]="esActual(c)" (click)="paqueteAbierto.set(null)">
+                  <strong>{{ c.codigo }}</strong>
+                  <span>{{ c.nombre }}</span>
+                  @if (!c.ruta) {
+                    <em class="etiqueta etiqueta--construir">Por construir</em>
+                  } @else if (c.antes) {
+                    <em class="etiqueta">antes {{ c.antes }}</em>
+                  }
+                  @if (parcialActivo() === 'p1' && c.porEmpresa) {
+                    <em class="etiqueta etiqueta--empresa">Por empresa</em>
+                  }
+                </a>
+                @if (c.subs?.length) {
+                  <div class="desplegable__subs">
+                    @for (s of c.subs; track s.ruta) {
+                      <a [routerLink]="['/superadmin', s.ruta]" routerLinkActive="is-active" (click)="paqueteAbierto.set(null)">
+                        {{ s.etiqueta }}
+                      </a>
+                    }
+                  </div>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="desplegable__vacio">Todos los CUs de este paquete pasaron al 2do parcial.</p>
+        }
+
+        @if (pk.movidos?.length) {
+          <div class="desplegable__movidos">
+            <span>Pasaron al 2do parcial</span>
+            @for (m of pk.movidos; track m.de) {
+              <button type="button" (click)="irAlSegundo(m.a); paqueteAbierto.set(null)">
+                <s>{{ m.de }}</s>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                <strong>{{ m.a }}</strong>
+                {{ m.nombre }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </nav>
+
+  <!-- Franja de contexto: en qué parcial / paquete / CU (y empresa) estamos -->
+  @if (ubicacion(); as u) {
+    <div class="contexto">
+      <span class="contexto__ruta">
+        <b>{{ u.parcial.nombre }}</b>
+        <i aria-hidden="true">/</i>
+        {{ u.paquete.codigo }} · {{ u.paquete.nombre }}
+        <i aria-hidden="true">/</i>
+        <b>{{ u.caso.codigo }}</b> {{ u.caso.nombre }}
+        @if (u.caso.antes && u.parcial.id === 'p2') {
+          <em>antes {{ u.caso.antes }} en el 1er parcial</em>
+        }
+      </span>
+      @if (empresaActual(); as e) {
+        <span class="contexto__empresa">
+          <span class="contexto__avatar" [style.background]="e.colorMarca">{{ e.nombre[0] }}</span>
+          Empresa: <b>{{ e.nombre }}</b>
+          <a [routerLink]="['/superadmin/empresa', u.caso.codigo]">Cambiar</a>
+        </span>
+      }
+    </div>
+  }
+
+  <main class="contenido">
+    <router-outlet />
+  </main>
+
+  <!-- Avisos -->
+  <div class="avisos" aria-live="polite">
+    @for (aviso of avisos.lista(); track aviso.id) {
+      <div class="aviso" [class.aviso--error]="aviso.tipo === 'error'" role="status">
+        <p>{{ aviso.texto }}</p>
+        <button type="button" (click)="avisos.cerrar(aviso.id)" aria-label="Cerrar aviso">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </div>
+    }
+  </div>
+</div>

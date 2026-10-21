@@ -1,9 +1,11 @@
+// Panel de marca de Arlani: foto del hero bajo un velo azul noche, con un
+// brillo coral abajo (colores del logo).
 .auth-showcase {
   position: relative;
   min-height: 320px;
   height: 100%;
   overflow: hidden;
-  background: var(--brand-dark);
+  background: #0b111d;
 }
 
 .auth-showcase__img {
@@ -12,13 +14,14 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: grayscale(0.3);
 }
 
 .auth-showcase__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(10, 15, 15, 0.75) 0%, rgba(10, 15, 15, 0.4) 45%, rgba(10, 15, 15, 0.85) 100%);
+  background:
+    radial-gradient(90% 50% at 20% 100%, rgba(232, 128, 107, 0.35), transparent 70%),
+    linear-gradient(180deg, rgba(11, 17, 29, 0.85) 0%, rgba(11, 17, 29, 0.55) 45%, rgba(11, 17, 29, 0.92) 100%);
 }
 
 .auth-showcase__content {
@@ -32,64 +35,76 @@
   color: #fff;
 
   @media (min-width: 700px) {
-    padding: 48px;
+    padding: 44px 48px;
   }
 }
 
 .auth-showcase__logo {
   align-self: flex-start;
-  height: 32px;
-  width: auto;
-  object-fit: contain;
+
+  img {
+    display: block;
+    height: 52px;
+    width: auto;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #f2b8a6;
+    outline-offset: 4px;
+  }
 }
 
 .auth-showcase__eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 18px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 16px;
+  color: #f2b8a6;
 
   &::before {
     content: '';
     width: 24px;
     height: 1px;
-    background: rgba(255, 255, 255, 0.5);
+    background: currentColor;
   }
 }
 
 .auth-showcase__body {
   h1 {
-    margin: 0 0 16px;
-    font-size: clamp(32px, 5vw, 48px);
+    margin: 0 0 18px;
+    max-width: 12ch;
+    font-family: inherit;
+    font-size: clamp(36px, 4.4vw, 60px);
     font-weight: 800;
+    font-style: italic;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
     text-transform: uppercase;
-    letter-spacing: -0.01em;
-    line-height: 1.1;
 
+    // Mismo estilo que el resto del título, solo cambia el color (como la
+    // palabra que rota en el hero).
     em {
-      font-style: italic;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.75);
+      font-style: inherit;
+      color: #f2b8a6;
     }
   }
 
   p {
     margin: 0;
     max-width: 380px;
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.6;
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.78);
   }
 }
 
 .auth-showcase__badges {
   display: flex;
-  gap: 28px;
+  gap: 32px;
   padding-top: 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.15);
 
@@ -100,14 +115,15 @@
   }
 
   span {
-    font-size: 16px;
-    font-weight: 800;
+    font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+    font-size: 18px;
+    font-weight: 500;
   }
 
   small {
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.6);
   }

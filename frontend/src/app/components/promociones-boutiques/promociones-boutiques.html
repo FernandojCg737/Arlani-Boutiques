@@ -1,0 +1,43 @@
+@if (promociones().length > 0) {
+  <section class="promos" id="promociones" aria-labelledby="promos-titulo">
+    <header class="promos__cabecera">
+      <div>
+        <span class="promos__antetitulo">Promociones</span>
+        <h2 class="promos__titulo" id="promos-titulo">Ofertas en las boutiques de Arlani.</h2>
+      </div>
+      <!-- Con pocas ofertas entran todas a la vista: las flechas sobran -->
+      @if (promociones().length > 4) {
+        <div class="promos__flechas">
+          <button type="button" aria-label="Ver anteriores" (click)="desplazar(-1)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <button type="button" aria-label="Ver siguientes" (click)="desplazar(1)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+        </div>
+      }
+    </header>
+
+    <ul class="promos__carril" #carril>
+      @for (p of promociones(); track p.id) {
+        <li class="promo">
+          <a class="promo__enlace" [routerLink]="['/producto', p.id]">
+            <div class="promo__foto">
+              <img [src]="p.image" [alt]="p.name" loading="lazy" />
+              <span class="promo__descuento">{{ p.discountLabel }}</span>
+              <span class="promo__boutique">
+                <img [src]="boutique.logo" alt="" />
+                {{ boutique.nombre }}
+              </span>
+            </div>
+            <span class="promo__nombre">{{ p.name }}</span>
+            <span class="promo__precios">
+              <strong>{{ p.price }} Bs</strong>
+              <s>{{ p.originalPrice }} Bs</s>
+            </span>
+          </a>
+        </li>
+      }
+    </ul>
+  </section>
+}

@@ -1,0 +1,28 @@
+@if (logos().length > 0) {
+  <section class="cinta" aria-labelledby="cinta-titulo">
+    <h2 class="cinta__titulo" id="cinta-titulo">Boutiques/Stores</h2>
+    <div class="cinta__ventana">
+      <ul class="cinta__pista">
+        @for (logo of logos(); track $index) {
+          <li [attr.aria-hidden]="logo.repetido ? 'true' : null">
+            <a
+              class="cinta__logo"
+              [routerLink]="logo.tienda.ruta"
+              [attr.tabindex]="logo.repetido ? -1 : null"
+              [attr.aria-label]="'Ver el catálogo de ' + logo.tienda.nombre"
+            >
+              @if (logo.tienda.logo) {
+                <img [src]="logo.tienda.logo" [alt]="logo.tienda.nombre" loading="lazy" />
+              } @else {
+                <span class="cinta__nombre" [style.--color]="logo.tienda.color">
+                  <i aria-hidden="true">{{ inicial(logo.tienda.nombre) }}</i>
+                  {{ logo.tienda.nombre }}
+                </span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    </div>
+  </section>
+}

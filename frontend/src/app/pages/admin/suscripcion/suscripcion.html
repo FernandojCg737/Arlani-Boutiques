@@ -1,0 +1,215 @@
+<div class="suscripcion">
+  <div class="suscripcion__encabezado">
+    <div>
+      <span class="suscripcion__eyebrow">Tu cuenta en Arlani Boutiques</span>
+      <h1>Mi suscripción</h1>
+      <p>Tu plan, cuándo vence, cuánto usas de él y el enlace público de tu tienda.</p>
+    </div>
+    @if (datos()) {
+      <a class="boton boton--borde" [href]="enlaceCambio(null)" target="_blank" rel="noopener">Hablar con soporte</a>
+    }
+  </div>
+
+  @if (cargando()) {
+    <div class="esqueleto"></div>
+  } @else if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  } @else if (datos(); as d) {
+    @if (aviso(); as a) {
+      <div class="aviso" [class.aviso--alerta]="a.tono === 'alerta'" role="status">
+        <span>{{ a.texto }}</span>
+        <a [href]="enlaceCambio(null)" target="_blank" rel="noopener">Escribir a soporte</a>
+      </div>
+    }
+
+    <section class="resumen">
+      <!-- Plan actual -->
+      <article class="plan-actual" [style.--color]="d.color_marca">
+        <span class="etiqueta">Plan actual</span>
+        @if (d.plan_nombre) {
+          <h2>{{ d.plan_nombre }}</h2>
+          <p class="plan-actual__precio">
+            @if (d.periodo === 'prueba') {
+              Gratis
+            } @else {
+              Bs {{ d.monto | number: '1.0-2' }}
+              <small>/ {{ d.periodo === 'anual' ? 'año' : 'mes' }}</small>
+            }
+          </p>
+          <dl>
+            <div>
+              <dt>Modalidad</dt>
+              <dd>{{ textoPeriodo[d.periodo ?? ''] ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>Desde</dt>
+              <dd>{{ d.fecha_inicio | date: 'd MMM y' }}</dd>
+            </div>
+            <div>
+              <dt>{{ (d.dias_restantes ?? 0) < 0 ? 'Venció' : 'Vence' }}</dt>
+              <dd>
+                @if (d.fecha_fin) {
+                  {{ d.fecha_fin | date: 'd MMM y' }}
+                  @if ((d.dias_restantes ?? 0) >= 0) {
+                    <small>faltan {{ d.dias_restantes }} {{ d.dias_restantes === 1 ? 'día' : 'días' }}</small>
+                  }
+                } @else {
+                  Sin vencimiento
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Estado de la tienda</dt>
+              <dd>
+                <span class="estado" [class.estado--suspendida]="d.empresa_estado === 'suspendida'">
+                  {{ d.empresa_estado === 'activa' ? 'Activa' : 'Suspendida' }}
+                </span>
+              </dd>
+            </div>
+          </dl>
+        } @else {
+          <h2>Sin plan</h2>
+          <p class="plan-actual__nota">Elige uno de los planes de abajo para activar tu tienda.</p>
+        }
+      </article>
+
+      <!-- Uso del plan -->
+      <article class="uso">
+        <span class="etiqueta">Lo que usas de tu plan</span>
+
+        <div class="uso__fila">
+          <div class="uso__titulo">
+            <strong>Sucursales activas</strong>
+            <span>{{ d.sucursales_usadas }} de {{ d.max_sucursales ?? '-' }}</span>
+          </div>
+          <div
+            class="barra"
+            role="progressbar"
+            [attr.aria-valuenow]="d.sucursales_usadas"
+            aria-valuemin="0"
+            [attr.aria-valuemax]="d.max_sucursales"
+            aria-label="Sucursales activas"
+          >
+            <span [style.width.%]="usoSucursales()" [class.barra--llena]="usoSucursales() >= 100"></span>
+          </div>
+          @if (d.max_sucursales && d.sucursales_usadas >= d.max_sucursales) {
+            <small class="uso__nota">Llegaste al máximo de tu plan. Para abrir otra sucursal, cambia de plan.</small>
+          }
+        </div>
+
+        <div class="uso__cifras">
+          <div>
+            <strong>{{ d.personal }}</strong>
+            <span>Personal</span>
+          </div>
+          <div>
+            <strong>{{ d.clientes }}</strong>
+            <span>Clientes</span>
+          </div>
+          <div>
+            <strong>{{ d.ia_generativa ? 'Incluida' : 'No incluida' }}</strong>
+            <span>IA generativa</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Enlace publico -->
+    <section class="enlace">
+      <div>
+        <span class="etiqueta">Enlace de tu tienda</span>
+        <p>Compártelo con tus clientes: ahí ven tu tienda, tus sucursales y tu catálogo.</p>
+      </div>
+      <div class="enlace__caja">
+        <code>{{ enlace() }}</code>
+        <button type="button" class="boton boton--borde" (click)="copiarEnlace()">
+          {{ copiado() ? '¡Copiado!' : 'Copiar' }}
+        </button>
+        <a class="boton boton--lleno" [href]="ruta()" target="_blank" rel="noopener">Abrir</a>
+      </div>
+    </section>
+
+    <!-- Planes -->
+    <section class="planes">
+      <div class="seccion-titulo">
+        <h2>Planes</h2>
+        <p>El cambio lo aplica el equipo de Arlani: elige un plan y te contactamos por WhatsApp.</p>
+      </div>
+
+      <div class="planes__grid">
+        @for (p of d.planes; track p.codigo) {
+          <article class="plan" [class.plan--actual]="p.codigo === d.plan_codigo">
+            @if (p.codigo === d.plan_codigo) {
+              <span class="plan__marca">Tu plan</span>
+            }
+            <h3>{{ p.nombre }}</h3>
+            <p class="plan__precio">
+              @if (p.dias_prueba) {
+                Gratis <small>{{ p.dias_prueba }} días</small>
+              } @else {
+                Bs {{ p.precio_mensual | number: '1.0-0' }} <small>/ mes</small>
+              }
+            </p>
+            <ul>
+              <li>Hasta {{ p.max_sucursales }} {{ p.max_sucursales === 1 ? 'sucursal' : 'sucursales' }}</li>
+              <li [class.no]="!p.ia_generativa">{{ p.ia_generativa ? 'IA generativa incluida' : 'Sin IA generativa' }}</li>
+            </ul>
+            @if (p.codigo === d.plan_codigo) {
+              <span class="plan__accion plan__accion--actual">Plan actual</span>
+            } @else if (noAlcanza(p)) {
+              <span class="plan__accion plan__accion--bloqueado">
+                Tienes {{ d.sucursales_usadas }} sucursales activas; este plan permite {{ p.max_sucursales }}.
+              </span>
+            } @else {
+              <a class="boton" [class.boton--lleno]="esMejora(p)" [class.boton--borde]="!esMejora(p)"
+                 [href]="enlaceCambio(p)" target="_blank" rel="noopener">
+                {{ esMejora(p) ? 'Mejorar a ' + p.nombre : 'Cambiar a ' + p.nombre }}
+              </a>
+            }
+          </article>
+        }
+      </div>
+    </section>
+
+    <!-- Historial -->
+    <section class="historial">
+      <div class="seccion-titulo">
+        <h2>Historial</h2>
+      </div>
+      <div class="tabla">
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th>Modalidad</th>
+              <th>Monto</th>
+              <th>Desde</th>
+              <th>Hasta</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (h of d.historial; track h.id) {
+              <tr>
+                <td><strong>{{ h.plan_nombre }}</strong></td>
+                <td>{{ textoPeriodo[h.periodo] ?? h.periodo }}</td>
+                <td>Bs {{ h.monto | number: '1.0-2' }}</td>
+                <td>{{ h.fecha_inicio | date: 'd MMM y' }}</td>
+                <td>{{ h.fecha_fin ? (h.fecha_fin | date: 'd MMM y') : '-' }}</td>
+                <td>
+                  <span class="estado" [class.estado--apagado]="h.estado !== 'activa'">
+                    {{ textoEstado[h.estado] ?? h.estado }}
+                  </span>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="tabla__vacio">Todavía no tienes suscripciones.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

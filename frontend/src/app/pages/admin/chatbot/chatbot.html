@@ -31,7 +31,7 @@
           </tr>
         } @else {
           @for (u of items(); track u.cliente_id) {
-            <tr [routerLink]="['/admin/chatbot', u.cliente_id]" class="admin-table__row-link">
+            <tr [routerLink]="[u.cliente_id]" class="admin-table__row-link">
               <td>
                 <div class="admin-table__user">
                   <strong>{{ u.cliente_nombre }}</strong>

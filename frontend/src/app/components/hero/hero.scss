@@ -121,6 +121,63 @@
   }
 }
 
+// ---------------------------------------------- titulo con frase rotativa
+// Mismo tamano y estilo del h1 de siempre; solo agrega una linea debajo que
+// va cambiando (sube la nueva, sale la anterior hacia arriba).
+
+.hero-titulo-fijo {
+  display: block;
+}
+
+// Todas las frases comparten la misma celda: el alto lo fija la mas alta,
+// asi el subtitulo de abajo no salta cuando cambia la frase.
+.hero-rotativo {
+  display: grid;
+  // Recorta solo arriba y abajo (para el efecto de subir/salir); a los
+  // costados no, porque palabras largas como "multisucursal" son más anchas
+  // que la columna del hero y con overflow: hidden perdían la última letra.
+  clip-path: inset(0 -100vw);
+  // Aire para que la cursiva no se recorte abajo.
+  padding: 0 0 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.hero-frase {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  color: #f2b8a6;
+  transform: translateY(105%);
+  opacity: 0;
+  transition:
+    transform 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-frase--activa {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.hero-frase--saliente {
+  transform: translateY(-105%);
+  opacity: 0;
+}
+
+.hero-solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-frase {
+    transition: none;
+  }
+}
+
 .hero-cta {
   position: absolute;
   z-index: 1;

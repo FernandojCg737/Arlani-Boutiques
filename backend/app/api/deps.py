@@ -8,10 +8,14 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import Usuario
+from app.services.usuarios import codigos_permiso
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-STAFF_TIPOS = {"administrador", "encargado_sucursal", "cajero"}
+# El SuperAdministrador (dueno de la plataforma) hereda todo el acceso del
+# Administrador de una tienda, y ademas gestiona empresas y planes.
+ADMIN_TIPOS = {"administrador", "superadministrador"}
+STAFF_TIPOS = {*ADMIN_TIPOS, "encargado_sucursal", "cajero"}
 
 
 def get_current_user(
@@ -73,10 +77,9 @@ def require_permiso_cliente(*codigos: str) -> Callable[[Usuario], Usuario]:
     # que apagar/prender un CU aca desde el panel (CU02, pestana Cliente)
     # bloquea o habilita la funcionalidad de verdad, no solo la UI.
     def _dependency(usuario: Usuario = Depends(get_current_user)) -> Usuario:
-        if usuario.tipo == "administrador":
+        if usuario.tipo in ADMIN_TIPOS:
             return usuario
-        codigos_usuario = {p.nombre for p in usuario.rol.permisos} if usuario.rol else set()
-        if not codigos_usuario & set(codigos):
+        if not codigos_permiso(usuario) & set(codigos):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Esta funcionalidad no esta habilitada por el momento.")
         return usuario
 
@@ -88,14 +91,13 @@ def cliente_sin_permiso(usuario: Usuario | None, *codigos: str) -> bool:
     estos permisos en su rol (CU02, pestana Cliente). Para endpoints
     publicos (catalogo, relacionados) que un visitante anonimo puede seguir
     usando igual que antes: solo restringe a quien SI tiene sesion."""
-    if usuario is None or usuario.tipo == "administrador":
+    if usuario is None or usuario.tipo in ADMIN_TIPOS:
         return False
-    codigos_usuario = {p.nombre for p in usuario.rol.permisos} if usuario.rol else set()
-    return not (codigos_usuario & set(codigos))
+    return not (codigos_permiso(usuario) & set(codigos))
 
 
 def require_administrador(usuario: Usuario = Depends(require_staff)) -> Usuario:
-    if usuario.tipo != "administrador":
+    if usuario.tipo not in ADMIN_TIPOS:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Accion restringida al Administrador.")
     return usuario
 
@@ -105,7 +107,7 @@ def sucursal_restringida(usuario: Usuario) -> int | None:
     sobre todas. El Administrador ve todo; Encargado y Cajero solo su propia
     sucursal (asi un cajero de la sucursal A no aprueba, edita ni borra
     ventas/devoluciones/reservas de la sucursal B)."""
-    if usuario.tipo == "administrador":
+    if usuario.tipo in ADMIN_TIPOS:
         return None
     return getattr(usuario, "sucursal_id", None)
 
@@ -119,7 +121,7 @@ def verificar_acceso_sucursal(usuario: Usuario, sucursal_id: int | None) -> None
 def require_encargado_o_admin(usuario: Usuario) -> None:
     """Acciones destructivas (borrar ventas/devoluciones) quedan fuera del
     alcance del Cajero aunque su rol tenga el permiso del CU."""
-    if usuario.tipo not in ("administrador", "encargado_sucursal"):
+    if usuario.tipo not in (*ADMIN_TIPOS, "encargado_sucursal"):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Solo el Administrador o el Encargado de Sucursal pueden eliminar registros."
         )
@@ -132,14 +134,21 @@ def require_permiso(*codigos: str) -> Callable[[Usuario], Usuario]:
     # Acepta varios codigos (ej. CU05 o CU12) para endpoints compartidos por
     # mas de un caso de uso; basta con tener uno de ellos.
     def _dependency(usuario: Usuario = Depends(require_staff)) -> Usuario:
-        if usuario.tipo == "administrador":
+        if usuario.tipo in ADMIN_TIPOS:
             return usuario
 
-        codigos_usuario = {p.nombre for p in usuario.rol.permisos} if usuario.rol else set()
-        if not codigos_usuario & set(codigos):
+        # Matriz de permisos de la empresa del usuario (CU02 por empresa).
+        if not codigos_permiso(usuario) & set(codigos):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN, f"Tu rol no tiene permiso para acceder a {' o '.join(codigos)}."
             )
         return usuario
 
     return _dependency
+
+
+def require_superadmin(usuario: Usuario = Depends(get_current_user)) -> Usuario:
+    """CU09/CU10: solo el SuperAdministrador gestiona empresas y planes."""
+    if usuario.tipo != "superadministrador":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Accion restringida al SuperAdministrador de la plataforma.")
+    return usuario

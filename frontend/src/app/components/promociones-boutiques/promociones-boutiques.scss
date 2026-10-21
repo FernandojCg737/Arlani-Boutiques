@@ -1,0 +1,224 @@
+// Promociones: sección clara (marfil) entre la vitrina y las funciones.
+:host {
+  --marfil: #f7f4f2;
+  --noche: #121a2c;
+  --coral: #e8806b;
+  --coral-oscuro: #c4503d;
+  --gris: #5f6779;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+.promos {
+  scroll-margin-top: 84px;
+  background: var(--marfil);
+  color: var(--noche);
+  padding: clamp(64px, 8vw, 112px) 0;
+}
+
+.promos__cabecera {
+  max-width: 1440px;
+  margin: 0 auto 36px;
+  padding: 0 clamp(20px, 6vw, 120px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.promos__antetitulo {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--coral-oscuro);
+}
+
+.promos__titulo {
+  max-width: 16ch;
+  margin: 0;
+  font-family: inherit;
+  font-size: clamp(2rem, 4.2vw, 3.75rem);
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.promos__flechas {
+  display: none;
+  gap: 10px;
+
+  @media (min-width: 760px) {
+    display: flex;
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(18, 26, 44, 0.18);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--noche);
+    cursor: pointer;
+    transition:
+      background-color 180ms var(--salida),
+      color 180ms var(--salida),
+      transform 140ms var(--salida);
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--noche);
+        color: #fff;
+      }
+    }
+
+    &:active {
+      transform: scale(0.94);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--coral);
+      outline-offset: 2px;
+    }
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+// Carril horizontal: se desliza con el dedo, la rueda o las flechas.
+.promos__carril {
+  display: flex;
+  gap: 20px;
+  margin: 0;
+  padding: 0 clamp(20px, 6vw, 120px) 8px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 clamp(20px, 6vw, 120px);
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.promo {
+  flex: 0 0 auto;
+  width: min(68vw, 280px);
+  scroll-snap-align: start;
+}
+
+.promo__enlace {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 4px;
+    border-radius: 12px;
+  }
+}
+
+.promo__foto {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: #e9e5e1;
+  aspect-ratio: 3 / 4;
+
+  > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 700ms var(--salida);
+  }
+}
+
+@media (hover: hover) {
+  .promo__enlace:hover .promo__foto > img {
+    transform: scale(1.04);
+  }
+}
+
+.promo__descuento {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--coral-oscuro);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+// De qué boutique es la oferta (en el SaaS habrá varias).
+.promo__boutique {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 0.72rem;
+  font-weight: 600;
+
+  img {
+    height: 16px;
+    width: auto;
+  }
+}
+
+.promo__nombre {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.promo__precios {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+
+  strong {
+    font-size: 1.05rem;
+    color: var(--coral-oscuro);
+  }
+
+  s {
+    font-size: 0.85rem;
+    color: var(--gris);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo__foto > img {
+    transition: none;
+  }
+}

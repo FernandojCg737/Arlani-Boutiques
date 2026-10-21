@@ -17,9 +17,9 @@ export class Footer {
   protected readonly year = new Date().getFullYear();
 
   protected readonly exploreLinks: FooterLink[] = [
-    { label: 'Productos', path: '/tienda' },
-    { label: 'Novedades', path: '/', fragment: 'novedades' },
-    { label: 'Descuentos', path: '/', fragment: 'descuentos' },
+    { label: 'Productos', path: '/tienda-atelier-aranier' },
+    { label: 'Novedades', path: '/atelier', fragment: 'novedades' },
+    { label: 'Descuentos', path: '/atelier', fragment: 'descuentos' },
     { label: 'Soporte', path: '/contacto' },
   ];
 

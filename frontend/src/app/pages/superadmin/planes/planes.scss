@@ -1,0 +1,426 @@
+@use '../comun' as *;
+
+// ----------------------------------------------------------------- planes
+
+.planes {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.planes__cargando {
+  height: 360px;
+  border-radius: 20px;
+}
+
+.plan {
+  --acento: var(--pizarra);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--papel);
+  border: 1px solid var(--borde);
+  @include entrada(60ms);
+  transition:
+    border-color 240ms ease,
+    box-shadow 240ms ease;
+
+  // Línea de color del plan arriba.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 22px auto;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--acento);
+  }
+}
+
+.plan--prueba {
+  --acento: #e0a33b;
+}
+
+.plan--profesional {
+  --acento: var(--coral);
+  background:
+    radial-gradient(80% 60% at 100% 0%, rgba(232, 128, 107, 0.12), transparent 70%),
+    var(--papel);
+}
+
+.plan--cambiado {
+  border-color: var(--acento);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 18%, transparent);
+}
+
+.plan__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  small {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.8rem;
+    color: var(--gris);
+  }
+}
+
+.plan__nombre {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.plan__pendiente {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--acento) 16%, #fff);
+  color: color-mix(in srgb, var(--acento) 80%, #000);
+  font-size: 0.7rem;
+  font-weight: 700;
+  animation: latir 1.8s ease-in-out infinite;
+}
+
+@keyframes latir {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.plan__precio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  > span {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gris);
+  }
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1.5px solid var(--borde);
+    border-radius: 14px;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+
+    &:focus-within {
+      border-color: var(--acento);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 15%, transparent);
+    }
+  }
+
+  b {
+    font-weight: 600;
+    color: var(--gris);
+  }
+
+  input {
+    width: 100%;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--tinta);
+    font-family: 'Outfit', sans-serif;
+    font-size: 2rem;
+    font-weight: 600;
+
+    &:disabled {
+      color: var(--gris-2);
+    }
+  }
+
+  em {
+    font-size: 0.76rem;
+    font-style: normal;
+    color: var(--gris);
+  }
+}
+
+.plan__fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--borde);
+  font-size: 0.9rem;
+  font-weight: 600;
+
+  small {
+    display: block;
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: var(--gris);
+  }
+}
+
+.plan__fila--interruptor {
+  cursor: pointer;
+}
+
+.contador {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid var(--borde);
+  border-radius: 999px;
+
+  button {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--tinta);
+    font-size: 1.1rem;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--marfil);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--coral);
+      outline-offset: -2px;
+    }
+  }
+
+  span {
+    min-width: 30px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.05rem;
+    text-align: center;
+  }
+}
+
+// Interruptor tipo iOS hecho con un checkbox.
+.interruptor {
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  margin: 0;
+  border-radius: 999px;
+  background: #ddd7d1;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: background-color 240ms var(--salida);
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(18, 26, 44, 0.25);
+    transition: transform 300ms var(--salida);
+  }
+
+  &:checked {
+    background: var(--acento);
+
+    &::after {
+      transform: translateX(20px);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 3px;
+  }
+}
+
+.plan__acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+}
+
+// ----------------------------------------------------------------- abajo
+
+.fila {
+  display: grid;
+  gap: 18px;
+
+  @media (min-width: 1000px) {
+    grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+    align-items: start;
+  }
+}
+
+.comparacion__tabla {
+  margin: 14px 10px 14px;
+  overflow-x: auto;
+}
+
+.comparacion__fila {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.6fr) repeat(3, minmax(80px, 1fr));
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+
+  &:nth-child(even) {
+    background: var(--marfil);
+  }
+
+  > span:not(:first-child) {
+    text-align: center;
+  }
+
+  b {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+.comparacion__fila--cabecera {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gris-2);
+}
+
+.si,
+.no {
+  display: inline-flex;
+  justify-content: center;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+.si svg {
+  stroke: var(--verde);
+}
+
+.no svg {
+  stroke: #c9c2bb;
+}
+
+.limites__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 14px 12px 6px;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 14px;
+    @include entrada(250ms);
+
+    &:hover {
+      background: var(--marfil);
+    }
+  }
+}
+
+.limites__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+  }
+
+  b {
+    font-size: 0.9rem;
+  }
+
+  small {
+    font-size: 0.76rem;
+    color: var(--gris);
+  }
+}
+
+.limites__estado {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e3f6ec;
+  color: #1d6b45;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.limites__estado--tope {
+  background: #fdecea;
+  color: #a12a1d;
+}
+
+.limites__vacio {
+  color: var(--gris);
+  font-size: 0.9rem;
+}
+
+.limites__nota {
+  display: flex;
+  gap: 10px;
+  margin: 6px 22px 22px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ecf0f8;
+  color: #3e4c6d;
+  font-size: 0.8rem;
+  line-height: 1.5;
+
+  svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+
+  code {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: rgba(62, 76, 109, 0.12);
+    font-size: 0.74rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan__pendiente {
+    animation: none;
+  }
+}

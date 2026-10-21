@@ -205,3 +205,37 @@
 .admin-main {
   min-width: 0;
 }
+
+// Acceso del SuperAdministrador de vuelta a la consola de la plataforma.
+.admin-topbar__plataforma {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #121a2c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+
+  &:hover {
+    background: #000;
+  }
+}
+
+// Administrador de la tienda: acceso a su plan en Arlani.
+.admin-topbar__suscripcion {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover,
+  &.is-active {
+    background: #fff;
+    color: var(--brand-dark);
+  }
+}

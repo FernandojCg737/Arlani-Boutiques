@@ -1,11 +1,18 @@
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { BOUTIQUES, Boutique } from '../../data/boutiques';
 import { Auth } from '../../services/auth';
-import { Cart } from '../../services/cart';
+import { Cart, DetalleCarrito } from '../../services/cart';
+
+interface GrupoBoutique {
+  boutique: Boutique;
+  items: DetalleCarrito[];
+  subtotal: number;
+}
 
 interface Sucursal {
   id: number;
@@ -26,6 +33,15 @@ export class Carrito implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   protected readonly auth = inject(Auth);
+
+  // Carrito de la plataforma: las prendas se agrupan por la boutique que las
+  // vende. TODO: cuando el detalle del carrito traiga la empresa (módulo
+  // multiempresa), agrupar por ese dato; hoy todas son de la única boutique.
+  protected readonly grupos = computed<GrupoBoutique[]>(() => {
+    const items = this.cart.items();
+    if (items.length === 0) return [];
+    return [{ boutique: BOUTIQUES[0], items, subtotal: items.reduce((suma, i) => suma + i.subtotal, 0) }];
+  });
 
   // Reservar el carrito entero: en vez de pagar ahora, retiene el stock y le
   // adjunta la fecha/hora en que el cliente ira a la sucursal a pagar y

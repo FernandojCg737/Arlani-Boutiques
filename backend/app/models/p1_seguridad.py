@@ -48,6 +48,9 @@ class Usuario(Base):
 
     rol_id: Mapped[int | None] = mapped_column(ForeignKey("rol.id"))
     rol: Mapped["Rol | None"] = relationship(back_populates="usuarios")
+    # Empresa (tenant) a la que pertenece el personal; NULL para clientes y
+    # para el SuperAdministrador, que son de la plataforma.
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
 
     # session_id identifica la sesion activa: cada login la reemplaza, asi
     # que un token viejo (de otro dispositivo) deja de pasar la verificacion.
@@ -90,6 +93,9 @@ class Bitacora(Base):
     # `app/core/audit.py`. Nullable: acciones registradas antes de este
     # campo (o llamadas directas a la API sin el header) quedan sin dato.
     plataforma: Mapped[str | None] = mapped_column(String(20))
+    # Empresa a la que se refiere el registro (la deduce trg_bitacora_empresa).
+    # NULL = de la plataforma: solo lo ve el SuperAdministrador.
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
 
     usuario: Mapped["Usuario"] = relationship(back_populates="bitacoras")
 
@@ -116,6 +122,17 @@ class Administrador(Empleado):
     id: Mapped[int] = mapped_column(ForeignKey("empleado.id"), primary_key=True)
 
     __mapper_args__ = {"polymorphic_identity": "administrador"}
+
+
+class SuperAdministrador(Administrador):
+    # Dueno de la plataforma Arlani Boutiques: hereda todo lo del
+    # Administrador y ademas gestiona empresas (tenants), planes y
+    # suscripciones (CU09, CU10). No pertenece a ninguna empresa.
+    __tablename__ = "superadministrador"
+
+    id: Mapped[int] = mapped_column(ForeignKey("administrador.id"), primary_key=True)
+
+    __mapper_args__ = {"polymorphic_identity": "superadministrador"}
 
 
 class EncargadoSucursal(Empleado):
@@ -148,6 +165,8 @@ class ConfiguracionAsistencia(Base):
     # hoy -- ya sea porque se alcanzo hora_liberacion o porque el
     # Administrador la libero manualmente antes. Se resetea a NULL cada dia.
     ventana_inicio: Mapped[datetime | None] = mapped_column(DateTime)
+    # Una configuracion por empresa: cada tienda tiene su clave y su hora.
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"))
 
 
 class MarcadoAsistencia(Base):

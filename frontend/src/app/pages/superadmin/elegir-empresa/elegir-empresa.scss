@@ -1,0 +1,225 @@
+// Mismo esqueleto que las pantallas del panel (admin-content).
+.admin-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+
+  @media (min-width: 700px) {
+    padding: 28px 32px 64px;
+  }
+
+  &__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 28px;
+
+    h1 {
+      margin: 4px 0 8px;
+      font-size: clamp(24px, 3vw, 30px);
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--brand-dark);
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #777;
+      max-width: 480px;
+    }
+  }
+}
+
+.buscar input {
+  width: min(320px, 100%);
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+
+  &:focus {
+    border-color: var(--brand-dark);
+  }
+}
+
+.admin-error {
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 13px;
+}
+
+// Cuadros de empresa.
+.cuadros {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.cuadro {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 210px;
+  padding: 20px;
+  border: 1px solid #e7e2dd;
+  background: #fff;
+  color: var(--brand-dark);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: cuadro-entra 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--n, 0) * 60ms);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  strong {
+    margin-top: 10px;
+    font-size: 17px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  small {
+    font-size: 12px;
+    color: #888;
+  }
+
+  &:hover {
+    border-color: var(--color);
+    transform: translateY(-3px);
+    box-shadow: 0 16px 30px -20px rgba(18, 26, 44, 0.45);
+
+    .cuadro__franja {
+      transform: scaleX(1);
+    }
+
+    .cuadro__ir {
+      color: var(--brand-dark);
+
+      svg {
+        transform: translateX(3px);
+      }
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #e8806b;
+    outline-offset: 3px;
+  }
+}
+
+// Franja del color de la marca que se extiende al pasar el cursor.
+.cuadro__franja {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--color);
+  transform: scaleX(0.25);
+  transform-origin: left;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cuadro__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--color);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.cuadro__datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+
+  span {
+    padding: 2px 8px;
+    background: #f4f1ee;
+    font-size: 11px;
+    font-weight: 700;
+    color: #666;
+  }
+}
+
+.cuadro__estado {
+  background: #e3f6ec !important;
+  color: #1d6b45 !important;
+}
+
+.cuadro__estado--suspendida {
+  background: #fdecea !important;
+  color: #a12a1d !important;
+}
+
+.cuadro__ir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #aaa;
+  transition: color 0.2s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.25s ease;
+  }
+}
+
+.cuadro--cargando {
+  cursor: default;
+  background: linear-gradient(90deg, #efebe7 25%, #f7f4f2 50%, #efebe7 75%);
+  background-size: 200% 100%;
+  animation: esqueleto 1.4s ease-in-out infinite;
+}
+
+@keyframes esqueleto {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes cuadro-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.vacio {
+  color: #888;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cuadro {
+    animation: none;
+  }
+}

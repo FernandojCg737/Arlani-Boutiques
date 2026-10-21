@@ -417,3 +417,243 @@
     }
   }
 }
+
+// ------------------------------------------------------------------
+// SuperAdministrador: primero se elige la empresa (tenant).
+
+.empresas-intro {
+  margin: 4px 0 16px;
+  font-size: 14px;
+  color: #777;
+}
+
+.empresas-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  margin-bottom: 24px;
+}
+
+.empresa-cuadro {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 176px;
+  padding: 18px;
+  border: 1px solid #e7e2dd;
+  background: #fff;
+  color: var(--brand-dark);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: empresa-entra 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--n, 0) * 55ms);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  strong {
+    margin-top: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  small {
+    font-size: 12px;
+    color: #888;
+  }
+
+  &:hover {
+    border-color: var(--color);
+    transform: translateY(-3px);
+    box-shadow: 0 14px 28px -20px rgba(18, 26, 44, 0.45);
+
+    .empresa-cuadro__franja {
+      transform: scaleX(1);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid #e8806b;
+    outline-offset: 3px;
+  }
+}
+
+.empresa-cuadro__franja {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--color);
+  transform: scaleX(0.25);
+  transform-origin: left;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.empresa-cuadro__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: var(--color);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.empresa-cuadro__dato {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+
+  b {
+    font-size: 20px;
+    margin-right: 4px;
+    color: var(--brand-dark);
+  }
+}
+
+.empresa-cuadro--cargando {
+  cursor: default;
+  background: linear-gradient(90deg, #efebe7 25%, #f7f4f2 50%, #efebe7 75%);
+  background-size: 200% 100%;
+  animation: empresa-esqueleto 1.4s ease-in-out infinite;
+}
+
+.empresas-vacio {
+  color: #888;
+  font-size: 14px;
+}
+
+@keyframes empresa-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes empresa-esqueleto {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+// Barra con la empresa elegida y el regreso a la lista.
+.empresa-elegida {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 4px 0 18px;
+}
+
+.empresa-elegida__volver {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #777;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--brand-dark);
+  }
+}
+
+.empresa-elegida__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border: 1px solid #e7e2dd;
+  background: #fff;
+  font-size: 13px;
+  color: #555;
+
+  b {
+    color: var(--brand-dark);
+  }
+}
+
+.empresa-elegida__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+// Matriz de permisos dividida por examen.
+.permisos-parcial {
+  margin-bottom: 8px;
+  animation: empresa-entra 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.permisos-parcial--segundo {
+  padding-top: 20px;
+  border-top: 2px solid var(--brand-dark);
+  animation-delay: 80ms;
+}
+
+.permisos-parcial__titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+
+  small {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+    color: #888;
+  }
+}
+
+.permisos-package__vacio {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: #999;
+}
+
+.permisos-antes {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  background: #f1ede9;
+  color: #888;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.permisos-antes--nuevo {
+  background: #fdf1dc;
+  color: #8a5a0b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empresa-cuadro,
+  .permisos-parcial {
+    animation: none;
+  }
+}

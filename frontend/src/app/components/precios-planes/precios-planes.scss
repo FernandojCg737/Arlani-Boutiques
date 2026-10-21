@@ -1,0 +1,427 @@
+// Precios: vuelve al azul noche, con un brillo coral detrás de las tarjetas.
+:host {
+  --fondo: #0b111d;
+  --tarjeta: #121a2c;
+  --coral: #e8806b;
+  --coral-oscuro: #c4503d;
+  --oro: #f2b8a6;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+.precios {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 45% at 50% 62%, rgba(232, 128, 107, 0.16), transparent 70%),
+    var(--fondo);
+  color: #fff;
+  padding: clamp(72px, 9vw, 128px) 0;
+}
+
+.precios__cabecera {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 6vw, 120px);
+  text-align: center;
+}
+
+.precios__antetitulo {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--oro);
+}
+
+.precios__titulo {
+  max-width: 18ch;
+  margin: 0 auto;
+  font-family: inherit;
+  font-size: clamp(2.2rem, 4.8vw, 4.25rem);
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.precios__bajada {
+  margin: 18px 0 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+// --------------------------------------------------------------- controles
+
+.controles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  margin: 44px auto 48px;
+  padding: 0 20px;
+
+  @media (min-width: 760px) {
+    flex-direction: row;
+    justify-content: center;
+    gap: 56px;
+  }
+}
+
+// Interruptor mensual / anual con una píldora que se desliza.
+.periodo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+
+  button {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 999px;
+    background: none;
+    color: rgba(255, 255, 255, 0.7);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 250ms var(--salida);
+
+    &[aria-pressed='true'] {
+      color: var(--fondo);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--oro);
+      outline-offset: 2px;
+    }
+  }
+
+  em {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(232, 128, 107, 0.2);
+    color: var(--oro);
+    font-size: 0.7rem;
+    font-style: normal;
+    transition:
+      background-color 250ms var(--salida),
+      color 250ms var(--salida);
+  }
+
+  button[aria-pressed='true'] em {
+    background: var(--coral);
+    color: #fff;
+  }
+}
+
+.periodo__pildora {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc(50% - 5px);
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 400ms var(--salida);
+}
+
+.periodo__pildora--anual {
+  transform: translateX(100%);
+}
+
+// Deslizador de sucursales.
+.deslizador {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(320px, 100%);
+}
+
+.deslizador__texto {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+
+  strong {
+    font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: #fff;
+  }
+}
+
+input[type='range'] {
+  --progreso: 0%;
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--coral) var(--progreso), rgba(255, 255, 255, 0.14) var(--progreso));
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 4px solid var(--coral);
+    background: #fff;
+    box-shadow: 0 0 0 6px rgba(232, 128, 107, 0.2);
+    transition: transform 150ms var(--salida);
+  }
+
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 4px solid var(--coral);
+    background: #fff;
+    box-shadow: 0 0 0 6px rgba(232, 128, 107, 0.2);
+  }
+
+  &:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--oro);
+    outline-offset: 6px;
+  }
+}
+
+// ------------------------------------------------------------------ planes
+
+.planes {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 6vw, 120px);
+  display: grid;
+  gap: 20px;
+  list-style: none;
+
+  @media (min-width: 960px) {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+    padding: 0 40px;
+  }
+}
+
+.plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 28px 30px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--tarjeta);
+  transition:
+    transform 500ms var(--salida),
+    border-color 400ms var(--salida),
+    box-shadow 500ms var(--salida);
+
+  h3 {
+    margin: 0;
+    font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+}
+
+// El plan que corresponde a las sucursales elegidas se levanta y se enciende.
+.plan--recomendado {
+  border-color: rgba(242, 184, 166, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(242, 184, 166, 0.25),
+    0 30px 80px -30px rgba(232, 128, 107, 0.6);
+
+  @media (min-width: 960px) {
+    transform: translateY(-12px);
+  }
+
+  .plan__boton {
+    background: linear-gradient(90deg, var(--coral-oscuro), var(--coral));
+    border-color: transparent;
+    color: #fff;
+  }
+}
+
+.plan__insignia {
+  position: absolute;
+  top: -13px;
+  left: 28px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--coral-oscuro), var(--coral));
+  font-size: 0.72rem;
+  font-weight: 700;
+  animation: insignia-entra 400ms var(--salida);
+}
+
+.plan__resumen {
+  min-height: 2.9em;
+  margin: 8px 0 22px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.plan__precio {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.plan__moneda {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.plan__monto {
+  display: inline-block;
+  font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  font-size: 3.4rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  animation: monto-entra 450ms var(--salida);
+}
+
+.plan__por {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.plan__detalle {
+  margin: 8px 0 24px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.plan__boton {
+  display: block;
+  padding: 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color 200ms var(--salida),
+    border-color 200ms var(--salida),
+    transform 140ms var(--salida);
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--oro);
+    outline-offset: 3px;
+  }
+}
+
+.plan__incluye {
+  display: grid;
+  gap: 12px;
+  margin: 26px 0 0;
+  padding: 24px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  list-style: none;
+
+  li {
+    display: flex;
+    gap: 10px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  svg {
+    flex-shrink: 0;
+    width: 17px;
+    height: 17px;
+    margin-top: 1px;
+    fill: none;
+    stroke: var(--oro);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+// Lo que el plan no trae: tachado suave con una X en gris.
+.plan__incluye li.plan__falta {
+  color: rgba(255, 255, 255, 0.4);
+
+  svg {
+    stroke: rgba(255, 255, 255, 0.35);
+  }
+
+  > span {
+    text-decoration: line-through;
+    text-decoration-color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes monto-entra {
+  from {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+}
+
+@keyframes insignia-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan,
+  .periodo__pildora,
+  .plan__monto,
+  .plan__insignia {
+    transition: none;
+    animation: none;
+  }
+}

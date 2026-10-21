@@ -1,0 +1,274 @@
+<header
+  class="encabezado"
+  [class.encabezado--vidrio]="solido() || menuMovilAbierto()"
+  [class.encabezado--pleno]="siempreSolido()"
+>
+  <div class="encabezado__fila">
+    <a class="encabezado__logo" routerLink="/" (click)="cerrarTodo()" aria-label="Arlani Boutiques, inicio">
+      <img src="/img/arlani-logo-encabezado.png" alt="Arlani Boutiques" width="129" height="52" />
+    </a>
+
+    <nav class="encabezado__nav" aria-label="Principal">
+      <ul>
+        <li class="desplegable" (mouseenter)="abrirConCursor('por-que')" (mouseleave)="cerrarConCursor()">
+          <button
+            type="button"
+            class="encabezado__enlace"
+            [attr.aria-expanded]="menuAbierto() === 'por-que'"
+            aria-controls="menu-por-que"
+            (click)="alternar('por-que')"
+          >
+            Por qué Arlani
+            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+          @if (menuAbierto() === 'por-que') {
+            <div class="panel panel--angosto" id="menu-por-que">
+              <ul>
+                @for (item of porQue; track item.titulo) {
+                  <li>
+                    <a routerLink="/" [fragment]="item.fragmento" (click)="cerrarTodo()">
+                      <strong>{{ item.titulo }}</strong>
+                      <span>{{ item.detalle }}</span>
+                    </a>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </li>
+
+        <li class="desplegable" (mouseenter)="abrirConCursor('funciones')" (mouseleave)="cerrarConCursor()">
+          <button
+            type="button"
+            class="encabezado__enlace"
+            [attr.aria-expanded]="menuAbierto() === 'funciones'"
+            aria-controls="menu-funciones"
+            (click)="alternar('funciones')"
+          >
+            Funciones
+            <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+          @if (menuAbierto() === 'funciones') {
+            <div class="panel panel--ancho" id="menu-funciones">
+              @for (col of funciones; track col.titulo) {
+                <div class="panel__columna">
+                  <h3>{{ col.titulo }}</h3>
+                  <ul>
+                    @for (item of col.items; track item.titulo) {
+                      <li>
+                        <a routerLink="/" [fragment]="item.fragmento" (click)="cerrarTodo()">
+                          <strong>{{ item.titulo }}</strong>
+                          <span>{{ item.detalle }}</span>
+                        </a>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          }
+        </li>
+
+        <li><a class="encabezado__enlace" routerLink="/" fragment="precios">Precios</a></li>
+        <li><a class="encabezado__enlace" routerLink="/tienda-atelier-aranier">Boutiques</a></li>
+      </ul>
+    </nav>
+
+    <div class="encabezado__acciones">
+      <!-- Buscar: igual que en la tienda, abre un campo en línea y manda a /tienda?buscar= -->
+      <div class="solo-escritorio">
+        @if (!buscando()) {
+          <button type="button" class="icono" aria-label="Buscar" (click)="abrirBusqueda()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+        } @else {
+          <div class="busqueda">
+            <input
+              #campoBusqueda
+              type="text"
+              placeholder="Buscar productos..."
+              aria-label="Buscar productos"
+              [value]="busqueda()"
+              (input)="busqueda.set($any($event.target).value)"
+              (keydown.enter)="buscar()"
+            />
+            <button type="button" class="icono" aria-label="Cerrar búsqueda" (click)="cerrarBusqueda()">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="5" y1="5" x2="19" y2="19" />
+                <line x1="19" y1="5" x2="5" y2="19" />
+              </svg>
+            </button>
+          </div>
+        }
+      </div>
+
+      @if (esClienteConSesion() && auth.hasPermiso('CU14')) {
+        <div class="notif solo-escritorio">
+          <button
+            type="button"
+            class="icono"
+            aria-label="Notificaciones"
+            [attr.aria-expanded]="notifAbiertas()"
+            (click)="alternarNotif()"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
+              <path d="M9.5 20a2.5 2.5 0 0 0 5 0" />
+            </svg>
+            @if (notificaciones.noLeidas() > 0) {
+              <span class="icono__globo">{{ notificaciones.noLeidas() }}</span>
+            }
+          </button>
+
+          @if (notifAbiertas()) {
+            <div class="menu-icono menu-icono--notif">
+              <div class="menu-icono__cabecera">
+                <span>Notificaciones</span>
+                @if (notificaciones.noLeidas() > 0) {
+                  <button type="button" (click)="marcarTodasNotifLeidas()">Marcar todas como leídas</button>
+                }
+              </div>
+              @if (notificaciones.items().length === 0) {
+                <p class="menu-icono__vacio">No tienes notificaciones.</p>
+              } @else {
+                <ul class="menu-icono__lista">
+                  @for (n of notificaciones.items().slice(0, 8); track n.id) {
+                    <li [class.no-leida]="!n.leida">
+                      <a [routerLink]="enlaceNotif(n)" (click)="marcarNotifLeida(n.id); notifAbiertas.set(false)">
+                        <span class="menu-icono__mensaje">{{ n.mensaje }}</span>
+                        <span class="menu-icono__fecha">{{ n.fecha_envio | date: 'd MMM, h:mm a' : '-0400' }}</span>
+                      </a>
+                    </li>
+                  }
+                </ul>
+              }
+              <a
+                class="menu-icono__pie"
+                routerLink="/perfil"
+                [queryParams]="{ tab: 'notificaciones' }"
+                (click)="notifAbiertas.set(false)"
+              >
+                Ver todas
+              </a>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="cuenta solo-escritorio">
+        <button
+          type="button"
+          class="icono"
+          aria-label="Mi cuenta"
+          [attr.aria-expanded]="cuentaAbierta()"
+          (click)="alternarCuenta()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+          </svg>
+        </button>
+
+        @if (cuentaAbierta()) {
+          <div class="menu-icono menu-icono--cuenta">
+            @if (auth.currentUser(); as usuario) {
+              <span class="menu-icono__saludo">Hola, {{ usuario.nombre.split(' ')[0] }}</span>
+              <a routerLink="/perfil" (click)="cuentaAbierta.set(false)">Mi perfil</a>
+              <button type="button" (click)="cerrarSesion()">Cerrar sesión</button>
+            } @else {
+              <a routerLink="/login" (click)="cuentaAbierta.set(false)">Iniciar sesión</a>
+              <a routerLink="/registro" (click)="cuentaAbierta.set(false)">Crear una cuenta</a>
+            }
+          </div>
+        }
+      </div>
+
+      @if (auth.mostrarAccionCliente('CU13')) {
+        <a class="icono" routerLink="/carrito" aria-label="Carrito" (click)="abrirCarrito($event)">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6h15l-1.5 9h-12z" />
+            <path d="M6 6 5 3H2" />
+            <circle cx="9.5" cy="19.5" r="1.5" />
+            <circle cx="17.5" cy="19.5" r="1.5" />
+          </svg>
+          @if (cart.totalItems() > 0) {
+            <span class="icono__globo">{{ cart.totalItems() }}</span>
+          }
+        </a>
+      }
+
+      <button
+        type="button"
+        class="encabezado__hamburguesa"
+        [attr.aria-expanded]="menuMovilAbierto()"
+        aria-controls="menu-movil"
+        [attr.aria-label]="menuMovilAbierto() ? 'Cerrar menú' : 'Abrir menú'"
+        (click)="menuMovilAbierto.set(!menuMovilAbierto())"
+      >
+        @if (menuMovilAbierto()) {
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        } @else {
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Menú de celular: buscador, los dos desplegables como acordeón y la cuenta -->
+  @if (menuMovilAbierto()) {
+    <nav class="movil" id="menu-movil" aria-label="Principal">
+      <div class="movil__busqueda">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Buscar productos..."
+          aria-label="Buscar productos"
+          [value]="busqueda()"
+          (input)="busqueda.set($any($event.target).value)"
+          (keydown.enter)="buscar()"
+        />
+      </div>
+
+      <details>
+        <summary>Por qué Arlani</summary>
+        @for (item of porQue; track item.titulo) {
+          <a routerLink="/" [fragment]="item.fragmento" (click)="cerrarTodo()">{{ item.titulo }}</a>
+        }
+      </details>
+      <details>
+        <summary>Funciones</summary>
+        @for (col of funciones; track col.titulo) {
+          @for (item of col.items; track item.titulo) {
+            <a routerLink="/" [fragment]="item.fragmento" (click)="cerrarTodo()">{{ item.titulo }}</a>
+          }
+        }
+      </details>
+      <a class="movil__enlace" routerLink="/" fragment="precios" (click)="cerrarTodo()">Precios</a>
+      <a class="movil__enlace" routerLink="/tienda-atelier-aranier" (click)="cerrarTodo()">Boutiques</a>
+
+      <div class="movil__acciones">
+        @if (auth.currentUser()) {
+          <a class="movil__enlace" routerLink="/perfil" (click)="cerrarTodo()">Mi perfil</a>
+          @if (esClienteConSesion() && auth.hasPermiso('CU14')) {
+            <a class="movil__enlace" routerLink="/perfil" [queryParams]="{ tab: 'notificaciones' }" (click)="cerrarTodo()">
+              Notificaciones
+              @if (notificaciones.noLeidas() > 0) {
+                <span class="movil__cuenta">({{ notificaciones.noLeidas() }})</span>
+              }
+            </a>
+          }
+          <button type="button" class="movil__enlace" (click)="cerrarSesion()">Cerrar sesión</button>
+        } @else {
+          <a class="movil__enlace" routerLink="/login" (click)="cerrarTodo()">Iniciar sesión</a>
+          <a class="movil__enlace" routerLink="/registro" (click)="cerrarTodo()">Crear una cuenta</a>
+        }
+      </div>
+    </nav>
+  }
+</header>

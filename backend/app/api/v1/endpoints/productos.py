@@ -6,6 +6,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import (
+    ADMIN_TIPOS,
     cliente_sin_permiso,
     get_current_user,
     get_current_user_optional,
@@ -586,7 +587,7 @@ def update_inventario_cantidad(
 
     # CU12: Encargado/Cajero solo controlan el inventario de SU sucursal --
     # Administrador (con o sin sucursal asignada) sigue viendo/editando todas.
-    if admin.tipo != "administrador" and inventario.sucursal_id != getattr(admin, "sucursal_id", None):
+    if admin.tipo not in ADMIN_TIPOS and inventario.sucursal_id != getattr(admin, "sucursal_id", None):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No podes modificar el inventario de otra sucursal.")
 
     db.execute(
@@ -622,7 +623,7 @@ def delete_inventario(
 
     # CU12: Encargado/Cajero solo controlan el inventario de SU sucursal --
     # Administrador (con o sin sucursal asignada) sigue viendo/editando todas.
-    if admin.tipo != "administrador" and inventario.sucursal_id != getattr(admin, "sucursal_id", None):
+    if admin.tipo not in ADMIN_TIPOS and inventario.sucursal_id != getattr(admin, "sucursal_id", None):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No podes modificar el inventario de otra sucursal.")
 
     try:

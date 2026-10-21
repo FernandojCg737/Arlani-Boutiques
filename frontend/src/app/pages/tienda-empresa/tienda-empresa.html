@@ -1,0 +1,66 @@
+@if (cargando()) {
+  <div class="tienda tienda--cargando" aria-busy="true"></div>
+} @else if (tienda(); as t) {
+  <section class="tienda" [style.--color]="t.color_marca">
+    <div class="tienda__portada">
+      @if (t.logo_url) {
+        <img class="tienda__logo" [src]="t.logo_url" [alt]="t.nombre" />
+      } @else {
+        <span class="tienda__inicial" aria-hidden="true">{{ inicial(t.nombre) }}</span>
+      }
+      <h1>{{ t.nombre }}</h1>
+      @if (t.ciudad) {
+        <p class="tienda__ciudad">{{ t.ciudad }}</p>
+      }
+    </div>
+
+    <div class="tienda__cuerpo">
+      @if (t.estado === 'suspendida') {
+        <div class="tienda__aviso">
+          <h2>Esta tienda no está disponible por ahora</h2>
+          <p>Vuelve a intentarlo más tarde o mira otras boutiques de Arlani.</p>
+          <a class="tienda__boton" routerLink="/">Ver boutiques</a>
+        </div>
+      } @else {
+        <div class="tienda__aviso">
+          <h2>Estamos preparando nuestro catálogo en línea</h2>
+          <p>Mientras tanto, visítanos en nuestras sucursales.</p>
+        </div>
+
+        @if (t.sucursales.length) {
+          <h2 class="tienda__titulo">Sucursales</h2>
+          <ul class="sucursales">
+            @for (s of t.sucursales; track s.nombre) {
+              <li class="sucursal">
+                <strong>{{ s.nombre }}</strong>
+                <span>{{ s.direccion }}, {{ s.ciudad }}</span>
+                @if (s.horario_atencion) {
+                  <small>{{ s.horario_atencion }}</small>
+                }
+                <div class="sucursal__acciones">
+                  <a [href]="mapa(s)" target="_blank" rel="noopener">Cómo llegar</a>
+                  @if (s.telefono) {
+                    <a [href]="'tel:' + s.telefono">{{ s.telefono }}</a>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </div>
+  </section>
+} @else {
+  <section class="tienda tienda--vacia">
+    <div class="tienda__aviso">
+      @if (noExiste()) {
+        <h1>No encontramos esta tienda</h1>
+        <p>Revisa el enlace o mira todas las boutiques de Arlani.</p>
+      } @else {
+        <h1>No pudimos cargar la tienda</h1>
+        <p>Revisa tu conexión e inténtalo de nuevo.</p>
+      }
+      <a class="tienda__boton" routerLink="/">Ver boutiques</a>
+    </div>
+  </section>
+}

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import require_permiso
+from app.api.deps import ADMIN_TIPOS, require_permiso
 from app.db.session import get_db
 from app.models import Inventario, Producto, Sucursal, Usuario
 from app.schemas.catalogo import CatalogoProductoOut, CatalogoVarianteOut, SucursalOpcion
@@ -31,7 +31,7 @@ def list_catalogo_sucursal(
     # sucursal -- antes esto solo se ocultaba en el frontend, pero la API en
     # si no lo exigia (se podia pedir cualquier sucursal_id directo).
     # Administrador ve todas.
-    if usuario.tipo != "administrador" and sucursal_id != getattr(usuario, "sucursal_id", None):
+    if usuario.tipo not in ADMIN_TIPOS and sucursal_id != getattr(usuario, "sucursal_id", None):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No podes consultar el catalogo de otra sucursal.")
 
     productos = (

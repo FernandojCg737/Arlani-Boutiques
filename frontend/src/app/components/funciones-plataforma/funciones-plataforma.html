@@ -1,0 +1,85 @@
+<section class="funciones" id="funciones" [class.funciones--activa]="enVista()" aria-labelledby="funciones-titulo">
+  <h2 class="funciones__titulo" id="funciones-titulo">
+    Llegá más lejos.<br />
+    Sin perder el control de nada.
+  </h2>
+
+  <div class="funciones__grilla">
+    <!-- 1. Tienda con tu marca: captura real con un recuadro de edición -->
+    <article class="funcion">
+      <div class="funcion__lienzo funcion__lienzo--tienda" aria-hidden="true">
+        <div class="anillos anillos--suaves"><span></span><span></span><span></span></div>
+        <div class="maqueta">
+          <img src="/img/vitrina/atelier-tienda.jpg" alt="" loading="lazy" />
+          <div class="maqueta__seleccion">
+            <span class="maqueta__etiqueta">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7" /></svg>
+              Tu marca
+            </span>
+          </div>
+          <div class="maqueta__colores">
+            <span class="muestra" style="background: #203c40"></span>
+            <span class="muestra" style="background: #e8806b"></span>
+            <span class="muestra" style="background: #f7f4f2"></span>
+            Tus colores
+          </div>
+        </div>
+      </div>
+      <h3>Tu tienda online,<br />con tu marca</h3>
+      <p>
+        Catálogo, carrito, reservas y probador virtual listos desde el primer día.
+        <a routerLink="/tienda-atelier-aranier">Mirá una tienda real</a>.
+      </p>
+    </article>
+
+    <!-- 2. Panel central: anillos con los módulos que se van encendiendo -->
+    <article class="funcion">
+      <div class="funcion__lienzo funcion__lienzo--panel" aria-hidden="true">
+        <div class="anillos"><span></span><span></span><span></span></div>
+        <div class="barrido"></div>
+        <div class="nucleo"></div>
+        @for (m of modulos; track m.nombre; let i = $index) {
+          <span class="modulo" [style.--x]="m.x" [style.--y]="m.y" [style.--i]="i">{{ m.nombre }}</span>
+        }
+      </div>
+      <h3>Todas tus sucursales en un panel</h3>
+      <p>
+        Inventario, ventas, reservas y empleados de cada sucursal. Lo ves todo junto o por separado, desde donde
+        estés.
+      </p>
+    </article>
+
+    <!-- 3. Sin internet: dispositivos alrededor de la nube y estado de sincronización -->
+    <article class="funcion">
+      <div class="funcion__lienzo funcion__lienzo--offline" aria-hidden="true">
+        <div class="anillos anillos--suaves"><span></span><span></span><span></span></div>
+        <div class="baldosa baldosa--centro">
+          <svg viewBox="0 0 24 24">
+            <path d="M7 18a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5z" />
+            <path d="M9.5 13.5 12 11l2.5 2.5M12 11v5" />
+          </svg>
+        </div>
+        <div class="baldosa baldosa--movil">
+          <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M11 18h2" /></svg>
+          <span>App</span>
+        </div>
+        <div class="baldosa baldosa--caja">
+          <svg viewBox="0 0 24 24"><path d="M4 10h16v10H4zM6 10V6h12v4M9 14h6" /></svg>
+          <span>Caja</span>
+        </div>
+        <div class="baldosa baldosa--web">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /></svg>
+          <span>Web</span>
+        </div>
+        <div class="estado">
+          <span class="estado__fila estado__fila--sin"><i></i>Sin internet · 3 ventas guardadas</span>
+          <span class="estado__fila estado__fila--ok"><i></i>Sincronizado</span>
+        </div>
+      </div>
+      <h3>Vendé aunque se caiga internet</h3>
+      <p>
+        La caja y la app guardan cada venta sin conexión y la sincronizan solas cuando vuelve la señal.
+      </p>
+    </article>
+  </div>
+</section>

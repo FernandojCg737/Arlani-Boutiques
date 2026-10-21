@@ -1,0 +1,364 @@
+<header class="encabezado">
+  <div>
+    <span class="encabezado__ante encabezado__ante--pagina">CU09 · Gestionar empresas</span>
+    <h1>Empresas</h1>
+    <p>Las boutiques que venden con Arlani. Crea empresas, ajusta su marca, cambia su plan o suspéndelas.</p>
+  </div>
+  <button type="button" class="btn btn--coral" (click)="abrirNueva()">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+    Nueva empresa
+  </button>
+</header>
+
+<!-- Herramientas -->
+<div class="herramientas">
+  <label class="buscador">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+    <span class="solo-lectores">Buscar empresa</span>
+    <input
+      type="search"
+      placeholder="Buscar por nombre, dirección o ciudad"
+      [value]="busqueda()"
+      (input)="busqueda.set($any($event.target).value)"
+    />
+  </label>
+  <div class="filtros" role="group" aria-label="Filtrar empresas">
+    @for (f of [
+      { id: 'todas', texto: 'Todas' },
+      { id: 'activas', texto: 'Activas' },
+      { id: 'suspendidas', texto: 'Suspendidas' },
+      { id: 'prueba', texto: 'En prueba' }
+    ]; track f.id) {
+      <button
+        type="button"
+        [attr.aria-pressed]="filtro() === f.id"
+        (click)="filtro.set($any(f.id))"
+      >
+        {{ f.texto }} <b>{{ $any(conteos())[f.id] }}</b>
+      </button>
+    }
+  </div>
+</div>
+
+<!-- Tarjetas -->
+<section class="grilla" aria-live="polite">
+  @if (cargando()) {
+    @for (n of [1, 2, 3]; track n) {
+      <div class="esqueleto grilla__cargando"></div>
+    }
+  } @else {
+    @for (e of visibles(); track e.id; let i = $index) {
+      <article class="empresa" [class.empresa--suspendida]="e.estado === 'suspendida'" [style.--n]="i" [style.--color]="e.colorMarca">
+        <div class="empresa__banda" aria-hidden="true"></div>
+        <header class="empresa__cabecera">
+          <span class="avatar avatar--grande" [style.--color]="e.colorMarca">{{ inicial(e.nombre) }}</span>
+          <div class="empresa__titulo">
+            <h2>{{ e.nombre }}</h2>
+            <a [href]="rutaTienda(e.subdominio)" target="_blank" rel="noopener">/tienda-{{ e.subdominio }}</a>
+          </div>
+          <span class="pill" [class]="'pill pill--' + e.estado"><i></i>{{ e.estado === 'activa' ? 'Activa' : 'Suspendida' }}</span>
+        </header>
+
+        <div class="empresa__plan">
+          <span class="pill" [class]="'pill pill--' + e.planCodigo">{{ e.planNombre ?? 'Sin plan' }}</span>
+          <span>{{ periodoTexto(e.periodo) }}@if (e.monto > 0) { · Bs {{ e.monto | number: '1.0-0' }} }</span>
+          @if (e.fechaFin) {
+            <span class="empresa__vence">Vence {{ e.fechaFin | date: 'd MMM y' }}</span>
+          }
+        </div>
+
+        <div class="empresa__uso">
+          <div>
+            <small>Sucursales activas</small>
+            <b>{{ e.sucursalesActivas }} <em>/ {{ e.maxSucursales ?? '—' }}</em></b>
+          </div>
+          <span class="medidor" [class.medidor--alto]="usoPct(e) >= 80"><span [style.--uso]="usoPct(e) + '%'"></span></span>
+        </div>
+
+        <dl class="empresa__datos">
+          <div>
+            <dt>Personal</dt>
+            <dd>{{ e.usuarios }}</dd>
+          </div>
+          <div>
+            <dt>Ventas totales</dt>
+            <dd>Bs {{ e.ventasTotal | number: '1.0-0' }}</dd>
+          </div>
+          <div>
+            <dt>Ciudad</dt>
+            <dd>{{ e.ciudad ?? '—' }}</dd>
+          </div>
+        </dl>
+
+        <footer class="empresa__acciones">
+          <button type="button" class="btn btn--chico" (click)="abrirEditar(e)">Editar</button>
+          <button type="button" class="btn btn--chico" (click)="abrirCambioPlan(e)">Cambiar plan</button>
+          @if (e.estado === 'activa') {
+            <button type="button" class="btn btn--chico" (click)="confirmar.set({ tipo: 'suspender', empresa: e })">Suspender</button>
+          } @else {
+            <button type="button" class="btn btn--chico" (click)="confirmar.set({ tipo: 'reactivar', empresa: e })">Reactivar</button>
+          }
+          <button
+            type="button"
+            class="empresa__borrar"
+            [attr.aria-label]="'Eliminar ' + e.nombre"
+            title="Eliminar"
+            (click)="confirmar.set({ tipo: 'eliminar', empresa: e })"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13" /></svg>
+          </button>
+        </footer>
+      </article>
+    } @empty {
+      <div class="sin-resultados">
+        <img src="/img/arlani-icono-192.png" alt="" width="72" height="72" />
+        <h2>{{ empresas().length ? 'Ninguna empresa coincide' : 'Todavía no hay empresas' }}</h2>
+        <p>{{ empresas().length ? 'Prueba con otra búsqueda o filtro.' : 'Crea la primera boutique de la plataforma.' }}</p>
+        @if (!empresas().length) {
+          <button type="button" class="btn btn--coral" (click)="abrirNueva()">Nueva empresa</button>
+        }
+      </div>
+    }
+  }
+</section>
+
+<!-- Panel lateral: alta / edición -->
+@if (panel(); as modo) {
+  <div class="capa" (click)="cerrarPanel()" aria-hidden="true"></div>
+  <aside class="cajon" role="dialog" aria-modal="true" aria-labelledby="cajon-titulo">
+    <header class="cajon__cabecera">
+      <div>
+        <span class="encabezado__ante">{{ modo === 'nueva' ? 'Alta de empresa' : 'Editar empresa' }}</span>
+        <h2 id="cajon-titulo">{{ modo === 'nueva' ? 'Nueva empresa' : editando()?.nombre }}</h2>
+      </div>
+      <button type="button" class="cajon__cerrar" (click)="cerrarPanel()" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </header>
+
+    <!-- Vista previa en vivo de la tarjeta -->
+    <div class="vista" [style.--color]="fColor()">
+      <span class="avatar avatar--grande" [style.--color]="fColor()">{{ inicial(fNombre() || 'N') }}</span>
+      <div>
+        <strong>{{ fNombre().trim() || 'Nombre de la boutique' }}</strong>
+        <small>/tienda-{{ (modo === 'editar' ? fSubdominio() : enlaceFinal()) || 'tuboutique' }} · {{ fCiudad() }}</small>
+      </div>
+    </div>
+
+    <form class="cajon__form" (submit)="$event.preventDefault(); guardar()" novalidate>
+      <label class="campo">
+        <span>Nombre</span>
+        <input
+          type="text"
+          maxlength="120"
+          placeholder="Ej.: Atelier Aranier"
+          [value]="fNombre()"
+          [attr.aria-invalid]="!!error('nombre')"
+          (input)="alCambiarNombre($any($event.target).value)"
+        />
+        @if (error('nombre'); as m) {
+          <em class="campo__error">{{ m }}</em>
+        }
+      </label>
+
+      <label class="campo">
+        <span>Enlace de la tienda</span>
+        <div class="campo__compuesto" [class.campo__compuesto--fijo]="modo === 'editar'">
+          <b>{{ prefijoEnlace }}</b>
+          <input
+            type="text"
+            maxlength="40"
+            autocapitalize="off"
+            spellcheck="false"
+            [disabled]="modo === 'editar'"
+            [value]="fSubdominio()"
+            [attr.aria-invalid]="!!error('subdominio')"
+            (input)="alCambiarSubdominio($any($event.target).value)"
+          />
+        </div>
+        @if (error('subdominio'); as m) {
+          <em class="campo__error">{{ m }}</em>
+        } @else if (modo === 'editar') {
+          <em class="campo__ayuda">El enlace no se cambia para no romper los que la tienda ya compartió.</em>
+        } @else if (enlaceOcupado()) {
+          <em class="campo__ayuda campo__ayuda--aviso">
+            Ya hay una tienda con ese enlace: esta quedará como <b>/tienda-{{ enlaceFinal() }}</b>.
+          </em>
+        } @else {
+          <em class="campo__ayuda">Así entran sus clientes a la tienda. Solo minúsculas, números y guiones.</em>
+        }
+      </label>
+
+      <div class="campo__fila">
+        <label class="campo">
+          <span>Ciudad</span>
+          <select [value]="fCiudad()" (change)="fCiudad.set($any($event.target).value)">
+            @for (c of ciudades; track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </label>
+        <label class="campo">
+          <span>Correo de contacto</span>
+          <input
+            type="email"
+            placeholder="contacto@boutique.com"
+            [value]="fEmail()"
+            [attr.aria-invalid]="!!error('email')"
+            (input)="fEmail.set($any($event.target).value)"
+          />
+          @if (error('email'); as m) {
+            <em class="campo__error">{{ m }}</em>
+          }
+        </label>
+      </div>
+
+      <fieldset class="campo">
+        <legend>Color de la marca</legend>
+        <div class="muestras">
+          @for (c of colores; track c) {
+            <button
+              type="button"
+              class="muestra"
+              [style.background]="c"
+              [attr.aria-pressed]="fColor() === c"
+              [attr.aria-label]="'Color ' + c"
+              (click)="fColor.set(c)"
+            ></button>
+          }
+          <label class="muestra muestra--libre" title="Otro color">
+            <input type="color" [value]="fColor()" (input)="fColor.set($any($event.target).value)" />
+            <span class="solo-lectores">Elegir otro color</span>
+          </label>
+        </div>
+      </fieldset>
+
+      @if (modo === 'nueva') {
+        <fieldset class="campo">
+          <legend>Plan inicial</legend>
+          <div class="opciones-plan">
+            @for (p of planes(); track p.codigo) {
+              <button type="button" class="opcion-plan" [attr.aria-pressed]="fPlan() === p.codigo" (click)="fPlan.set(p.codigo)">
+                <strong>{{ p.nombre }}</strong>
+                <small>{{ p.diasPrueba ? p.diasPrueba + ' días gratis' : 'Bs ' + p.precioMensual + '/mes' }}</small>
+                <small>Hasta {{ p.maxSucursales }} {{ p.maxSucursales === 1 ? 'sucursal' : 'sucursales' }}</small>
+              </button>
+            }
+          </div>
+        </fieldset>
+
+        @if (!planElegido()?.diasPrueba) {
+          <div class="segmentado" role="group" aria-label="Periodo de facturación">
+            <button type="button" [attr.aria-pressed]="fPeriodo() === 'mensual'" (click)="fPeriodo.set('mensual')">Mensual</button>
+            <button type="button" [attr.aria-pressed]="fPeriodo() === 'anual'" (click)="fPeriodo.set('anual')">
+              Anual <em>2 meses gratis</em>
+            </button>
+          </div>
+        }
+      }
+
+      <footer class="cajon__pie">
+        <button type="button" class="btn" (click)="cerrarPanel()">Cancelar</button>
+        <button type="submit" class="btn btn--primario" [disabled]="ocupado()">
+          {{ ocupado() ? 'Guardando…' : modo === 'nueva' ? 'Crear empresa' : 'Guardar cambios' }}
+        </button>
+      </footer>
+    </form>
+  </aside>
+}
+
+<!-- Cambio de plan -->
+@if (cambioPlan(); as e) {
+  <div class="capa capa--centro" (click)="cambioPlan.set(null)">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-titulo" (click)="$event.stopPropagation()">
+      <span class="encabezado__ante">CU10 · Plan y límites</span>
+      <h2 id="plan-titulo">Cambiar el plan de {{ e.nombre }}</h2>
+      <p class="modal__texto">
+        Tiene <b>{{ e.sucursalesActivas }}</b> {{ e.sucursalesActivas === 1 ? 'sucursal activa' : 'sucursales activas' }}.
+        Solo se puede pasar a un plan que las cubra.
+      </p>
+      <div class="opciones-plan opciones-plan--modal">
+        @for (p of planes(); track p.codigo) {
+          <button
+            type="button"
+            class="opcion-plan"
+            [attr.aria-pressed]="cpPlan() === p.codigo"
+            [disabled]="!cubre(p, e)"
+            (click)="cpPlan.set(p.codigo)"
+          >
+            @if (p.codigo === e.planCodigo) {
+              <span class="opcion-plan__actual">Actual</span>
+            }
+            <strong>{{ p.nombre }}</strong>
+            <small>{{ p.diasPrueba ? p.diasPrueba + ' días gratis' : 'Bs ' + p.precioMensual + '/mes' }}</small>
+            <small>
+              @if (cubre(p, e)) {
+                Hasta {{ p.maxSucursales }} {{ p.maxSucursales === 1 ? 'sucursal' : 'sucursales' }}
+              } @else {
+                No cubre sus sucursales
+              }
+            </small>
+          </button>
+        }
+      </div>
+      @if (!planCambio()?.diasPrueba) {
+        <div class="segmentado" role="group" aria-label="Periodo de facturación">
+          <button type="button" [attr.aria-pressed]="cpPeriodo() === 'mensual'" (click)="cpPeriodo.set('mensual')">Mensual</button>
+          <button type="button" [attr.aria-pressed]="cpPeriodo() === 'anual'" (click)="cpPeriodo.set('anual')">
+            Anual <em>2 meses gratis</em>
+          </button>
+        </div>
+      }
+      <div class="modal__acciones">
+        <button type="button" class="btn" (click)="cambioPlan.set(null)">Cancelar</button>
+        <button type="button" class="btn btn--primario" [disabled]="ocupado()" (click)="confirmarCambioPlan()">
+          {{ ocupado() ? 'Aplicando…' : 'Aplicar plan' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Confirmaciones -->
+@if (confirmar(); as c) {
+  <div class="capa capa--centro" (click)="confirmar.set(null)">
+    <div class="modal modal--angosto" role="alertdialog" aria-modal="true" aria-labelledby="conf-titulo" (click)="$event.stopPropagation()">
+      <span class="modal__icono" [class.modal__icono--peligro]="c.tipo !== 'reactivar'" aria-hidden="true">
+        @if (c.tipo === 'reactivar') {
+          <svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z" /></svg>
+        } @else if (c.tipo === 'suspender') {
+          <svg viewBox="0 0 24 24"><path d="M9 6v12M15 6v12" /></svg>
+        } @else {
+          <svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13" /></svg>
+        }
+      </span>
+      <h2 id="conf-titulo">
+        @switch (c.tipo) {
+          @case ('suspender') { ¿Suspender {{ c.empresa.nombre }}? }
+          @case ('reactivar') { ¿Reactivar {{ c.empresa.nombre }}? }
+          @default { ¿Eliminar {{ c.empresa.nombre }}? }
+        }
+      </h2>
+      <p class="modal__texto">
+        @switch (c.tipo) {
+          @case ('suspender') { La tienda deja de poder habilitar sucursales hasta que la reactives. Sus datos no se borran. }
+          @case ('reactivar') { La empresa vuelve a operar con su plan actual. }
+          @default { Solo se pueden eliminar empresas sin sucursales ni personal. Esta acción no se puede deshacer. }
+        }
+      </p>
+      <div class="modal__acciones">
+        <button type="button" class="btn" (click)="confirmar.set(null)">Cancelar</button>
+        <button
+          type="button"
+          class="btn"
+          [class.btn--peligro]="c.tipo !== 'reactivar'"
+          [class.btn--primario]="c.tipo === 'reactivar'"
+          [disabled]="ocupado()"
+          (click)="ejecutarConfirmacion()"
+        >
+          {{ ocupado() ? 'Procesando…' : c.tipo === 'suspender' ? 'Suspender' : c.tipo === 'reactivar' ? 'Reactivar' : 'Eliminar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
