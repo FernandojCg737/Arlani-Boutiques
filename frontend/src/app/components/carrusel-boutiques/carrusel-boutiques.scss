@@ -1,0 +1,138 @@
+// Cinta de logos sobre el azul noche del pie (queda como su encabezado).
+:host {
+  --noche: #0b111d;
+  --oro: #f2b8a6;
+  display: block;
+}
+
+.cinta {
+  background: var(--noche);
+  padding: clamp(40px, 5vw, 64px) 0 clamp(8px, 2vw, 16px);
+}
+
+.cinta__titulo {
+  margin: 0 0 clamp(24px, 3vw, 36px);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--oro);
+}
+
+// Los bordes se desvanecen para que los logos entren y salgan suavemente.
+.cinta__ventana {
+  overflow: hidden;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.cinta__pista {
+  display: flex;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: cinta-gira 40s linear infinite;
+
+  // Con el cursor encima se frena, para poder elegir una boutique.
+  &:hover,
+  &:focus-within {
+    animation-play-state: paused;
+  }
+
+  li {
+    flex-shrink: 0;
+    padding: 0 clamp(28px, 4vw, 56px);
+  }
+}
+
+// Logos atenuados y en gris; al pasar el cursor toman su color.
+.cinta__logo {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  border-radius: 8px;
+
+  img {
+    display: block;
+    max-height: 48px;
+    max-width: 160px;
+    width: auto;
+    filter: grayscale(1);
+    opacity: 0.6;
+    transition:
+      filter 300ms ease,
+      opacity 300ms ease,
+      transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (hover: hover) {
+    &:hover img,
+    &:hover .cinta__nombre {
+      filter: none;
+      opacity: 1;
+      transform: scale(1.06);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--oro);
+    outline-offset: 6px;
+
+    img,
+    .cinta__nombre {
+      filter: none;
+      opacity: 1;
+    }
+  }
+}
+
+// Tienda sin logo cargado: su inicial en el color de la marca y su nombre,
+// atenuados igual que los logos.
+.cinta__nombre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 220px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  filter: grayscale(1);
+  opacity: 0.6;
+  transition:
+    filter 300ms ease,
+    opacity 300ms ease,
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  i {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--color);
+    font-style: normal;
+  }
+}
+
+@keyframes cinta-gira {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+// Sin movimiento: la cinta queda quieta y se puede desplazar a mano.
+@media (prefers-reduced-motion: reduce) {
+  .cinta__ventana {
+    overflow-x: auto;
+  }
+
+  .cinta__pista {
+    animation: none;
+  }
+}

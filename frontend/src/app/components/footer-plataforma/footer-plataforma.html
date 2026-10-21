@@ -1,0 +1,24 @@
+<footer class="pie">
+  <div class="pie__arriba">
+    <div class="pie__marca">
+      <a routerLink="/" aria-label="Arlani Boutiques, inicio">
+        <img src="/img/arlani-logo-encabezado.png" alt="Arlani Boutiques" width="148" height="60" />
+      </a>
+      <p>La plataforma para que las boutiques de Bolivia vendan en línea y en mostrador, en todas sus sucursales.</p>
+    </div>
+
+    @for (col of columnas; track col.titulo) {
+      <nav class="pie__columna" [attr.aria-label]="col.titulo">
+        <span class="pie__titulo">{{ col.titulo }}</span>
+        @for (e of col.enlaces; track e.texto) {
+          <a [routerLink]="e.ruta" [fragment]="e.fragmento">{{ e.texto }}</a>
+        }
+      </nav>
+    }
+  </div>
+
+  <div class="pie__abajo">
+    <span>© {{ anio }} Arlani Boutiques. Todos los derechos reservados.</span>
+    <span>Hecho en Bolivia</span>
+  </div>
+</footer>

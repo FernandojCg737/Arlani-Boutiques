@@ -17,6 +17,21 @@
     </form>
   </div>
 
+  @if (esSuper) {
+    <div class="filtros-empresa" role="group" aria-label="Filtrar bitácora">
+      <button type="button" [class.is-active]="filtro() === 'todas'" (click)="elegirFiltro('todas')">Todo el sistema</button>
+      <button type="button" [class.is-active]="filtro() === 'plataforma'" (click)="elegirFiltro('plataforma')">
+        Plataforma
+      </button>
+      @for (e of empresas(); track e.id) {
+        <button type="button" [class.is-active]="filtro() === e.id" (click)="elegirFiltro(e.id)">
+          <span class="filtros-empresa__avatar" [style.background]="e.colorMarca">{{ inicial(e.nombre) }}</span>
+          {{ e.nombre }}
+        </button>
+      }
+    </div>
+  }
+
   @if (error()) {
     <div class="admin-error">{{ error() }}</div>
   }
@@ -26,6 +41,9 @@
       <thead>
         <tr>
           <th>Usuario</th>
+          @if (esSuper) {
+            <th>Empresa</th>
+          }
           <th>Accion</th>
           <th>Entidad</th>
           <th>Fecha y hora</th>
@@ -37,11 +55,11 @@
       <tbody>
         @if (loading()) {
           <tr>
-            <td colspan="7" class="admin-table__empty">Cargando...</td>
+            <td [attr.colspan]="esSuper ? 8 : 7" class="admin-table__empty">Cargando...</td>
           </tr>
         } @else if (items().length === 0) {
           <tr>
-            <td colspan="7" class="admin-table__empty">No hay registros.</td>
+            <td [attr.colspan]="esSuper ? 8 : 7" class="admin-table__empty">No hay registros.</td>
           </tr>
         } @else {
           @for (item of items(); track item.id) {
@@ -52,6 +70,9 @@
                   <span>{{ item.usuario_email }}</span>
                 </div>
               </td>
+              @if (esSuper) {
+                <td>{{ item.empresa_nombre || 'Plataforma' }}</td>
+              }
               <td><span class="admin-badge">{{ item.accion }}</span></td>
               <td>{{ item.entidad_afectada }} @if (item.entidad_id) { #{{ item.entidad_id }} }</td>
               <td>{{ item.fecha | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }}</td>

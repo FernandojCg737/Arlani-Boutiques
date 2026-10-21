@@ -5,6 +5,13 @@
       <span>Panel de Administracion</span>
     </div>
     <div class="admin-topbar__user">
+      @if (auth.isSuperAdmin()) {
+        <a class="admin-topbar__plataforma" routerLink="/superadmin">Volver a la plataforma</a>
+      } @else if (auth.isAdmin()) {
+        <a class="admin-topbar__suscripcion" routerLink="/admin/suscripcion" routerLinkActive="is-active">
+          Mi suscripción
+        </a>
+      }
       <span>{{ auth.currentUser()?.nombre }}</span>
       <button type="button" (click)="logout()">Cerrar Sesion</button>
     </div>

@@ -1,0 +1,94 @@
+<section class="porque" id="por-que" aria-labelledby="porque-titulo">
+  <header class="porque__cabecera">
+    <span class="porque__antetitulo">Por qué Arlani</span>
+    <h2 class="porque__titulo" id="porque-titulo">Hecha para boutiques como la tuya.</h2>
+  </header>
+
+  <div class="porque__cuerpo">
+    <!-- Escena fija: cambia según el paso activo -->
+    <div class="escenario" aria-hidden="true">
+      <!-- 1. La tienda se arma sola -->
+      <div class="escena escena--tienda" [class.escena--activa]="activo() === 0">
+        <div class="navegador">
+          <div class="navegador__barra"><i></i><i></i><i></i><span>tuboutique.arlani.bo</span></div>
+          <div class="tienda">
+            <div class="tienda__cabecera">
+              <span class="tienda__logo">Tu logo</span>
+              <span class="tienda__nav"><i></i><i></i><i></i></span>
+            </div>
+            <div class="tienda__grilla">
+              @for (p of productos; track p.nombre; let i = $index) {
+                <div class="producto" [style.--i]="i">
+                  <img [src]="p.imagen" alt="" loading="lazy" />
+                  <strong>{{ p.nombre }}</strong>
+                  <span>{{ p.precio }} Bs</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="aviso">
+          <svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7" /></svg>
+          Tu tienda ya está publicada
+        </div>
+      </div>
+
+      <!-- 2. Panel con todas las sucursales -->
+      <div class="escena escena--panel" [class.escena--activa]="activo() === 1">
+        <div class="panel">
+          <div class="panel__cabecera">
+            <span>Ventas de hoy · Todas las sucursales</span>
+            <em>Ejemplo</em>
+          </div>
+          <strong class="panel__total">Bs {{ totalSucursales.toLocaleString('es-BO') }}</strong>
+          <ul class="panel__lista">
+            @for (s of sucursales; track s.nombre; let i = $index) {
+              <li [style.--i]="i">
+                <div class="panel__fila">
+                  <span>Sucursal {{ s.nombre }}</span>
+                  <b>Bs {{ s.monto.toLocaleString('es-BO') }}</b>
+                </div>
+                <div class="barra"><span [style.--ancho]="s.porcentaje + '%'"></span></div>
+              </li>
+            }
+          </ul>
+        </div>
+      </div>
+
+      <!-- 3. Ventas guardadas sin internet que se sincronizan -->
+      <div class="escena escena--offline" [class.escena--activa]="activo() === 2">
+        <div class="caja">
+          <div class="caja__estado">
+            <span class="caja__senal caja__senal--sin"><i></i>Sin conexión</span>
+            <span class="caja__senal caja__senal--ok"><i></i>Conectado</span>
+          </div>
+          <ul class="caja__lista">
+            @for (v of ventasSinConexion; track v.numero; let i = $index) {
+              <li [style.--i]="i">
+                <div>
+                  <strong>Venta #{{ v.numero }}</strong>
+                  <span>{{ v.prenda }} · {{ v.monto }} Bs</span>
+                </div>
+                <span class="pastilla">
+                  <span class="pastilla__texto pastilla__texto--guardada">Guardada</span>
+                  <span class="pastilla__texto pastilla__texto--lista">Sincronizada</span>
+                </span>
+              </li>
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pasos que van pasando con el scroll -->
+    <ol class="pasos">
+      @for (paso of pasos; track paso.titulo; let i = $index) {
+        <li #paso class="paso" [class.paso--activo]="activo() === i">
+          <span class="paso__etiqueta">{{ paso.etiqueta }}</span>
+          <h3>{{ paso.titulo }}</h3>
+          <p>{{ paso.texto }}</p>
+        </li>
+      }
+    </ol>
+  </div>
+</section>

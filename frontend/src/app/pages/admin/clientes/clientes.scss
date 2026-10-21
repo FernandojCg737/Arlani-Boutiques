@@ -156,10 +156,13 @@
     }
   }
 
+  // Sin display:flex en el <td>: asi sigue siendo celda y se alinea con la fila.
   &__actions {
-    display: flex;
-    gap: 8px;
     white-space: nowrap;
+
+    button + button {
+      margin-left: 8px;
+    }
 
     button {
       border: 1px solid #ddd;
@@ -301,3 +304,48 @@
     }
   }
 }
+
+// Dentro de la pantalla de empresas del SuperAdministrador.
+.admin-content--embebido {
+  max-width: none;
+  margin-top: 40px;
+  padding: 32px 0 0;
+  border-top: 1px solid #e2ddd8;
+
+  @media (min-width: 700px) {
+    padding: 32px 0 0;
+  }
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: clamp(20px, 2.4vw, 24px);
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--brand-dark);
+  }
+}
+
+.admin-content__total {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #999;
+}
+
+// Relacion del cliente con la tienda: "7 compras · 1 reserva · ..." y la fecha debajo.
+.relacion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #444;
+
+  small {
+    font-size: 11px;
+    color: #999;
+  }
+}
+

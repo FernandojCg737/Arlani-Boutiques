@@ -148,10 +148,18 @@ def google_auth(payload: GoogleAuthPayload, request: Request, db: Session = Depe
     _limitar_por_ip(request, "google", maximo=30, segundos=300)
 
     try:
+        # 10 s de tolerancia: si el reloj del servidor (Docker, Render) va un
+        # poco atrasado, Google rechaza el token como "usado antes de tiempo".
         idinfo = google_id_token.verify_oauth2_token(
-            payload.credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID
+            payload.credential,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=10,
         )
-    except ValueError:
+    except ValueError as err:
+        # El motivo real (audiencia equivocada, expirado, ...) queda en el log
+        # del backend; al usuario le basta el mensaje general.
+        logger.warning("Google rechazo el id_token: %s", err)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token de Google invalido.")
 
     email = idinfo.get("email")

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso
 from app.db.session import get_db
-from app.models import Bitacora, Usuario
+from app.models import Bitacora, Empresa, Usuario
 from app.schemas.bitacora import BitacoraItem, BitacoraPage
 
 router = APIRouter()
@@ -14,10 +14,23 @@ def list_bitacora(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     buscar: str | None = Query(default=None),
+    empresa_id: int | None = Query(default=None),
+    plataforma: bool = Query(default=False),
     db: Session = Depends(get_db),
-    _usuario: Usuario = Depends(require_permiso("CU17")),
+    usuario: Usuario = Depends(require_permiso("CU17")),
 ) -> BitacoraPage:
     query = db.query(Bitacora).join(Usuario, Usuario.id == Bitacora.usuario_id)
+
+    # Cada tienda ve solo lo que se refiere a ella (su personal, ventas y
+    # reservas en sus sucursales, uso del probador...). El SuperAdministrador
+    # ve todo y puede filtrar por empresa o por lo que es de la plataforma.
+    if usuario.tipo == "superadministrador":
+        if empresa_id is not None:
+            query = query.filter(Bitacora.empresa_id == empresa_id)
+        elif plataforma:
+            query = query.filter(Bitacora.empresa_id.is_(None))
+    else:
+        query = query.filter(Bitacora.empresa_id == usuario.empresa_id)
 
     if buscar:
         like = f"%{buscar}%"
@@ -26,8 +39,9 @@ def list_bitacora(
         )
 
     total = query.count()
+    empresas = {e.id: e.nombre for e in db.query(Empresa.id, Empresa.nombre).all()}
     rows = (
-        query.order_by(Bitacora.fecha.desc())
+        query.order_by(Bitacora.fecha.desc(), Bitacora.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -46,6 +60,8 @@ def list_bitacora(
             detalle=b.detalle,
             ip_address=b.ip_address,
             plataforma=b.plataforma,
+            empresa_id=b.empresa_id,
+            empresa_nombre=empresas.get(b.empresa_id) if b.empresa_id else None,
         )
         for b in rows
     ]

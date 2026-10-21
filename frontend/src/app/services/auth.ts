@@ -3,7 +3,10 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-const STAFF_TIPOS = new Set(['administrador', 'encargado_sucursal', 'cajero']);
+// El SuperAdministrador (dueño de la plataforma) hereda todo lo del
+// Administrador de una tienda y además gestiona empresas y planes.
+const ADMIN_TIPOS = new Set(['administrador', 'superadministrador']);
+const STAFF_TIPOS = new Set([...ADMIN_TIPOS, 'encargado_sucursal', 'cajero']);
 
 export interface Cliente {
   id: number;
@@ -50,7 +53,8 @@ export class Auth {
 
   readonly currentUser = signal<Cliente | null>(this.readCliente());
   readonly token = signal<string | null>(localStorage.getItem(TOKEN_KEY));
-  readonly isAdmin = computed(() => this.currentUser()?.tipo === 'administrador');
+  readonly isAdmin = computed(() => ADMIN_TIPOS.has(this.currentUser()?.tipo ?? ''));
+  readonly isSuperAdmin = computed(() => this.currentUser()?.tipo === 'superadministrador');
   readonly isStaff = computed(() => STAFF_TIPOS.has(this.currentUser()?.tipo ?? ''));
   readonly sessionMessage = signal<string | null>(null);
 
@@ -72,6 +76,7 @@ export class Auth {
   // ahi; el resto del personal cae en la landing del panel (accesos rapidos
   // segun su rol), y un Cliente va al inicio de la tienda.
   landingRoute(): string {
+    if (this.isSuperAdmin()) return '/superadmin';
     if (this.hasPermiso('CU17')) return '/admin/bitacora';
     if (this.isStaff()) return '/admin';
     return '/';

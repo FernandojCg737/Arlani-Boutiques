@@ -33,11 +33,11 @@ interface Dashboard {
 }
 
 const REPORTES_LINKS = [
-  { label: 'Ventas', desc: 'Total vendido, metodos de pago, top productos y sucursales', route: '/admin/reportes/ventas' },
-  { label: 'Asistencia de empleados', desc: 'Horas conectadas por empleado y sucursal, segun login/logout', route: '/admin/reportes/asistencia' },
-  { label: 'Inventario', desc: 'Stock actual, alertas de stock bajo y movimientos', route: '/admin/reportes/inventario' },
-  { label: 'Reservas', desc: 'Reservas por estado y tasa de conversion a venta', route: '/admin/reportes/reservas' },
-  { label: 'Productos mas vendidos', desc: 'Ranking completo por unidades, con los que menos rotan tambien', route: '/admin/reportes/productos' },
+  { label: 'Ventas', desc: 'Total vendido, metodos de pago, top productos y sucursales', route: 'ventas' },
+  { label: 'Asistencia de empleados', desc: 'Horas conectadas por empleado y sucursal, segun login/logout', route: 'asistencia' },
+  { label: 'Inventario', desc: 'Stock actual, alertas de stock bajo y movimientos', route: 'inventario' },
+  { label: 'Reservas', desc: 'Reservas por estado y tasa de conversion a venta', route: 'reservas' },
+  { label: 'Productos mas vendidos', desc: 'Ranking completo por unidades, con los que menos rotan tambien', route: 'productos' },
 ];
 
 // CU16 "Gestion Reportes y Dashboards": landing con KPIs y graficos de los

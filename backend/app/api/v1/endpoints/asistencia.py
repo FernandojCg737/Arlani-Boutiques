@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_administrador, require_permiso
+from app.api.deps import ADMIN_TIPOS, require_administrador, require_permiso
 from app.core.audit import log_bitacora
 from app.core.storage import upload_foto_asistencia
 from app.db.session import get_db
@@ -19,6 +19,32 @@ from app.schemas.asistencia import (
 
 router = APIRouter()
 
+# Personal que marca asistencia (el Administrador la gestiona, no la marca).
+PERSONAL_ASISTENCIA = ("encargado_sucursal", "cajero")
+
+
+def _empresa_asistencia(usuario: Usuario, empresa_id: int | None) -> int:
+    """Empresa cuyo control de asistencia se consulta. Cada tienda ve la
+    suya; el SuperAdministrador elige cual mirar (solo lectura)."""
+    if usuario.tipo == "superadministrador":
+        if empresa_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Elige la empresa cuyo control de asistencia quieres ver.")
+        return empresa_id
+    if usuario.empresa_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo el personal de una tienda tiene control de asistencia.")
+    return usuario.empresa_id
+
+
+def require_admin_tienda(admin: Usuario = Depends(require_administrador)) -> Usuario:
+    # Configurar la hora y liberar la clave es del Administrador de cada
+    # tienda. El SuperAdministrador solo puede mirar.
+    if admin.tipo != "administrador":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "El control de asistencia lo gestiona el Administrador de cada empresa; desde la plataforma solo se consulta.",
+        )
+    return admin
+
 
 def _utc(dt: datetime) -> datetime:
     # hora_marcado se guarda con datetime.utcnow() (naive, sin tzinfo) --
@@ -28,8 +54,8 @@ def _utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc)
 
 
-def _estado_hoy(db: Session) -> dict:
-    fila = db.execute(text("SELECT * FROM fn_estado_asistencia_hoy()")).mappings().first()
+def _estado_hoy(db: Session, empresa_id: int) -> dict:
+    fila = db.execute(text("SELECT * FROM fn_estado_asistencia_hoy(:e)"), {"e": empresa_id}).mappings().first()
     db.commit()
     if fila is None:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Configuracion de asistencia no inicializada.")
@@ -40,7 +66,11 @@ def _estado_out(fila: dict, usuario: Usuario) -> EstadoAsistenciaOut:
     # El Administrador siempre ve la clave (para poder anunciarla/supervisar
     # sin depender de que ya este "liberada"); el resto del personal solo
     # la ve mientras la ventana este abierta.
-    mostrar_codigo = fila["liberado"] or usuario.tipo == "administrador"
+    # El SuperAdministrador no participa del control: nunca ve la clave.
+    if usuario.tipo == "superadministrador":
+        mostrar_codigo = False
+    else:
+        mostrar_codigo = fila["liberado"] or usuario.tipo in ADMIN_TIPOS
     return EstadoAsistenciaOut(
         liberado=fila["liberado"],
         ventana_cerrada=fila["ventana_cerrada"],
@@ -52,10 +82,11 @@ def _estado_out(fila: dict, usuario: Usuario) -> EstadoAsistenciaOut:
 
 @router.get("/estado", response_model=EstadoAsistenciaOut)
 def estado_asistencia(
+    empresa_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso("CU01")),
 ) -> EstadoAsistenciaOut:
-    return _estado_out(_estado_hoy(db), usuario)
+    return _estado_out(_estado_hoy(db, _empresa_asistencia(usuario, empresa_id)), usuario)
 
 
 @router.put("/hora", response_model=EstadoAsistenciaOut)
@@ -63,27 +94,34 @@ def configurar_hora(
     payload: ConfigurarHoraRequest,
     request: Request,
     db: Session = Depends(get_db),
-    admin: Usuario = Depends(require_administrador),
+    admin: Usuario = Depends(require_admin_tienda),
 ) -> EstadoAsistenciaOut:
-    db.execute(text("SELECT sp_configurar_hora_asistencia(:hora)"), {"hora": payload.hora_liberacion})
+    empresa = _empresa_asistencia(admin, None)
+    db.execute(
+        text("SELECT sp_configurar_hora_asistencia(:e, :hora)"), {"e": empresa, "hora": payload.hora_liberacion}
+    )
     db.commit()
     log_bitacora(
-        db, admin, "ACTUALIZAR", "configuracion_asistencia", 1,
+        db, admin, "ACTUALIZAR", "configuracion_asistencia", empresa,
         f"Hora de liberacion de asistencia cambiada a {payload.hora_liberacion}", request,
     )
-    return _estado_out(_estado_hoy(db), admin)
+    return _estado_out(_estado_hoy(db, empresa), admin)
 
 
 @router.post("/liberar", response_model=EstadoAsistenciaOut)
 def liberar_manual(
     request: Request,
     db: Session = Depends(get_db),
-    admin: Usuario = Depends(require_administrador),
+    admin: Usuario = Depends(require_admin_tienda),
 ) -> EstadoAsistenciaOut:
-    db.execute(text("SELECT sp_liberar_asistencia_manual()"))
+    empresa = _empresa_asistencia(admin, None)
+    db.execute(text("SELECT sp_liberar_asistencia_manual(:e)"), {"e": empresa})
     db.commit()
-    log_bitacora(db, admin, "ACTUALIZAR", "configuracion_asistencia", 1, "Clave de asistencia liberada manualmente (ventana de 5 min)", request)
-    return _estado_out(_estado_hoy(db), admin)
+    log_bitacora(
+        db, admin, "ACTUALIZAR", "configuracion_asistencia", empresa,
+        "Clave de asistencia liberada manualmente (ventana de 5 min)", request,
+    )
+    return _estado_out(_estado_hoy(db, empresa), admin)
 
 
 @router.post("/marcar", response_model=MarcadoOut, status_code=status.HTTP_201_CREATED)
@@ -128,6 +166,7 @@ async def marcar_asistencia(
             "La clave de asistencia todavia no fue liberada.",
             "La clave ingresada no es correcta.",
             "Ya marcaste tu asistencia hoy.",
+            "Solo el personal de una tienda puede marcar asistencia.",
         ):
             if candidato in mensaje:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, candidato)
@@ -175,12 +214,22 @@ def mi_historial(
 
 @router.get("/hoy", response_model=list[MarcadoHoyOut])
 def marcados_hoy(
+    empresa_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _admin: Usuario = Depends(require_administrador),
+    admin: Usuario = Depends(require_administrador),
 ) -> list[MarcadoHoyOut]:
-    fila_estado = _estado_hoy(db)
+    empresa = _empresa_asistencia(admin, empresa_id)
+    fila_estado = _estado_hoy(db, empresa)
     hoy: date = fila_estado["codigo_fecha"]
-    empleados = db.query(Empleado).filter(Empleado.estado == "activo").all()
+    empleados = (
+        db.query(Empleado)
+        .filter(
+            Empleado.estado == "activo",
+            Empleado.empresa_id == empresa,
+            Empleado.tipo.in_(PERSONAL_ASISTENCIA),
+        )
+        .all()
+    )
     marcados = {m.empleado_id: m for m in db.query(MarcadoAsistencia).filter(MarcadoAsistencia.fecha == hoy).all()}
 
     resultado = []
@@ -212,13 +261,24 @@ def historial_completo(
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
     empleado_id: int | None = Query(default=None),
+    empresa_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
-    _admin: Usuario = Depends(require_administrador),
+    admin: Usuario = Depends(require_administrador),
 ) -> list[MarcadoOut]:
+    empresa = _empresa_asistencia(admin, empresa_id)
     desde = fecha_desde or (date.today() - timedelta(days=7))
     hasta = fecha_hasta or date.today()
 
-    query = db.query(MarcadoAsistencia).filter(MarcadoAsistencia.fecha >= desde, MarcadoAsistencia.fecha <= hasta)
+    # Solo los marcados del personal de esa empresa.
+    query = (
+        db.query(MarcadoAsistencia)
+        .join(Empleado, Empleado.id == MarcadoAsistencia.empleado_id)
+        .filter(
+            MarcadoAsistencia.fecha >= desde,
+            MarcadoAsistencia.fecha <= hasta,
+            Empleado.empresa_id == empresa,
+        )
+    )
     if empleado_id:
         query = query.filter(MarcadoAsistencia.empleado_id == empleado_id)
 

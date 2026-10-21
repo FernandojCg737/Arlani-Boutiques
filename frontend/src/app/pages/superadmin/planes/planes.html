@@ -1,0 +1,191 @@
+<header class="encabezado">
+  <div>
+    <span class="encabezado__ante encabezado__ante--pagina">CU10 · Planes, suscripciones y límites</span>
+    <h1>Planes y suscripciones</h1>
+    <p>
+      Ajusta precio, límite de sucursales e IA de cada plan. La base de datos impide bajar un límite por debajo de lo
+      que una empresa ya usa.
+    </p>
+  </div>
+</header>
+
+<!-- Tarjetas de plan editables -->
+<section class="planes">
+  @if (cargando()) {
+    @for (n of [1, 2, 3]; track n) {
+      <div class="esqueleto planes__cargando"></div>
+    }
+  }
+  @for (p of planes(); track p.codigo; let i = $index) {
+    <article class="plan" [class]="'plan plan--' + p.codigo" [class.plan--cambiado]="cambiado(p)" [style.--n]="i">
+      <header class="plan__cabecera">
+        <div>
+          <span class="plan__nombre">{{ p.nombre }}</span>
+          <small>
+            {{ p.empresas }} {{ p.empresas === 1 ? 'empresa suscrita' : 'empresas suscritas' }}
+            @if (p.diasPrueba) {
+              · {{ p.diasPrueba }} días de prueba
+            }
+          </small>
+        </div>
+        @if (cambiado(p)) {
+          <span class="plan__pendiente">Sin guardar</span>
+        }
+      </header>
+
+      <!-- Precio -->
+      <label class="plan__precio">
+        <span>Precio mensual</span>
+        <div>
+          <b>Bs</b>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputmode="decimal"
+            [disabled]="!!p.diasPrueba"
+            [value]="borrador(p.codigo).precio"
+            (input)="editar(p.codigo, { precio: +$any($event.target).value })"
+          />
+        </div>
+        @if (p.diasPrueba) {
+          <em>El plan de prueba siempre es gratuito.</em>
+        } @else {
+          <em>Anual: Bs {{ borrador(p.codigo).precio * 10 | number: '1.0-0' }} (2 meses de regalo)</em>
+        }
+      </label>
+
+      <!-- Sucursales -->
+      <div class="plan__fila">
+        <span>
+          Sucursales activas
+          <small>Máximo por empresa</small>
+        </span>
+        <div class="contador">
+          <button type="button" (click)="sumarSucursales(p.codigo, -1)" aria-label="Una sucursal menos">−</button>
+          <span aria-live="polite">{{ borrador(p.codigo).max }}</span>
+          <button type="button" (click)="sumarSucursales(p.codigo, 1)" aria-label="Una sucursal más">+</button>
+        </div>
+      </div>
+
+      <!-- IA -->
+      <label class="plan__fila plan__fila--interruptor">
+        <span>
+          Reportes generativos con IA
+          <small>CU17 · texto o voz</small>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          class="interruptor"
+          [checked]="borrador(p.codigo).ia"
+          (change)="editar(p.codigo, { ia: $any($event.target).checked })"
+        />
+      </label>
+
+      <footer class="plan__acciones">
+        <button type="button" class="btn btn--chico" [disabled]="!cambiado(p)" (click)="descartar(p)">Descartar</button>
+        <button
+          type="button"
+          class="btn btn--primario btn--chico"
+          [disabled]="!cambiado(p) || guardando() === p.codigo"
+          (click)="guardar(p)"
+        >
+          {{ guardando() === p.codigo ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </footer>
+    </article>
+  }
+</section>
+
+<div class="fila">
+  <!-- Tabla del requerimiento -->
+  <article class="tarjeta comparacion" style="--n: 3">
+    <div class="tarjeta__cabecera">
+      <div>
+        <h2>Qué incluye cada plan</h2>
+        <small>Generada con los datos vigentes de la base de datos</small>
+      </div>
+    </div>
+    <div class="comparacion__tabla" role="table" aria-label="Comparación de planes">
+      <div class="comparacion__fila comparacion__fila--cabecera" role="row">
+        <span role="columnheader">Característica</span>
+        @for (p of planes(); track p.codigo) {
+          <span role="columnheader">{{ p.nombre }}</span>
+        }
+      </div>
+      <div class="comparacion__fila" role="row">
+        <span role="cell">Sucursales activas</span>
+        @for (p of planes(); track p.codigo) {
+          <span role="cell"><b>Hasta {{ p.maxSucursales }}</b></span>
+        }
+      </div>
+      @for (f of funcionesBase; track f) {
+        <div class="comparacion__fila" role="row">
+          <span role="cell">{{ f }}</span>
+          @for (p of planes(); track p.codigo) {
+            <span role="cell" class="si" aria-label="Sí">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" /></svg>
+            </span>
+          }
+        </div>
+      }
+      <div class="comparacion__fila" role="row">
+        <span role="cell">Reportes generativos con IA</span>
+        @for (p of planes(); track p.codigo) {
+          @if (p.iaGenerativa) {
+            <span role="cell" class="si" aria-label="Sí">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" /></svg>
+            </span>
+          } @else {
+            <span role="cell" class="no" aria-label="No">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+            </span>
+          }
+        }
+      </div>
+      <div class="comparacion__fila" role="row">
+        <span role="cell">Precio mensual</span>
+        @for (p of planes(); track p.codigo) {
+          <span role="cell"><b>{{ p.diasPrueba ? 'Gratis' : 'Bs ' + (p.precioMensual | number: '1.0-0') }}</b></span>
+        }
+      </div>
+    </div>
+  </article>
+
+  <!-- Verificación de límites -->
+  <article class="tarjeta limites" style="--n: 4">
+    <div class="tarjeta__cabecera">
+      <div>
+        <h2>Verificación de límites</h2>
+        <small>Sucursales activas de cada empresa frente a su plan</small>
+      </div>
+    </div>
+    <ul class="limites__lista">
+      @for (e of empresasConPlan(); track e.id; let i = $index) {
+        <li [style.--n]="i">
+          <span class="avatar" [style.--color]="e.colorMarca">{{ inicial(e.nombre) }}</span>
+          <div class="limites__info">
+            <div>
+              <b>{{ e.nombre }}</b>
+              <small>{{ e.planNombre }} · {{ e.sucursalesActivas }} de {{ e.maxSucursales }}</small>
+            </div>
+            <span class="medidor" [class.medidor--alto]="e.pct >= 80"><span [style.--uso]="e.pct + '%'"></span></span>
+          </div>
+          <span class="limites__estado" [class.limites__estado--tope]="e.pct >= 100">
+            {{ e.pct >= 100 ? 'Al tope' : e.pct >= 80 ? 'Cerca del tope' : 'Con margen' }}
+          </span>
+        </li>
+      } @empty {
+        <li class="limites__vacio">{{ cargando() ? 'Cargando…' : 'No hay empresas con suscripción vigente.' }}</li>
+      }
+    </ul>
+    <p class="limites__nota">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V7z" /></svg>
+      <span>
+        El trigger <code>trg_sucursal_limite_plan</code> rechaza en la base de datos cualquier sucursal que supere el
+        límite, venga del panel, de la app móvil o de la API.
+      </span>
+    </p>
+  </article>
+</div>

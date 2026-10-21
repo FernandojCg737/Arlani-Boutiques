@@ -210,6 +210,6 @@ export class Checkout implements OnInit, AfterViewInit {
   }
 
   protected irATienda(): void {
-    void this.router.navigate(['/tienda']);
+    void this.router.navigate(['/tienda-atelier-aranier']);
   }
 }

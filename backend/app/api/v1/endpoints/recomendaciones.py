@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_current_user_optional, require_permiso, require_permiso_cliente
+from app.api.deps import ADMIN_TIPOS, get_current_user, get_current_user_optional, require_permiso, require_permiso_cliente
 from app.core.gemini import generar_razones, generar_razones_relacionados
 from app.db.session import get_db
+from app.services.usuarios import codigos_permiso
 from app.models import Cliente, Usuario
 from app.schemas.recomendaciones import (
     RecomendacionAdminOut,
@@ -500,9 +501,8 @@ def productos_relacionados(
     # un cliente logueado y CU18 esta apagado para el rol Cliente (CU02),
     # se devuelve vacio en vez de la lista -- no rompe la pagina, solo no
     # muestra el widget. A un visitante anonimo no le afecta este toggle.
-    if usuario is not None and usuario.tipo != "administrador":
-        codigos_usuario = {p.nombre for p in usuario.rol.permisos} if usuario.rol else set()
-        if "CU18" not in codigos_usuario:
+    if usuario is not None and usuario.tipo not in ADMIN_TIPOS:
+        if "CU18" not in codigos_permiso(usuario):
             return []
 
     producto = db.execute(text("SELECT nombre FROM producto WHERE id = :pid"), {"pid": producto_id}).first()

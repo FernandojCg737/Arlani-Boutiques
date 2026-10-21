@@ -50,7 +50,7 @@ export class AdminInventario implements OnInit {
   protected readonly error = signal('');
   protected readonly errorInventario = signal('');
 
-  protected readonly esAdministrador = computed(() => this.auth.currentUser()?.tipo === 'administrador');
+  protected readonly esAdministrador = computed(() => this.auth.isAdmin());
 
   // Cache por sucursal: volver a hacer click en una ya vista no vuelve a pedirla.
   private readonly cache = new Map<number, ProductoCatalogo[]>();

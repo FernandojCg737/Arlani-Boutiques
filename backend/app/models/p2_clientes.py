@@ -27,6 +27,9 @@ class Sucursal(Base):
     horario_atencion: Mapped[str | None] = mapped_column(String(100))
     telefono: Mapped[str | None] = mapped_column(String(30))
     estado: Mapped[str] = mapped_column(String(20), default="activa")
+    # Empresa (tenant) dueña de la sucursal. La asigna trg_sucursal_limite_plan
+    # si no viene (sucursales creadas desde las pantallas del 1er parcial).
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
     fecha_creacion: Mapped[date] = mapped_column(Date, default=date.today)
     # CU01: coordenadas de la sucursal, usadas para validar que el empleado
     # este fisicamente cerca al marcar asistencia. Opcionales -- si una

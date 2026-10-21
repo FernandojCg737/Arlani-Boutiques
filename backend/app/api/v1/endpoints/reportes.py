@@ -275,8 +275,15 @@ def exportar_ventas(
 
 
 def _datos_asistencia(
-    db: Session, desde: datetime, hasta: datetime, sucursal_id: int | None, empleado_id: int | None
+    db: Session,
+    desde: datetime,
+    hasta: datetime,
+    sucursal_id: int | None,
+    empleado_id: int | None,
+    empresa_id: int | None = None,
 ) -> ReporteAsistenciaOut:
+    # empresa_id: el personal de una tienda solo ve a su empresa; None (el
+    # SuperAdministrador) ve el personal de todas.
     filas = db.execute(
         text(
             "SELECT b.usuario_id, u.nombre, COALESCE(s.nombre, 'Sin sucursal'), b.accion, b.fecha "
@@ -285,9 +292,17 @@ def _datos_asistencia(
             "WHERE b.accion IN ('LOGIN','LOGOUT') AND b.fecha >= :desde AND b.fecha < :hasta "
             "AND (:sucursal_id IS NULL OR emp.sucursal_id = :sucursal_id) "
             "AND (:empleado_id IS NULL OR b.usuario_id = :empleado_id) "
+            "AND (CAST(:empresa_id AS INTEGER) IS NULL OR u.empresa_id = :empresa_id) "
+            "AND u.tipo <> 'superadministrador' "
             "ORDER BY b.usuario_id, b.fecha"
         ),
-        {"desde": desde, "hasta": hasta, "sucursal_id": sucursal_id, "empleado_id": empleado_id},
+        {
+            "desde": desde,
+            "hasta": hasta,
+            "sucursal_id": sucursal_id,
+            "empleado_id": empleado_id,
+            "empresa_id": empresa_id,
+        },
     ).all()
 
     grupos: dict[tuple[int, date], dict] = {}
@@ -348,7 +363,7 @@ def reporte_asistencia(
     _empleado: Usuario = Depends(require_permiso("CU16")),
 ) -> ReporteAsistenciaOut:
     desde, hasta = _rango_fechas(fecha_desde, fecha_hasta)
-    return _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id)
+    return _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id, _empleado.empresa_id)
 
 
 @router.get("/asistencia/exportar")
@@ -362,7 +377,7 @@ def exportar_asistencia(
     _empleado: Usuario = Depends(require_permiso("CU16")),
 ) -> Response:
     desde, hasta = _rango_fechas(fecha_desde, fecha_hasta)
-    datos = _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id)
+    datos = _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id, _empleado.empresa_id)
     headers = ["Empleado", "Sucursal", "Fecha", "Hora entrada", "Hora salida", "Horas conectado"]
     filas = [
         [

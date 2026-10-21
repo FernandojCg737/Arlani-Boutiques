@@ -1,28 +1,36 @@
 <div class="auth-showcase">
-  <img class="auth-showcase__img" src="/img/productos/producto-4.jpg" alt="Atelier Aranier" />
+  <img
+    class="auth-showcase__img"
+    [src]="fondoFallo() ? fondoPorDefecto : imagen()"
+    [style.object-position]="fondoFallo() ? null : enfoque()"
+    (error)="fondoFallo.set(true)"
+    alt=""
+  />
   <div class="auth-showcase__overlay"></div>
 
   <div class="auth-showcase__content">
-    <img class="auth-showcase__logo" src="/img/logo.png" alt="Atelier Aranier" />
+    <a class="auth-showcase__logo" routerLink="/" aria-label="Arlani Boutiques, inicio">
+      <img src="/img/arlani-logo-encabezado.png" alt="Arlani Boutiques" width="129" height="52" />
+    </a>
 
     <div class="auth-showcase__body">
-      <span class="auth-showcase__eyebrow">Tienda online</span>
-      <h1>Compra <em>con</em> confianza.</h1>
-      <p>Catalogo curado, pagos seguros y envios a todo el pais. Tu proxima compra empieza aqui.</p>
+      <span class="auth-showcase__eyebrow">La plataforma para boutiques de Bolivia</span>
+      <h1>Tu boutique, en <em>todas partes.</em></h1>
+      <p>Vendé en línea y en mostrador, en todas tus sucursales, aunque se caiga internet.</p>
     </div>
 
     <div class="auth-showcase__badges">
       <div>
-        <span>100%</span>
-        <small>Seguro</small>
+        <span>Tienda</span>
+        <small>Online</small>
       </div>
       <div>
-        <span>24/7</span>
-        <small>Soporte</small>
+        <span>Caja</span>
+        <small>Sin internet</small>
       </div>
       <div>
-        <span>Express</span>
-        <small>Envios</small>
+        <span>Probador</span>
+        <small>Virtual</small>
       </div>
     </div>
   </div>

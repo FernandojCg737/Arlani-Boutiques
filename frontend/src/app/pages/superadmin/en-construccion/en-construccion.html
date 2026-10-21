@@ -1,0 +1,36 @@
+<div class="admin-content">
+  @if (ubicacion(); as u) {
+    <div class="admin-content__header">
+      <div>
+        <h1>{{ u.caso.nombre }}</h1>
+        <p>{{ u.paquete.codigo }} · {{ u.paquete.nombre }}</p>
+      </div>
+    </div>
+
+    <section class="obra">
+      <div class="obra__icono" aria-hidden="true">
+        <svg viewBox="0 0 48 48">
+          <path class="obra__trazo" d="M8 40h32M12 40V22l12-10 12 10v18M20 40V28h8v12" />
+        </svg>
+      </div>
+      <div class="obra__texto">
+        <span class="obra__estado"><i></i> En construcción</span>
+        <h2>{{ u.caso.codigo }} todavía no tiene pantalla</h2>
+        <p>{{ u.caso.descripcion }}</p>
+        @if (u.caso.plataformas?.length) {
+          <div class="obra__plataformas">
+            @for (pl of u.caso.plataformas; track pl) {
+              <span>{{ pl }}</span>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  } @else {
+    <div class="admin-content__header">
+      <div>
+        <h1>Caso de uso no encontrado</h1>
+      </div>
+    </div>
+  }
+</div>

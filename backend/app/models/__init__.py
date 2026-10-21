@@ -8,10 +8,12 @@ from app.models.p1_seguridad import (
     MarcadoAsistencia,
     Permiso,
     Rol,
+    SuperAdministrador,
     Usuario,
     rol_permiso,
 )
 from app.models.p2_clientes import Cliente, Ciudad, Sucursal
+from app.models.p6_plataforma import Empresa, PlanSuscripcion, Suscripcion
 from app.models.p3_catalogo import (
     Categoria,
     Coleccion,
@@ -59,6 +61,10 @@ __all__ = [
     "Usuario",
     "Empleado",
     "Administrador",
+    "SuperAdministrador",
+    "Empresa",
+    "PlanSuscripcion",
+    "Suscripcion",
     "EncargadoSucursal",
     "Cajero",
     "Rol",

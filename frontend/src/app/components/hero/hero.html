@@ -21,17 +21,38 @@
     @if (eyebrow()) {
       <span class="hero-eyebrow">{{ eyebrow() }}</span>
     }
-    <h1>{{ title() }}</h1>
+    @if (frasesRotativas().length) {
+      <h1>
+        <!-- Lectores de pantalla: el titulo completo, sin la rotacion -->
+        <span class="hero-solo-lectores">{{ title() }} {{ frasesRotativas().join(', ') }}.</span>
+        <span class="hero-titulo-fijo" aria-hidden="true">{{ title() }}</span>
+        <span class="hero-rotativo" aria-hidden="true">
+          @for (frase of frasesRotativas(); track frase; let i = $index) {
+            <span
+              class="hero-frase"
+              [class.hero-frase--activa]="i === fraseActual()"
+              [class.hero-frase--saliente]="i === fraseSaliente()"
+            >{{ frase }}</span>
+          }
+        </span>
+      </h1>
+    } @else {
+      <h1>{{ title() }}</h1>
+    }
     <p>{{ subtitle() }}</p>
   </div>
 
   @if (showCta()) {
     <div class="hero-cta">
-      <a class="hero-cta__btn" routerLink="/tienda">
-        <span>Ir a tienda</span>
+      <a class="hero-cta__btn" [routerLink]="ctaPrincipalRuta()" [fragment]="ctaPrincipalFragmento()">
+        <span>{{ ctaPrincipalTexto() }}</span>
       </a>
-      <a class="hero-cta__btn hero-cta__btn--secondary" routerLink="/tienda">
-        <span>Explorar coleccion</span>
+      <a
+        class="hero-cta__btn hero-cta__btn--secondary"
+        [routerLink]="ctaSecundarioRuta()"
+        [fragment]="ctaSecundarioFragmento()"
+      >
+        <span>{{ ctaSecundarioTexto() }}</span>
       </a>
     </div>
   }

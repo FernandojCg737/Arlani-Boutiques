@@ -4,13 +4,33 @@
       <span class="admin-content__eyebrow">P1 · CU01</span>
       <h1>Inicio y Cierre de Sesion</h1>
       <p>
-        Usuarios con una sesion activa ahora mismo. Cada login reemplaza la sesion anterior (una sola sesion por
-        cuenta) y expira sola a los 60 minutos o a los 30 minutos de inactividad.
+        @if (esSuper) {
+          Todas las personas con una sesión activa en la plataforma. Filtra por empresa o mira solo las cuentas de la
+          plataforma (clientes).
+        } @else {
+          El personal de tu empresa (administradores, encargados de sucursal y cajeros) con una sesión activa ahora mismo. Cada sesión expira sola a
+          los 60 minutos o a los 30 minutos de inactividad.
+        }
       </p>
     </div>
 
     <button type="button" class="admin-search__refresh" (click)="refrescar()">Actualizar</button>
   </div>
+
+  @if (esSuper) {
+    <div class="filtros-empresa" role="group" aria-label="Filtrar sesiones">
+      <button type="button" [class.is-active]="filtro() === 'todas'" (click)="elegirFiltro('todas')">Todo el sistema</button>
+      <button type="button" [class.is-active]="filtro() === 'plataforma'" (click)="elegirFiltro('plataforma')">
+        Plataforma (clientes)
+      </button>
+      @for (e of empresas(); track e.id) {
+        <button type="button" [class.is-active]="filtro() === e.id" (click)="elegirFiltro(e.id)">
+          <span class="filtros-empresa__avatar" [style.background]="e.colorMarca">{{ inicial(e.nombre) }}</span>
+          {{ e.nombre }}
+        </button>
+      }
+    </div>
+  }
 
   @if (error()) {
     <div class="admin-error">{{ error() }}</div>
@@ -23,16 +43,21 @@
           <th>Usuario</th>
           <th>Tipo</th>
           <th>Rol</th>
+          @if (esSuper) {
+            <th>Empresa</th>
+          }
+          <th>Sucursal</th>
+          <th>Sesión hasta</th>
         </tr>
       </thead>
       <tbody>
         @if (loading()) {
           <tr>
-            <td colspan="3" class="admin-table__empty">Cargando...</td>
+            <td [attr.colspan]="esSuper ? 6 : 5" class="admin-table__empty">Cargando...</td>
           </tr>
         } @else if (items().length === 0) {
           <tr>
-            <td colspan="3" class="admin-table__empty">No hay sesiones activas.</td>
+            <td [attr.colspan]="esSuper ? 6 : 5" class="admin-table__empty">No hay sesiones activas.</td>
           </tr>
         } @else {
           @for (item of items(); track item.id) {
@@ -43,8 +68,13 @@
                   <span>{{ item.email }}</span>
                 </div>
               </td>
-              <td><span class="admin-badge">{{ item.tipo }}</span></td>
+              <td><span class="admin-badge">{{ tipoTexto[item.tipo] ?? item.tipo }}</span></td>
               <td>{{ item.rol || '-' }}</td>
+              @if (esSuper) {
+                <td>{{ item.empresa_nombre || 'Plataforma' }}</td>
+              }
+              <td>{{ item.sucursal_nombre || '-' }}</td>
+              <td>{{ item.expira_en | date: 'h:mm a' : tzBolivia }}</td>
             </tr>
           }
         }
@@ -54,8 +84,61 @@
 
   <hr class="admin-divider" />
 
-  @if (auth.isAdmin()) {
-    <!-- ================= Vista Administrador ================= -->
+  @if (esSuper) {
+    <!-- ================= Vista SuperAdministrador (solo consulta) ================= -->
+    <div class="admin-content__header">
+      <div>
+        <span class="admin-content__eyebrow">P1 · CU01</span>
+        <h1>Control de Asistencia</h1>
+        <p>
+          Solo consulta. La clave diaria y la hora de liberación las gestiona el Administrador de cada empresa.
+        </p>
+      </div>
+      <span class="solo-lectura">Solo lectura</span>
+    </div>
+
+    @if (empresaElegida(); as emp) {
+      <div class="asistencia-config asistencia-config--lectura">
+        <div class="asistencia-config__campo">
+          <label>Empresa</label>
+          <strong class="asistencia-empresa">
+            <span class="filtros-empresa__avatar" [style.background]="emp.colorMarca">{{ inicial(emp.nombre) }}</span>
+            {{ emp.nombre }}
+          </strong>
+        </div>
+        @if (estado(); as e) {
+          <div class="asistencia-config__campo">
+            <label>Hora de liberación</label>
+            <strong>{{ e.hora_liberacion.slice(0, 5) }} (hora Bolivia)</strong>
+          </div>
+          <div class="asistencia-config__estado">
+            <span
+              class="admin-badge"
+              [class.admin-badge--pagada]="e.liberado"
+              [class.admin-badge--pendiente]="!e.liberado && !e.ventana_cerrada"
+            >
+              {{ e.liberado ? 'Clave liberada (ventana de 5 min)' : e.ventana_cerrada ? 'Ventana cerrada' : 'Clave aún no liberada' }}
+            </span>
+          </div>
+        }
+      </div>
+      <ng-container *ngTemplateOutlet="tablasAsistencia" />
+    } @else {
+      <p class="asistencia-mensaje">Elige una empresa para ver su control de asistencia.</p>
+      <div class="empresas-asistencia">
+        @for (e of empresas(); track e.id) {
+          <button type="button" class="empresa-asistencia" [style.--color]="e.colorMarca" (click)="elegirFiltro(e.id)">
+            <span class="filtros-empresa__avatar filtros-empresa__avatar--grande" [style.background]="e.colorMarca">
+              {{ inicial(e.nombre) }}
+            </span>
+            <strong>{{ e.nombre }}</strong>
+            <small>{{ e.sucursalesActivas }} {{ e.sucursalesActivas === 1 ? 'sucursal' : 'sucursales' }} · {{ e.usuarios }} del personal</small>
+          </button>
+        }
+      </div>
+    }
+  } @else if (esAdminTienda) {
+    <!-- ================= Vista Administrador de la tienda ================= -->
     <div class="admin-content__header">
       <div>
         <span class="admin-content__eyebrow">P1 · CU01</span>
@@ -93,6 +176,97 @@
       <p class="asistencia-mensaje">{{ mensajeAdmin() }}</p>
     }
 
+    <ng-container *ngTemplateOutlet="tablasAsistencia" />
+  } @else {
+    <!-- ================= Vista Encargado / Cajero ================= -->
+    <div class="admin-content__header">
+      <div>
+        <span class="admin-content__eyebrow">P1 · CU01</span>
+        <h1>Marcar Asistencia</h1>
+        <p>Ingresa la clave del dia, tomate una foto de verificacion y adjunta tu ubicacion. Tienes 5 minutos desde que se libera.</p>
+      </div>
+    </div>
+
+    @if (estado(); as e) {
+      @if (e.ventana_cerrada) {
+        <p class="asistencia-mensaje asistencia-mensaje--error">
+          La ventana de 5 minutos de hoy ya se cerro. Si no marcaste, quedaste registrado como falta.
+        </p>
+      } @else if (!e.liberado) {
+        <p class="asistencia-mensaje">
+          La clave todavia no fue liberada (se libera a las {{ e.hora_liberacion.slice(0, 5) }} hora Bolivia, o antes
+          si tu Administrador la libera manualmente). Solo dura 5 minutos, mantente atento.
+        </p>
+      } @else {
+        <div class="asistencia-marcar">
+          <label>Clave del dia</label>
+          <input
+            type="text"
+            maxlength="6"
+            placeholder="000000"
+            [value]="codigoIngresado()"
+            (input)="codigoIngresado.set($any($event.target).value)"
+          />
+
+          <label class="asistencia-marcar__foto-label">
+            Foto de verificacion
+            <input type="file" accept="image/*" capture="user" (change)="onFotoSeleccionada($event)" />
+          </label>
+          @if (fotoPreviewUrl(); as preview) {
+            <img [src]="preview" alt="Vista previa" class="asistencia-foto-preview" />
+          }
+
+          <button
+            type="button"
+            (click)="marcarAsistencia()"
+            [disabled]="marcando() || !codigoIngresado() || !fotoSeleccionada()"
+          >
+            {{ marcando() ? 'Marcando...' : 'Marcar asistencia (adjunta tu ubicacion)' }}
+          </button>
+        </div>
+      }
+    }
+    @if (mensajeMarcado()) {
+      <p class="asistencia-mensaje asistencia-mensaje--ok">{{ mensajeMarcado() }}</p>
+    }
+    @if (errorMarcado()) {
+      <p class="asistencia-mensaje asistencia-mensaje--error">{{ errorMarcado() }}</p>
+    }
+
+    <h3 class="asistencia-subtitulo">Mi historial (semana actual)</h3>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Estado</th>
+            <th>Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (f of filaSemanaActual(); track f.dia) {
+            <tr>
+              <td>{{ f.dia }}</td>
+              <td>
+                <span
+                  class="admin-badge"
+                  [class.admin-badge--pagada]="f.marcado"
+                  [class.admin-badge--pendiente]="!f.marcado"
+                >
+                  {{ f.marcado ? 'Marcado' : 'Sin marcar' }}
+                </span>
+              </td>
+              <td>{{ f.marcado ? (f.marcado.hora_marcado | date: 'h:mm a' : tzBolivia) : '-' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+<!-- Quién marcó hoy + historial: lo usan el Administrador y el SuperAdministrador -->
+<ng-template #tablasAsistencia>
     <h3 class="asistencia-subtitulo">Quien marco hoy</h3>
     <div class="admin-table-wrap">
       <table class="admin-table">
@@ -181,90 +355,4 @@
         </tbody>
       </table>
     </div>
-  } @else {
-    <!-- ================= Vista Encargado / Cajero ================= -->
-    <div class="admin-content__header">
-      <div>
-        <span class="admin-content__eyebrow">P1 · CU01</span>
-        <h1>Marcar Asistencia</h1>
-        <p>Ingresa la clave del dia, tomate una foto de verificacion y adjunta tu ubicacion. Tienes 5 minutos desde que se libera.</p>
-      </div>
-    </div>
-
-    @if (estado(); as e) {
-      @if (e.ventana_cerrada) {
-        <p class="asistencia-mensaje asistencia-mensaje--error">
-          La ventana de 5 minutos de hoy ya se cerro. Si no marcaste, quedaste registrado como falta.
-        </p>
-      } @else if (!e.liberado) {
-        <p class="asistencia-mensaje">
-          La clave todavia no fue liberada (se libera a las {{ e.hora_liberacion.slice(0, 5) }} hora Bolivia, o antes
-          si tu Administrador la libera manualmente). Solo dura 5 minutos, mantente atento.
-        </p>
-      } @else {
-        <div class="asistencia-marcar">
-          <label>Clave del dia</label>
-          <input
-            type="text"
-            maxlength="6"
-            placeholder="000000"
-            [value]="codigoIngresado()"
-            (input)="codigoIngresado.set($any($event.target).value)"
-          />
-
-          <label class="asistencia-marcar__foto-label">
-            Foto de verificacion
-            <input type="file" accept="image/*" capture="user" (change)="onFotoSeleccionada($event)" />
-          </label>
-          @if (fotoPreviewUrl(); as preview) {
-            <img [src]="preview" alt="Vista previa" class="asistencia-foto-preview" />
-          }
-
-          <button
-            type="button"
-            (click)="marcarAsistencia()"
-            [disabled]="marcando() || !codigoIngresado() || !fotoSeleccionada()"
-          >
-            {{ marcando() ? 'Marcando...' : 'Marcar asistencia (adjunta tu ubicacion)' }}
-          </button>
-        </div>
-      }
-    }
-    @if (mensajeMarcado()) {
-      <p class="asistencia-mensaje asistencia-mensaje--ok">{{ mensajeMarcado() }}</p>
-    }
-    @if (errorMarcado()) {
-      <p class="asistencia-mensaje asistencia-mensaje--error">{{ errorMarcado() }}</p>
-    }
-
-    <h3 class="asistencia-subtitulo">Mi historial (semana actual)</h3>
-    <div class="admin-table-wrap">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Dia</th>
-            <th>Estado</th>
-            <th>Hora</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (f of filaSemanaActual(); track f.dia) {
-            <tr>
-              <td>{{ f.dia }}</td>
-              <td>
-                <span
-                  class="admin-badge"
-                  [class.admin-badge--pagada]="f.marcado"
-                  [class.admin-badge--pendiente]="!f.marcado"
-                >
-                  {{ f.marcado ? 'Marcado' : 'Sin marcar' }}
-                </span>
-              </td>
-              <td>{{ f.marcado ? (f.marcado.hora_marcado | date: 'h:mm a' : tzBolivia) : '-' }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  }
-</div>
+</ng-template>

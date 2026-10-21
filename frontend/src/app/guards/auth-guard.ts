@@ -54,6 +54,14 @@ export const permisoGuard = (codigo: string): CanActivateFn => {
   };
 };
 
+// Pantallas del Administrador de una tienda (ej. Mi suscripcion): el
+// personal de la tienda y el SuperAdministrador (sin tienda) vuelven al panel.
+export const adminTiendaGuard: CanActivateFn = () => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+  return auth.isAdmin() && !auth.isSuperAdmin() ? true : router.createUrlTree(['/admin']);
+};
+
 // Igual que permisoGuard pero para paginas del lado del cliente (carrito,
 // reservas, etc.): si HAY sesion y el rol Cliente no tiene ese CU habilitado
 // (CU02), manda al inicio. A un visitante sin sesion no lo bloquea aca --
@@ -65,4 +73,21 @@ export const clientePermisoGuard = (codigo: string): CanActivateFn => {
     if (!auth.currentUser()) return true;
     return auth.hasPermiso(codigo) || auth.isAdmin() ? true : router.createUrlTree(['/']);
   };
+};
+
+// Panel de la plataforma (/superadmin): solo el SuperAdministrador. Igual que
+// adminGuard, revalida la sesion contra el backend en cada navegacion.
+export const superadminGuard: CanActivateFn = async (_route, state) => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+
+  if (!auth.token()) return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+
+  try {
+    await auth.me();
+  } catch {
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  }
+
+  return auth.isSuperAdmin() ? true : router.createUrlTree([auth.landingRoute()]);
 };

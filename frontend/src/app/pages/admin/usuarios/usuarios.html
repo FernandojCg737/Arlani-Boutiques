@@ -38,8 +38,45 @@
       <button type="button" [class.is-active]="tipoActivo() === 'cajero'" (click)="setTipoActivo('cajero')">
         Cajeros
       </button>
-      <a class="admin-subtabs__link" routerLink="/admin/clientes">Clientes se administran en CU03 &rarr;</a>
+      <a class="admin-subtabs__link" routerLink="../clientes">Clientes se administran en CU03 &rarr;</a>
     </div>
+
+    @if (esSuper && !empresaUsuarios()) {
+      <!-- SuperAdministrador: primero la empresa -->
+      <p class="empresas-intro">Elige la empresa para ver sus {{ tipoLabel[tipoActivo()].toLowerCase() }}.</p>
+      <div class="empresas-grid">
+        @if (empresasCargando()) {
+          @for (n of [1, 2, 3]; track n) {
+            <div class="empresa-cuadro empresa-cuadro--cargando"></div>
+          }
+        }
+        @for (e of empresas(); track e.id; let i = $index) {
+          <button type="button" class="empresa-cuadro" [style.--color]="e.colorMarca" [style.--n]="i" (click)="elegirEmpresaUsuarios(e)">
+            <span class="empresa-cuadro__franja" aria-hidden="true"></span>
+            <span class="empresa-cuadro__avatar">{{ inicial(e.nombre) }}</span>
+            <strong>{{ e.nombre }}</strong>
+            <small>/tienda-{{ e.subdominio }} · {{ e.planNombre }}</small>
+            <span class="empresa-cuadro__dato">
+              <b>{{ conteoPorEmpresa().get(e.id) ?? 0 }}</b>
+              {{ tipoLabel[tipoActivo()].toLowerCase() }}
+            </span>
+          </button>
+        } @empty {
+          @if (!empresasCargando()) {
+            <p class="empresas-vacio">No hay empresas activas con suscripción vigente.</p>
+          }
+        }
+      </div>
+    } @else {
+    @if (esSuper && empresaUsuarios(); as emp) {
+      <div class="empresa-elegida">
+        <button type="button" class="empresa-elegida__volver" (click)="elegirEmpresaUsuarios(null)">&larr; Todas las empresas</button>
+        <span class="empresa-elegida__chip">
+          <span class="empresa-elegida__avatar" [style.background]="emp.colorMarca">{{ inicial(emp.nombre) }}</span>
+          {{ tipoLabel[tipoActivo()] }} de <b>{{ emp.nombre }}</b>
+        </span>
+      </div>
+    }
 
     <div class="admin-content__header admin-content__header--tight">
       <form class="admin-search" (submit)="$event.preventDefault(); search()">
@@ -108,9 +145,10 @@
         </tbody>
       </table>
     </div>
+    }
   } @else {
     <div class="admin-subtabs">
-      @for (r of roles(); track r.id) {
+      @for (r of rolesPermisos(); track r.id) {
         <button type="button" [class.is-active]="rolSeleccionadoId() === r.id" (click)="selectRol(r.id)">
           {{ r.nombre }}
         </button>
@@ -128,40 +166,120 @@
         </p>
       }
 
-      @if (permisosError()) {
-        <div class="admin-error">{{ permisosError() }}</div>
-      }
-      @if (permisosSuccess()) {
-        <div class="admin-success">{{ permisosSuccess() }}</div>
+      @if (esSuper && rolPorEmpresa() && !empresaPermisos()) {
+        <!-- SuperAdministrador: primero la empresa -->
+        <p class="empresas-intro">Elige la empresa cuyos permisos de <b>{{ rol.nombre }}</b> quieres ver o cambiar.</p>
+        <div class="empresas-grid">
+          @for (e of empresas(); track e.id; let i = $index) {
+            <button type="button" class="empresa-cuadro" [style.--color]="e.colorMarca" [style.--n]="i" (click)="elegirEmpresaPermisos(e)">
+              <span class="empresa-cuadro__franja" aria-hidden="true"></span>
+              <span class="empresa-cuadro__avatar">{{ inicial(e.nombre) }}</span>
+              <strong>{{ e.nombre }}</strong>
+              <small>/tienda-{{ e.subdominio }} · {{ e.planNombre }}</small>
+              <span class="empresa-cuadro__dato">Configurar permisos &rarr;</span>
+            </button>
+          } @empty {
+            <p class="empresas-vacio">No hay empresas activas con suscripción vigente.</p>
+          }
+        </div>
       }
 
-      <div class="permisos-grid">
-        @for (pkg of menu; track pkg.code) {
-          <div class="permisos-package">
-            <div class="permisos-package__header">{{ pkg.code }} · {{ pkg.label }}</div>
-            <ul>
-              @for (uc of pkg.useCases; track uc.code) {
-                <li>
-                  <label class="permisos-checkbox">
-                    <input
-                      type="checkbox"
-                      [checked]="permisosSeleccionados().has(permisoIdForCode(uc.code))"
-                      [disabled]="rol.nombre === 'Administrador'"
-                      (change)="togglePermiso(permisoIdForCode(uc.code))"
-                    />
-                    <span><strong>{{ uc.code }}</strong> {{ uc.label }}</span>
-                  </label>
-                </li>
-              }
-            </ul>
+      @if (mostrarMatriz()) {
+        @if (esSuper && rolPorEmpresa() && empresaPermisos(); as emp) {
+          <div class="empresa-elegida">
+            <button type="button" class="empresa-elegida__volver" (click)="elegirEmpresaPermisos(null)">&larr; Todas las empresas</button>
+            <span class="empresa-elegida__chip">
+              <span class="empresa-elegida__avatar" [style.background]="emp.colorMarca">{{ inicial(emp.nombre) }}</span>
+              Permisos de <b>{{ rol.nombre }}</b> en <b>{{ emp.nombre }}</b>
+            </span>
           </div>
         }
-      </div>
+        @if (esSuper && !rolPorEmpresa()) {
+          <p class="permisos-hint">Este rol es de toda la plataforma: sus permisos valen para todas las empresas.</p>
+        }
 
-      @if (rol.nombre !== 'Administrador') {
-        <button type="button" class="admin-search__refresh" [disabled]="permisosSaving()" (click)="guardarPermisos()">
-          {{ permisosSaving() ? 'Guardando...' : 'Guardar Permisos' }}
-        </button>
+        @if (permisosError()) {
+          <div class="admin-error">{{ permisosError() }}</div>
+        }
+        @if (permisosSuccess()) {
+          <div class="admin-success">{{ permisosSuccess() }}</div>
+        }
+
+        @if (esSuper) {
+          <!-- CUs del 1er parcial arriba y los del 2do parcial abajo -->
+          @for (parcial of parciales; track parcial.id) {
+            <section class="permisos-parcial" [class.permisos-parcial--segundo]="parcial.id === 'p2'">
+              <h2 class="permisos-parcial__titulo">
+                {{ parcial.nombre }}
+                <small>{{ parcial.id === 'p1' ? 'CUs que se mantienen del primer examen' : 'CUs del segundo examen (incluye los mejorados)' }}</small>
+              </h2>
+              <div class="permisos-grid">
+                @for (pkg of parcial.paquetes; track pkg.codigo) {
+                  <div class="permisos-package">
+                    <div class="permisos-package__header">{{ pkg.codigo }} · {{ pkg.nombre }}</div>
+                    @if (pkg.casos.length) {
+                      <ul>
+                        @for (caso of pkg.casos; track caso.codigo) {
+                          <li>
+                            <label class="permisos-checkbox">
+                              <input
+                                type="checkbox"
+                                [checked]="casoMarcado(caso)"
+                                [indeterminate]="casoParcial(caso)"
+                                [disabled]="rol.nombre === 'Administrador'"
+                                (change)="toggleCaso(caso)"
+                              />
+                              <span>
+                                <strong>{{ caso.codigo }}</strong> {{ caso.nombre }}
+                                @if (parcial.id === 'p2' && caso.antes) {
+                                  <em class="permisos-antes">antes {{ caso.antes }}</em>
+                                }
+                                @if (parcial.id === 'p2' && !caso.ruta) {
+                                  <em class="permisos-antes permisos-antes--nuevo">por construir</em>
+                                }
+                              </span>
+                            </label>
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="permisos-package__vacio">Sus CUs pasaron al 2do parcial.</p>
+                    }
+                  </div>
+                }
+              </div>
+            </section>
+          }
+        } @else {
+          <div class="permisos-grid">
+            @for (pkg of menu; track pkg.code) {
+              <div class="permisos-package">
+                <div class="permisos-package__header">{{ pkg.code }} · {{ pkg.label }}</div>
+                <ul>
+                  @for (uc of pkg.useCases; track uc.code) {
+                    <li>
+                      <label class="permisos-checkbox">
+                        <input
+                          type="checkbox"
+                          [checked]="permisosSeleccionados().has(permisoIdForCode(uc.code))"
+                          [disabled]="rol.nombre === 'Administrador'"
+                          (change)="togglePermiso(permisoIdForCode(uc.code))"
+                        />
+                        <span><strong>{{ uc.code }}</strong> {{ uc.label }}</span>
+                      </label>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+
+        @if (rol.nombre !== 'Administrador') {
+          <button type="button" class="admin-search__refresh" [disabled]="permisosSaving()" (click)="guardarPermisos()">
+            {{ permisosSaving() ? 'Guardando...' : 'Guardar Permisos' }}
+          </button>
+        }
       }
     }
   }
@@ -192,7 +310,7 @@
           <label class="modal-field">
             <span>Sucursal</span>
             <select [value]="fSucursalId()" (change)="fSucursalId.set(+$any($event.target).value)">
-              @for (s of sucursales(); track s.id) {
+              @for (s of sucursalesEmpresa(); track s.id) {
                 <option [value]="s.id">{{ s.nombre }}</option>
               }
             </select>

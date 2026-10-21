@@ -1,428 +1,653 @@
-.carrito-page {
-  max-width: 1100px;
+// Carrito de Arlani Boutiques: fondo marfil, tarjetas blancas por boutique y
+// un resumen fijo a la derecha. Azul noche y coral del logo.
+:host {
+  --noche: #121a2c;
+  --marfil: #f7f4f2;
+  --coral: #e8806b;
+  --coral-oscuro: #c4503d;
+  --gris: #5f6779;
+  --borde: #e6e1dc;
+  --verde: #1d6b45;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+  background: var(--marfil);
+  color: var(--noche);
+}
+
+.carrito {
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 130px 20px 80px;
+  padding: 124px 20px 88px;
 
   @media (min-width: 960px) {
-    padding: 150px 40px 100px;
+    padding: 144px 40px 112px;
   }
 }
 
-.volver-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 16px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--brand-dark);
-  text-decoration: none;
+// ---------------------------------------------------------------- cabecera
 
-  svg {
-    width: 16px;
-    height: 16px;
-  }
+.carrito__cabecera {
+  margin-bottom: 36px;
 
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
-.carrito-page__header {
-  margin-bottom: 40px;
-
+  // Outfit: geométrica y firme, distinta de la Bricolage de la portada.
   h1 {
     margin: 0 0 12px;
-    font-size: clamp(32px, 6vw, 48px);
+    font-family: inherit;
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
     font-weight: 800;
+    font-style: italic;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
     text-transform: uppercase;
-    letter-spacing: -0.01em;
-    color: var(--brand-dark);
   }
 
   p {
     margin: 0;
-    font-size: 15px;
-    color: #777;
+    font-size: 1rem;
+    color: var(--gris);
   }
 }
 
-.carrito-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 80px 20px;
-  background: #f7f7f5;
-}
-
-.carrito-empty__eyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #9aa5ac;
-  margin-bottom: 12px;
-}
-
-.carrito-empty h2 {
-  margin: 0 0 12px;
-  font-size: clamp(24px, 4vw, 34px);
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--brand-dark);
-}
-
-.carrito-empty p {
-  margin: 0 0 32px;
-  font-size: 15px;
-  color: #777;
-}
-
-.carrito-empty__btn {
+.carrito__volver {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  background: var(--brand-dark);
-  color: #fff;
+  gap: 4px;
+  margin-bottom: 22px;
+  color: var(--gris);
+  font-size: 0.88rem;
+  font-weight: 600;
   text-decoration: none;
-  padding: 16px 32px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  transition: transform 0.15s ease;
+
+  &:hover {
+    color: var(--noche);
+  }
 
   svg {
     width: 16px;
     height: 16px;
-  }
-
-  &:hover {
-    transform: translateY(-2px);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 }
 
-.carrito-empty__registro {
+.carrito__antetitulo {
   display: block;
-  margin-top: 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--brand-dark);
-  text-decoration: underline;
+  margin-bottom: 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--coral-oscuro);
 }
 
-.carrito-content {
+// ----------------------------------------------------------------- botones
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border: 1.5px solid rgba(18, 26, 44, 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--noche);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 160ms var(--salida),
+    border-color 160ms var(--salida),
+    transform 140ms var(--salida);
+
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      border-color: var(--noche);
+    }
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 3px;
+  }
+}
+
+.boton--lleno {
+  border-color: var(--noche);
+  background: var(--noche);
+  color: #fff;
+
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background: #000;
+    }
+  }
+}
+
+.boton--ancho {
+  width: 100%;
+}
+
+// ------------------------------------------------------------- estado vacío
+
+.vacio {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  align-items: center;
+  padding: clamp(48px, 8vw, 88px) 24px;
+  border-radius: 20px;
+  background: #fff;
+  text-align: center;
 
-  @media (min-width: 900px) {
-    flex-direction: row;
-    align-items: flex-start;
+  h2 {
+    margin: 18px 0 10px;
+    font-family: 'Outfit', 'Segoe UI', sans-serif;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    max-width: 42ch;
+    margin: 0;
+    line-height: 1.6;
+    color: var(--gris);
   }
 }
 
-.carrito-list {
-  flex: 1;
-  min-width: 0;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid #e5e5e5;
+.vacio__bolsa {
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 16px 24px rgba(18, 26, 44, 0.18));
 }
 
-.carrito-item {
+.vacio__botones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+// ---------------------------------------------------------------- contenido
+
+.carrito__contenido {
+  display: grid;
+  gap: 24px;
+
+  @media (min-width: 960px) {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    align-items: start;
+    gap: 32px;
+  }
+}
+
+.grupos {
+  display: grid;
+  gap: 20px;
+}
+
+// Una tarjeta por boutique.
+.grupo {
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(18, 26, 44, 0.04);
+}
+
+.grupo__cabecera {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid #e5e5e5;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.grupo__logo {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--borde);
+  background: #fff;
 
   img {
-    width: 72px;
-    height: 90px;
-    object-fit: cover;
-    flex-shrink: 0;
-    background: #eee;
+    width: 34px;
+    height: auto;
   }
 }
 
-.carrito-item__info {
-  flex: 1;
-  min-width: 0;
+.grupo__marca {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+
+  small {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gris);
+  }
+
+  strong {
+    font-size: 1rem;
+  }
 }
 
-.carrito-item__brand,
-.carrito-item__variante {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #9a9a9a;
-}
-
-.carrito-item__name {
-  font-size: 14px;
+.grupo__catalogo {
+  margin-left: auto;
+  color: var(--coral-oscuro);
+  font-size: 0.85rem;
   font-weight: 700;
-  color: var(--brand-dark);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-decoration: none;
   white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 
-.carrito-item__price {
-  font-size: 12px;
-  color: #888;
-  margin-top: 4px;
-}
-
-.carrito-item__qty {
+.grupo__pie {
   display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--borde);
+  font-size: 0.9rem;
+  color: var(--gris);
+
+  strong {
+    color: var(--noche);
+  }
+}
+
+// ---------------------------------------------------------------- prendas
+
+.lista {
+  margin: 0;
+  padding: 0 20px;
+  list-style: none;
+}
+
+// Celular: el texto usa todo el ancho junto a la foto y el tacho queda
+// flotando arriba a la derecha (sin robarle una columna al texto).
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'foto info info'
+    'foto cantidad subtotal';
+  gap: 10px 14px;
   align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+  padding: 18px 0;
+
+  & + & {
+    border-top: 1px solid var(--borde);
+  }
+
+  @media (min-width: 700px) {
+    grid-template-columns: 96px minmax(0, 1fr) auto auto auto;
+    grid-template-areas: 'foto info cantidad subtotal quitar';
+    gap: 20px;
+  }
+}
+
+.item__foto {
+  grid-area: foto;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 12px;
+  background: var(--marfil);
+}
+
+.item__info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  // Deja lugar al tacho, que en celular flota arriba a la derecha.
+  padding-right: 36px;
+
+  @media (min-width: 700px) {
+    padding-right: 0;
+  }
+}
+
+.item__nombre {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.item__variante,
+.item__unitario {
+  font-size: 0.84rem;
+  color: var(--gris);
+}
+
+.item__retiro {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--gris);
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: var(--coral-oscuro);
+    stroke-width: 2;
+  }
+}
+
+// Selector de cantidad en forma de píldora.
+.item__cantidad {
+  grid-area: cantidad;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid var(--borde);
+  border-radius: 999px;
 
   button {
-    width: 26px;
-    height: 26px;
-    border: 1px solid #ddd;
-    background: #fff;
-    color: var(--brand-dark);
-    font-size: 14px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--noche);
+    font-size: 1.1rem;
     cursor: pointer;
 
     &:hover {
-      background: #f5f5f5;
+      background: var(--marfil);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--coral);
+      outline-offset: -2px;
     }
   }
 
   span {
-    min-width: 18px;
-    text-align: center;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--brand-dark);
-  }
-}
-
-.carrito-item__subtotal {
-  flex-shrink: 0;
-  min-width: 70px;
-  text-align: right;
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--brand-dark);
-}
-
-.carrito-item__remove {
-  flex-shrink: 0;
-  border: none;
-  background: none;
-  padding: 6px;
-  color: #999;
-  cursor: pointer;
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  &:hover {
-    color: #d32f2f;
-  }
-}
-
-.carrito-summary {
-  flex-shrink: 0;
-  width: 100%;
-  background: #f7f7f5;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  @media (min-width: 900px) {
-    width: 300px;
-  }
-}
-
-.carrito-summary__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.carrito-summary__total {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--brand-dark);
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-.carrito-summary__checkout {
-  border: none;
-  background: var(--brand-dark);
-  color: #fff;
-  padding: 14px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
-
-  &:hover {
-    opacity: 0.85;
-  }
-}
-
-.carrito-summary__reservar {
-  border: 1px solid var(--brand-dark);
-  background: #fff;
-  color: var(--brand-dark);
-  padding: 14px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-
-  &:hover {
-    background: #eef1f0;
-  }
-}
-
-.carrito-reserva {
-  background: #fff;
-  border: 1px solid #ddd;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  &__titulo {
-    margin: 0 0 12px;
-    font-size: 12px;
+    min-width: 28px;
     font-weight: 700;
-    color: var(--brand-dark);
-    text-transform: none;
-    letter-spacing: normal;
+    text-align: center;
+  }
+}
+
+.item__subtotal {
+  grid-area: subtotal;
+  justify-self: end;
+  font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.item__quitar {
+  position: absolute;
+  top: 12px;
+  right: -8px;
+  display: inline-flex;
+
+  @media (min-width: 700px) {
+    position: static;
+    grid-area: quitar;
+    justify-self: end;
   }
 
-  &__error {
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--gris);
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+
+  &:hover {
     background: #fdecea;
     color: #b3261e;
-    font-size: 12px;
-    padding: 10px 12px;
-    margin-bottom: 14px;
   }
 
-  &__campo {
-    display: block;
-    margin-bottom: 14px;
-
-    span {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #999;
-    }
-
-    select,
-    input {
-      width: 100%;
-      border: none;
-      border-bottom: 1px solid #ddd;
-      padding: 8px 0;
-      font-size: 13px;
-      color: var(--brand-dark);
-      background: transparent;
-      outline: none;
-
-      &:focus {
-        border-color: var(--brand-dark);
-      }
-    }
+  &:focus-visible {
+    outline: 2px solid var(--coral);
+    outline-offset: 2px;
   }
 
-  &__acciones {
-    display: flex;
-    gap: 10px;
-
-    button {
-      flex: 1;
-      border: none;
-      background: var(--brand-dark);
-      color: #fff;
-      padding: 12px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      cursor: pointer;
-
-      &.is-secondary {
-        background: #fff;
-        color: var(--brand-dark);
-        border: 1px solid #ddd;
-      }
-
-      &:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-    }
-  }
-
-  &__exito {
-    text-align: center;
-
-    p {
-      margin: 0 0 8px;
-      font-size: 13px;
-      color: var(--brand-dark);
-    }
-
-    button {
-      width: 100%;
-      border: none;
-      background: var(--brand-dark);
-      color: #fff;
-      padding: 12px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      cursor: pointer;
-      margin-top: 4px;
-    }
-  }
-
-  &__detalle {
-    font-size: 12px;
-    color: #777;
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 }
 
-.carrito-summary__continue {
+// ----------------------------------------------------------------- resumen
+
+.resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  border-radius: 18px;
+  background: #fff;
+
+  @media (min-width: 960px) {
+    position: sticky;
+    top: 108px;
+  }
+}
+
+.resumen__titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gris);
+}
+
+.resumen__fila {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+  color: var(--gris);
+}
+
+.resumen__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--borde);
+
+  span {
+    font-weight: 700;
+  }
+
+  strong {
+    font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+    font-size: 2rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+}
+
+.resumen__garantias {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--borde);
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.84rem;
+    color: var(--gris);
+  }
+
+  svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: var(--coral-oscuro);
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+}
+
+// ---------------------------------------------------------------- reserva
+
+.reserva {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--marfil);
+  animation: reserva-entra 300ms var(--salida);
+}
+
+.reserva__titulo {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.reserva__error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 0.85rem;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  span {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gris);
+  }
+
+  select,
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--borde);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--noche);
+    font: inherit;
+    font-size: 0.95rem;
+
+    &:focus {
+      outline: none;
+      border-color: var(--coral);
+      box-shadow: 0 0 0 3px rgba(232, 128, 107, 0.18);
+    }
+  }
+}
+
+.reserva__acciones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+
+  .boton {
+    padding: 12px 14px;
+    font-size: 0.88rem;
+  }
+}
+
+.reserva__exito {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--brand-dark);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+
+  p {
+    margin: 0 0 8px;
+  }
+}
+
+.reserva__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: #e3f6ec;
+
+  svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: var(--verde);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+.reserva__detalle {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--gris);
+}
+
+@keyframes reserva-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reserva {
+    animation: none;
+  }
 }

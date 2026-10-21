@@ -1,0 +1,575 @@
+// "Por qué Arlani": sección clara (marfil) para cortar la seguidilla de
+// secciones oscuras. Texto azul noche, acentos coral del logo.
+:host {
+  --marfil: #f7f4f2;
+  --noche: #121a2c;
+  --pizarra: #3e4c6d;
+  --coral: #e8806b;
+  --coral-oscuro: #c4503d;
+  --gris: #5f6779;
+  --salida: cubic-bezier(0.16, 1, 0.3, 1);
+  --cabecera: 84px;
+  display: block;
+}
+
+.porque {
+  scroll-margin-top: var(--cabecera);
+  background: var(--marfil);
+  color: var(--noche);
+  padding: clamp(72px, 9vw, 128px) 0 clamp(40px, 6vw, 80px);
+}
+
+.porque__cabecera {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 6vw, 120px);
+}
+
+.porque__antetitulo {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--coral-oscuro);
+}
+
+.porque__titulo {
+  max-width: 14ch;
+  margin: 0;
+  font-family: inherit;
+  font-size: clamp(2.2rem, 5vw, 4.5rem);
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+// ------------------------------------------------------------------ cuerpo
+
+// Celular: la escena queda fija arriba y los pasos pasan por debajo.
+// Escritorio: pasos a la izquierda, escena fija a la derecha.
+.porque__cuerpo {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 6vw, 120px);
+
+  @media (min-width: 960px) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: clamp(40px, 6vw, 96px);
+  }
+}
+
+.escenario {
+  position: sticky;
+  top: var(--cabecera);
+  z-index: 1;
+  height: 330px;
+  margin: 32px -20px 0;
+  background: var(--marfil);
+
+  // Celular: el texto que pasa por debajo se desvanece en vez de cortarse.
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 32px;
+    background: linear-gradient(var(--marfil), transparent);
+    pointer-events: none;
+  }
+
+  @media (min-width: 960px) {
+    grid-column: 2;
+    grid-row: 1;
+    top: calc(var(--cabecera) + 40px);
+    height: calc(100vh - var(--cabecera) - 80px);
+    max-height: 640px;
+    margin: 0;
+
+    &::after {
+      display: none;
+    }
+  }
+}
+
+.pasos {
+  margin: 0;
+  // Aire al final para que el último paso pueda subir hasta quedar visible
+  // debajo de la escena fija.
+  padding: 0 0 22vh;
+  list-style: none;
+
+  @media (min-width: 960px) {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 18vh 0 22vh;
+  }
+}
+
+.paso {
+  min-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 0;
+  opacity: 0.3;
+  transition: opacity 500ms var(--salida);
+
+  @media (min-width: 960px) {
+    min-height: 70vh;
+  }
+
+  h3 {
+    margin: 12px 0 16px;
+    font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+    font-size: clamp(1.7rem, 3vw, 2.6rem);
+    font-weight: 400;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    max-width: 44ch;
+    margin: 0;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: var(--gris);
+  }
+}
+
+.paso--activo {
+  opacity: 1;
+}
+
+.paso__etiqueta {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(232, 128, 107, 0.14);
+  color: var(--coral-oscuro);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+// ----------------------------------------------------------------- escenas
+
+.escena {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 450ms var(--salida),
+    transform 600ms var(--salida);
+}
+
+.escena--activa {
+  opacity: 1;
+  transform: none;
+}
+
+// Tarjeta base de las escenas: blanca, con sombra suave azulada.
+%tarjeta {
+  width: min(100%, 460px);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(18, 26, 44, 0.06),
+    0 30px 60px -24px rgba(18, 26, 44, 0.35);
+}
+
+// ---------------------------------------------------- 1. tienda que se arma
+
+.escena--tienda {
+  flex-direction: column;
+}
+
+.navegador {
+  @extend %tarjeta;
+  overflow: hidden;
+}
+
+.navegador__barra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #eef0f4;
+
+  i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #cfd3dc;
+  }
+
+  span {
+    margin-left: 10px;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: #fff;
+    font-size: 0.68rem;
+    color: var(--gris);
+  }
+}
+
+.tienda {
+  padding: 14px 16px 18px;
+}
+
+.tienda__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.tienda__logo {
+  padding: 5px 10px;
+  border: 1.5px dashed var(--coral);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--coral-oscuro);
+}
+
+.tienda__nav {
+  display: flex;
+  gap: 8px;
+
+  i {
+    width: 34px;
+    height: 6px;
+    border-radius: 3px;
+    background: #e3e6ec;
+  }
+}
+
+.tienda__grilla {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.producto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  opacity: 0;
+  transform: translateY(14px);
+
+  img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-position: top;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 6px;
+
+    @media (min-width: 600px) {
+      aspect-ratio: 3 / 4;
+    }
+  }
+
+  strong {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  span {
+    font-size: 0.7rem;
+    color: var(--gris);
+  }
+}
+
+.escena--activa .producto {
+  animation: aparece 600ms var(--salida) forwards;
+  animation-delay: calc(250ms + var(--i) * 160ms);
+}
+
+.aviso {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--noche);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(10px);
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: #5fd39a;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+}
+
+.escena--activa .aviso {
+  animation: aparece 600ms var(--salida) 900ms forwards;
+}
+
+// ------------------------------------------------- 2. panel de sucursales
+
+.panel {
+  @extend %tarjeta;
+  padding: 22px 24px 26px;
+  background: var(--noche);
+  color: #fff;
+}
+
+.panel__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.6);
+
+  em {
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.66rem;
+    font-style: normal;
+  }
+}
+
+.panel__total {
+  display: block;
+  margin: 6px 0 20px;
+  font-family: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+
+.panel__lista {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel__fila {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font-size: 0.82rem;
+
+  span {
+    color: rgba(255, 255, 255, 0.75);
+  }
+}
+
+.barra {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+
+  span {
+    display: block;
+    width: var(--ancho);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--coral-oscuro), var(--coral) 60%, #f2b8a6);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+}
+
+.escena--activa .barra span {
+  animation: barra-crece 900ms var(--salida) forwards;
+  animation-delay: calc(200ms + var(--i) * 150ms);
+}
+
+// ----------------------------------------------- 3. ventas sin conexión
+
+.caja {
+  @extend %tarjeta;
+  padding: 18px 20px 20px;
+}
+
+.caja__estado {
+  display: grid;
+  margin-bottom: 14px;
+}
+
+.caja__senal {
+  grid-area: 1 / 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+
+  i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+}
+
+.caja__senal--sin {
+  background: #fdf1dc;
+  color: #8a5a0b;
+
+  i {
+    background: #e8a33b;
+  }
+}
+
+.caja__senal--ok {
+  background: #e3f6ec;
+  color: #1d6b45;
+  opacity: 0;
+
+  i {
+    background: #2fb36b;
+  }
+}
+
+.escena--activa {
+  .caja__senal--sin {
+    animation: se-va 400ms ease forwards 1100ms;
+  }
+
+  .caja__senal--ok {
+    animation: aparece-quieto 400ms ease forwards 1100ms;
+  }
+}
+
+.caja__lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid #eef0f4;
+  }
+
+  strong {
+    display: block;
+    font-size: 0.86rem;
+  }
+
+  div span {
+    font-size: 0.76rem;
+    color: var(--gris);
+  }
+}
+
+// Cada venta pasa de "Guardada" a "Sincronizada", una tras otra.
+.pastilla {
+  display: grid;
+  flex-shrink: 0;
+}
+
+.pastilla__texto {
+  grid-area: 1 / 1;
+  justify-self: end;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.pastilla__texto--guardada {
+  background: #fdf1dc;
+  color: #8a5a0b;
+}
+
+.pastilla__texto--lista {
+  background: #e3f6ec;
+  color: #1d6b45;
+  opacity: 0;
+}
+
+.escena--activa {
+  .pastilla__texto--guardada {
+    animation: se-va 350ms ease forwards;
+    animation-delay: calc(1500ms + var(--i) * 450ms);
+  }
+
+  .pastilla__texto--lista {
+    animation: aparece-quieto 350ms ease forwards;
+    animation-delay: calc(1500ms + var(--i) * 450ms);
+  }
+}
+
+// ---------------------------------------------------------- animaciones
+
+@keyframes aparece {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aparece-quieto {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes se-va {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes barra-crece {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .escena,
+  .paso {
+    transition: none;
+  }
+
+  .escena--activa * {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}

@@ -1,18 +1,35 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Auth } from '../../../services/auth';
+import { EmpresaTenant, PlataformaApi } from '../../../services/plataforma';
 
 interface UsuarioActivo {
   id: number;
   nombre: string;
   email: string;
-  telefono: string | null;
   tipo: string;
   rol: string | null;
+  empresa_id: number | null;
+  empresa_nombre: string | null;
+  sucursal_nombre: string | null;
+  expira_en: string;
 }
+
+// Filtro de sesiones del SuperAdministrador: todo, solo cuentas de la
+// plataforma (clientes y él mismo) o una empresa puntual.
+type FiltroSesiones = 'todas' | 'plataforma' | number;
+
+const TIPO_TEXTO: Record<string, string> = {
+  superadministrador: 'SuperAdministrador',
+  administrador: 'Administrador',
+  encargado_sucursal: 'Encargado de sucursal',
+  cajero: 'Cajero',
+  cliente: 'Cliente',
+  proveedor: 'Proveedor',
+};
 
 interface EstadoAsistencia {
   liberado: boolean;
@@ -48,14 +65,33 @@ const TZ_BOLIVIA = 'America/La_Paz';
 
 @Component({
   selector: 'app-admin-sesiones',
-  imports: [DatePipe],
+  imports: [DatePipe, NgTemplateOutlet],
   templateUrl: './sesiones.html',
   styleUrl: './sesiones.scss',
 })
+// CU01 Inicio y cierre de sesión + control de asistencia.
+// - SuperAdministrador: ve las sesiones de todo el sistema (filtrables por
+//   empresa) y el control de asistencia de la empresa que elija, solo lectura.
+// - Administrador de una tienda: ve las sesiones de sus Encargados y Cajeros
+//   y gestiona el control de asistencia de su empresa.
+// - Encargado / Cajero: marca su asistencia.
 export class AdminSesiones implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly plataforma = inject(PlataformaApi);
   protected readonly auth = inject(Auth);
   protected readonly tzBolivia = TZ_BOLIVIA;
+  protected readonly tipoTexto = TIPO_TEXTO;
+
+  protected readonly esSuper = this.auth.isSuperAdmin();
+  protected readonly esAdminTienda = this.auth.currentUser()?.tipo === 'administrador';
+
+  // ---- SuperAdministrador: empresa elegida
+  protected readonly empresas = signal<EmpresaTenant[]>([]);
+  protected readonly filtro = signal<FiltroSesiones>('todas');
+  protected readonly empresaElegida = computed(() => {
+    const f = this.filtro();
+    return typeof f === 'number' ? (this.empresas().find((e) => e.id === f) ?? null) : null;
+  });
 
   protected readonly items = signal<UsuarioActivo[]>([]);
   protected readonly loading = signal(false);
@@ -88,12 +124,16 @@ export class AdminSesiones implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.load();
-    this.cargarEstado();
-    if (this.auth.isAdmin()) {
-      this.cargarHoy();
-      this.cargarHistorial();
+    if (this.esSuper) {
+      void this.cargarEmpresas();
     } else {
-      this.cargarMiHistorial();
+      this.cargarEstado();
+      if (this.esAdminTienda) {
+        this.cargarHoy();
+        this.cargarHistorial();
+      } else {
+        this.cargarMiHistorial();
+      }
     }
     // Refresca el estado (cuenta regresiva de la ventana de 5 min) cada 10s,
     // sin depender del heartbeat general de sesion.
@@ -109,13 +149,60 @@ export class AdminSesiones implements OnInit, OnDestroy {
   protected refrescar(): void {
     this.load();
     this.cargarEstado();
+    if (this.esSuper && this.empresaElegida()) {
+      this.cargarHoy();
+      this.cargarHistorial();
+    }
+  }
+
+  // SuperAdministrador: cambiar de empresa filtra las sesiones y, si es una
+  // empresa, muestra su control de asistencia (solo lectura).
+  protected elegirFiltro(f: FiltroSesiones): void {
+    this.filtro.set(f);
+    this.estado.set(null);
+    this.marcadosHoy.set([]);
+    this.historial.set([]);
+    this.load();
+    if (typeof f === 'number') {
+      this.cargarEstado();
+      this.cargarHoy();
+      this.cargarHistorial();
+    }
+  }
+
+  protected inicial(nombre: string): string {
+    return nombre.trim()[0]?.toUpperCase() ?? '?';
+  }
+
+  private async cargarEmpresas(): Promise<void> {
+    try {
+      this.empresas.set(await this.plataforma.empresas());
+    } catch {
+      this.error.set('No se pudieron cargar las empresas.');
+    }
+  }
+
+  // Parámetros según el perfil: el SuperAdministrador manda la empresa.
+  private paramsEmpresa(): Record<string, string> {
+    const empresa = this.empresaElegida();
+    return this.esSuper && empresa ? { empresa_id: String(empresa.id) } : {};
   }
 
   private async load(): Promise<void> {
     this.loading.set(true);
     this.error.set('');
     try {
-      const res = await firstValueFrom(this.http.get<UsuarioActivo[]>(`${environment.apiUrl}/sesiones/activas`));
+      const f = this.filtro();
+      const params: Record<string, string> = !this.esSuper
+        ? {}
+        : typeof f === 'number'
+          ? { empresa_id: String(f) }
+          : f === 'plataforma'
+            ? { plataforma: 'true' }
+            : {};
+      const res = await firstValueFrom(
+        this.http.get<UsuarioActivo[]>(`${environment.apiUrl}/sesiones/activas`, { params }),
+      );
       this.items.set(res);
     } catch {
       this.error.set('No se pudo cargar las sesiones activas.');
@@ -125,9 +212,13 @@ export class AdminSesiones implements OnInit, OnDestroy {
   }
 
   protected async cargarEstado(): Promise<void> {
+    // El SuperAdministrador solo ve el estado de una empresa elegida.
+    if (this.esSuper && !this.empresaElegida()) return;
     this.cargandoEstado.set(true);
     try {
-      const res = await firstValueFrom(this.http.get<EstadoAsistencia>(`${environment.apiUrl}/asistencia/estado`));
+      const res = await firstValueFrom(
+        this.http.get<EstadoAsistencia>(`${environment.apiUrl}/asistencia/estado`, { params: this.paramsEmpresa() }),
+      );
       this.estado.set(res);
       this.nuevaHora.set(res.hora_liberacion.slice(0, 5));
     } catch {
@@ -173,7 +264,9 @@ export class AdminSesiones implements OnInit, OnDestroy {
   private async cargarHoy(): Promise<void> {
     this.cargandoAdmin.set(true);
     try {
-      const res = await firstValueFrom(this.http.get<MarcadoHoy[]>(`${environment.apiUrl}/asistencia/hoy`));
+      const res = await firstValueFrom(
+        this.http.get<MarcadoHoy[]>(`${environment.apiUrl}/asistencia/hoy`, { params: this.paramsEmpresa() }),
+      );
       this.marcadosHoy.set(res);
     } catch {
       // silencioso
@@ -184,7 +277,9 @@ export class AdminSesiones implements OnInit, OnDestroy {
 
   private async cargarHistorial(): Promise<void> {
     try {
-      const res = await firstValueFrom(this.http.get<Marcado[]>(`${environment.apiUrl}/asistencia/historial`));
+      const res = await firstValueFrom(
+        this.http.get<Marcado[]>(`${environment.apiUrl}/asistencia/historial`, { params: this.paramsEmpresa() }),
+      );
       this.historial.set(res);
     } catch {
       // silencioso

@@ -15,6 +15,8 @@ class BitacoraItem(BaseModel):
     detalle: str | None
     ip_address: str | None
     plataforma: str | None
+    empresa_id: int | None = None
+    empresa_nombre: str | None = None
 
     model_config = {"from_attributes": True}
 

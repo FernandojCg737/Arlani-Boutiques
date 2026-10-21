@@ -45,7 +45,7 @@ export class AdminCatalogo implements OnInit {
 
   // CU08, mismo criterio que CU12: un Encargado/Cajero solo consulta el
   // catalogo de SU sucursal, nunca el de otras -- Administrador ve todas.
-  protected readonly esAdministrador = computed(() => this.auth.currentUser()?.tipo === 'administrador');
+  protected readonly esAdministrador = computed(() => this.auth.isAdmin());
 
   protected readonly sucursales = signal<Sucursal[]>([]);
   protected readonly sucursalSeleccionada = signal<Sucursal | null>(null);
