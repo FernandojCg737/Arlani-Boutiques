@@ -1,3 +1,4 @@
+import html
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -6,10 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso, require_superadmin
 from app.core.audit import log_bitacora, set_client_ip_for_trigger
-from app.core.email import send_email
+from app.core.email import nombre_marca, send_email
 from app.core.security import generate_temp_password, hash_password
 from app.db.session import get_db
-from app.models import Cliente, Empresa, Usuario
+from app.models import Cliente, Usuario
 from app.schemas.clientes import (
     ClienteAdminCreate,
     ClienteAdminOut,
@@ -117,9 +118,7 @@ def create_cliente(
     cliente = _get_cliente_or_404(db, cliente_id)
 
     # Quien lo da de alta: una tienda (su nombre) o la plataforma.
-    marca = "Arlani Boutiques"
-    if admin.empresa_id is not None:
-        marca = db.query(Empresa.nombre).filter(Empresa.id == admin.empresa_id).scalar() or marca
+    marca = nombre_marca(db, admin.empresa_id)
 
     try:
         send_email(
@@ -127,8 +126,8 @@ def create_cliente(
             subject=f"Bienvenido a {marca}",
             html_body=(
                 f"<p>Hola {cliente.nombre},</p>"
-                f"<p>Se creo una cuenta para vos en <strong>{marca}</strong>. "
-                "Con ella podes comprar en todas las boutiques de Arlani.</p>"
+                f"<p>Se creo una cuenta para ti en <strong>{html.escape(marca)}</strong>. "
+                "Con ella puedes comprar en todas las boutiques de Arlani.</p>"
                 "<p>Estos son tus datos de acceso:</p>"
                 f"<p>Correo: {cliente.email}<br>Contrasena temporal: {password_temporal}</p>"
                 "<p>Te recomendamos cambiar la contrasena desde tu perfil apenas inicies sesion.</p>"

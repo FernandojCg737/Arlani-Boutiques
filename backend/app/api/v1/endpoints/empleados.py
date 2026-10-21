@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import ADMIN_TIPOS, require_permiso
 from app.core.audit import log_bitacora, set_client_ip_for_trigger
-from app.core.email import send_email
+from app.core.email import nombre_marca, send_email
 from app.core.errores_db import http_desde_pg
 from app.core.security import generate_temp_password, hash_password
 from app.db.session import get_db
@@ -144,15 +144,17 @@ def create_empleado(
         raise http from err
 
     empleado = _get_empleado_or_404(db, empleado_id)
+    # El personal es de una tienda: el correo lleva su nombre (ej. Atelier Aranier).
+    marca = nombre_marca(db, empleado.empresa_id)
 
     try:
         send_email(
             to=empleado.email,
-            subject="Bienvenido al equipo - Atelier Aranier",
+            subject=f"Bienvenido al equipo - {marca}",
             html_body=(
                 f"<p>Hola {html.escape(empleado.nombre)},</p>"
                 f"<p>Se creo tu cuenta de <strong>{empleado.tipo.replace('_', ' ')}</strong> en el panel de "
-                "administracion de Atelier Aranier.</p>"
+                f"administracion de {html.escape(marca)}, en Arlani Boutiques.</p>"
                 "<p>Estos son tus datos de acceso:</p>"
                 f"<p>Correo: {html.escape(empleado.email)}<br>Contrasena temporal: {password_temporal}</p>"
                 "<p>Te recomendamos cambiar la contrasena desde tu perfil apenas inicies sesion.</p>"

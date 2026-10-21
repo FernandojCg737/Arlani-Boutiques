@@ -19,7 +19,7 @@ export interface DocumentoLegal {
 }
 
 export const CONTACTO_LEGAL = {
-  correo: 'fcalanigarcia7@gmail.com',
+  correo: 'fcalanigarcia6@gmail.com',
   whatsappTexto: '+591 73766956',
   whatsappNumero: '59173766956',
 };
