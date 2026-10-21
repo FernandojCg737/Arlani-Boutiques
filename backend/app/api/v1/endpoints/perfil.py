@@ -77,11 +77,11 @@ def cambiar_password(
     try:
         send_email(
             to=usuario.email,
-            subject="Tu contrasena fue actualizada - Atelier Aranier",
+            subject="Tu contrasena fue actualizada - Arlani Boutiques",
             html_body=(
                 f"<p>Hola {usuario.nombre},</p>"
                 "<p>Tu contrasena se actualizo correctamente.</p>"
-                "<p>Si no fuiste vos, contactanos de inmediato para proteger tu cuenta.</p>"
+                "<p>Si no fuiste tu, contactanos de inmediato para proteger tu cuenta.</p>"
             ),
         )
     except Exception:

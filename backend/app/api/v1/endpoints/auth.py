@@ -128,13 +128,13 @@ def register(payload: ClienteRegister, request: Request, db: Session = Depends(g
     try:
         send_email(
             to=cliente.email,
-            subject="Bienvenido a Atelier Aranier",
+            subject="Bienvenido a Arlani Boutiques",
             html_body=(
                 f"<p>Hola {html.escape(cliente.nombre)},</p>"
-                "<p>Gracias por registrarte en <strong>Atelier Aranier</strong>. "
-                "Ya sos parte de nuestra tienda como cliente.</p>"
+                "<p>Gracias por registrarte en <strong>Arlani Boutiques</strong>. "
+                "Con tu cuenta puedes comprar y reservar en todas nuestras boutiques.</p>"
                 f"<p>Tu cuenta quedo registrada con el correo {html.escape(cliente.email)}.</p>"
-                "<p>Ya podes iniciar sesion cuando quieras en nuestra tienda.</p>"
+                "<p>Ya puedes iniciar sesion cuando quieras.</p>"
             ),
         )
     except Exception:
@@ -194,13 +194,13 @@ def google_auth(payload: GoogleAuthPayload, request: Request, db: Session = Depe
         try:
             send_email(
                 to=cliente.email,
-                subject="Bienvenido a Atelier Aranier",
+                subject="Bienvenido a Arlani Boutiques",
                 html_body=(
                     f"<p>Hola {html.escape(cliente.nombre)},</p>"
-                    "<p>Gracias por registrarte en <strong>Atelier Aranier</strong> con tu cuenta de Google. "
-                    "Ya sos parte de nuestra tienda como cliente.</p>"
+                    "<p>Gracias por registrarte en <strong>Arlani Boutiques</strong> con tu cuenta de Google. "
+                    "Con tu cuenta puedes comprar y reservar en todas nuestras boutiques.</p>"
                     f"<p>Iniciaste sesion con tu cuenta de Google ({html.escape(cliente.email)}), "
-                    "asi que podes volver a entrar en cualquier momento con el boton "
+                    "asi que puedes volver a entrar en cualquier momento con el boton "
                     "\"Continuar con Google\".</p>"
                 ),
             )
@@ -267,12 +267,12 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Sessio
     try:
         send_email(
             to=usuario.email,
-            subject="Codigo de verificacion - Atelier Aranier",
+            subject="Codigo de verificacion - Arlani Boutiques",
             html_body=(
                 f"<p>Hola {html.escape(usuario.nombre)},</p>"
                 "<p>Tu codigo de verificacion para recuperar tu contrasena es:</p>"
                 f"<h2>{code}</h2>"
-                "<p>Vence en 10 minutos. Si no fuiste vos, ignora este correo.</p>"
+                "<p>Vence en 10 minutos. Si no lo pediste tu, ignora este correo.</p>"
             ),
         )
     except Exception:

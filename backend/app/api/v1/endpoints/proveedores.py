@@ -1,3 +1,4 @@
+import html
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso
 from app.core.audit import log_bitacora, set_client_ip_for_trigger
-from app.core.email import send_email
+from app.core.email import nombre_marca, send_email
 from app.core.security import generate_temp_password, hash_password
 from app.db.session import get_db
 from app.models import Proveedor, Usuario
@@ -74,15 +75,17 @@ def create_proveedor(
     db.commit()
 
     proveedor = _get_proveedor_or_404(db, proveedor_id)
+    # El proveedor trabaja con la tienda de quien lo registra.
+    marca = nombre_marca(db, admin.empresa_id)
 
     try:
         send_email(
             to=proveedor.email,
-            subject="Alta de proveedor - Atelier Aranier",
+            subject=f"Alta de proveedor - {marca}",
             html_body=(
                 f"<p>Hola {proveedor.nombre},</p>"
                 "<p>Se registro tu cuenta de <strong>proveedor</strong> en el panel de administracion de "
-                "Atelier Aranier.</p>"
+                f"{html.escape(marca)}.</p>"
                 "<p>Estos son tus datos de acceso:</p>"
                 f"<p>Correo: {proveedor.email}<br>Contrasena temporal: {password_temporal}</p>"
             ),
