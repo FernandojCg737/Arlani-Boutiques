@@ -94,3 +94,20 @@
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.5);
 }
+
+// Privacidad y Términos, junto al "Hecho en Bolivia".
+.pie__legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+
+  a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+
+    &:hover {
+      color: #fff;
+      text-decoration: underline;
+    }
+  }
+}

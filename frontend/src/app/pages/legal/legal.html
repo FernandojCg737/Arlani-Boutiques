@@ -1,0 +1,59 @@
+<article class="legal">
+  <header class="legal__cabecera">
+    <span class="legal__eyebrow">Arlani Boutiques</span>
+    <h1>{{ doc.titulo }}</h1>
+    <p>{{ doc.bajada }}</p>
+    <small>Última actualización: {{ doc.actualizado }}</small>
+  </header>
+
+  <div class="legal__cuerpo">
+    <nav class="legal__indice" aria-label="En esta página">
+      <span>En esta página</span>
+      <ol>
+        @for (s of doc.secciones; track s.id) {
+          <li><a [routerLink]="[]" [fragment]="s.id">{{ s.titulo }}</a></li>
+        }
+        <li><a [routerLink]="[]" fragment="contacto">Contacto</a></li>
+      </ol>
+    </nav>
+
+    <div class="legal__texto">
+      @for (s of doc.secciones; track s.id; let i = $index) {
+        <section [id]="s.id">
+          <h2><span aria-hidden="true">{{ i + 1 }}.</span> {{ s.titulo }}</h2>
+          @for (p of s.parrafos ?? []; track $index) {
+            <p>{{ p }}</p>
+          }
+          @if (s.lista) {
+            <ul>
+              @for (item of s.lista; track $index) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          }
+          @if (s.cierre) {
+            <p>{{ s.cierre }}</p>
+          }
+        </section>
+      }
+
+      <section id="contacto" class="legal__contacto">
+        <h2><span aria-hidden="true">{{ doc.secciones.length + 1 }}.</span> Contacto</h2>
+        <p>Si tienes preguntas sobre este documento o quieres hacer un pedido sobre tus datos, escríbenos:</p>
+        <ul>
+          <li>
+            Correo: <a [href]="'mailto:' + contacto.correo">{{ contacto.correo }}</a>
+          </li>
+          <li>
+            WhatsApp:
+            <a [href]="'https://wa.me/' + contacto.whatsappNumero" target="_blank" rel="noopener">{{ contacto.whatsappTexto }}</a>
+          </li>
+        </ul>
+      </section>
+
+      <p class="legal__otro">
+        Lee también nuestros <a [routerLink]="otro.ruta">{{ otro.texto }}</a>.
+      </p>
+    </div>
+  </div>
+</article>

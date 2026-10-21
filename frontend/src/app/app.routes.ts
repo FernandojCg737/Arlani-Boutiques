@@ -36,6 +36,7 @@ import { Checkout } from './pages/checkout/checkout';
 import { Comprobante } from './pages/comprobante/comprobante';
 import { Cotizaciones } from './pages/cotizaciones/cotizaciones';
 import { Home } from './pages/home/home';
+import { Legal } from './pages/legal/legal';
 import { Login } from './pages/login/login';
 import { Perfil } from './pages/perfil/perfil';
 import { ProductoDetalle } from './pages/producto-detalle/producto-detalle';
@@ -58,6 +59,9 @@ export const routes: Routes = [
   // sesión: sin sesión, authGuard manda a /login y vuelve acá con el plan.
   { path: 'empezar', component: RegistroEmpresa, canActivate: [authGuard], data: { hideChrome: true } },
   { path: 'atelier', component: AtelierInicio },
+  // Documentos legales de la plataforma (Google los pide para el login con Google).
+  { path: 'privacidad', component: Legal, data: { documento: 'privacidad', header: 'plataforma', encabezadoSolido: true } },
+  { path: 'terminos', component: Legal, data: { documento: 'terminos', header: 'plataforma', encabezadoSolido: true } },
   // Enlace de cada tienda: /tienda-<subdominio>. Con catalogo muestra sus
   // productos; si todavia no tiene, su ficha (marca y sucursales).
   { matcher: tiendaMatcher, canMatch: [tieneCatalogoGuard], component: Tienda },
