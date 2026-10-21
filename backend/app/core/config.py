@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "no-reply@atelieraranier.com"
     SMTP_USE_TLS: bool = False
+    # Produccion (Render): el plan gratis bloquea SMTP, asi que el correo sale
+    # de la cuenta de Gmail por un Google Apps Script publicado como app web
+    # (HTTPS). El token es la clave compartida que el script exige.
+    # URL vacia = SMTP (desarrollo local).
+    GMAIL_SCRIPT_URL: str = ""
+    GMAIL_SCRIPT_TOKEN: str = ""
 
     @property
     def es_produccion(self) -> bool:
