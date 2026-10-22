@@ -11,7 +11,7 @@ import { Relacionados } from '../../components/relacionados/relacionados';
 import { ReservaForm } from '../../components/reserva-form/reserva-form';
 import { Product } from '../../data/products';
 import { Auth } from '../../services/auth';
-import { isAgotado, toArPrenda } from '../../services/catalogo-publico';
+import { CatalogoPublico, isAgotado, toArPrenda } from '../../services/catalogo-publico';
 import { TiendaActiva } from '../../services/tienda-activa';
 import { LoginRequerido } from '../../services/login-requerido';
 
@@ -80,6 +80,11 @@ function toProduct(p: ProductoPublico): Product {
   };
 }
 
+// Marca de la tienda que ya viene con el producto.
+function marcaDe(p: Product) {
+  return { nombre: p.tiendaNombre ?? '', color: p.tiendaColor ?? '', logo: p.tiendaLogo ?? null };
+}
+
 @Component({
   selector: 'app-producto-detalle',
   imports: [RouterLink, ArTryon, ArFoto, ReservaForm, AgregarCarrito, Relacionados],
@@ -89,6 +94,7 @@ function toProduct(p: ProductoPublico): Product {
 export class ProductoDetalle implements OnInit {
   // Tienda que vende el producto: su logo, su color y su catalogo.
   protected readonly tienda = inject(TiendaActiva);
+  private readonly catalogo = inject(CatalogoPublico);
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -119,13 +125,18 @@ export class ProductoDetalle implements OnInit {
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(async (params) => {
       const id = params.get('id') ?? '';
+      // Viniendo de un catálogo ya se sabe de qué tienda es: su marca sale al
+      // instante. Si no, encabezado neutro hasta que llegue el producto.
+      const conocido = this.catalogo.buscar(id);
+      if (conocido?.tienda) this.tienda.activar(conocido.tienda, marcaDe(conocido));
+      else this.tienda.esperar();
       try {
         const res = await firstValueFrom(
           this.http.get<ProductoPublico>(`${environment.apiUrl}/productos/publico/${id}`),
         );
         const found = toProduct(res);
         // Su marca, y relacionados y recomendaciones solo de la misma tienda.
-        this.tienda.activar(found.tienda ?? null);
+        this.tienda.activar(found.tienda ?? null, marcaDe(found));
         this.product.set(found);
         this.selectedColor.set(found.colors[0]?.name ?? null);
         this.selectedSize.set(found.sizes[0] ?? null);
