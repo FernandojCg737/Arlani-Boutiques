@@ -65,14 +65,19 @@
                   } @else if (c.antes) {
                     <em class="etiqueta">antes {{ c.antes }}</em>
                   }
-                  @if (parcialActivo() === 'p1' && c.porEmpresa) {
+                  @if (c.porEmpresa) {
                     <em class="etiqueta etiqueta--empresa">Por empresa</em>
                   }
                 </a>
                 @if (c.subs?.length) {
                   <div class="desplegable__subs">
                     @for (s of c.subs; track s.ruta) {
-                      <a [routerLink]="['/superadmin', s.ruta]" routerLinkActive="is-active" (click)="paqueteAbierto.set(null)">
+                      <a
+                        [routerLink]="['/superadmin', s.ruta]"
+                        [queryParams]="tiendaDeSub(c)"
+                        routerLinkActive="is-active"
+                        (click)="paqueteAbierto.set(null)"
+                      >
                         {{ s.etiqueta }}
                       </a>
                     }
@@ -119,7 +124,7 @@
         <span class="contexto__empresa">
           <span class="contexto__avatar" [style.background]="e.colorMarca">{{ e.nombre[0] }}</span>
           Empresa: <b>{{ e.nombre }}</b>
-          <a [routerLink]="['/superadmin/empresa', u.caso.codigo]">Cambiar</a>
+          <a [routerLink]="rutaCambiar(u)">Cambiar</a>
         </span>
       }
     </div>

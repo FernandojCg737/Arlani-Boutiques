@@ -7,10 +7,12 @@ import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { EmpresaTenant, PlataformaApi, mensajeError } from '../../../services/plataforma';
 import { AdminClientes } from '../../admin/clientes/clientes';
-import { buscarCaso } from '../superadmin-menu';
+import { ParcialId, buscarCaso } from '../superadmin-menu';
 
-// 1er parcial: antes de abrir un CU, el SuperAdministrador elige la empresa
-// (tenant) sobre la que va a trabajar. Cada empresa es un cuadro.
+// Antes de abrir un CU por empresa, el SuperAdministrador elige la empresa
+// (tenant) sobre la que va a trabajar. Cada empresa es un cuadro. Sirve a los
+// CUs del 1er parcial (/empresa/:codigo) y del 2do (/tiendas/:codigo: CU03
+// sucursales y CU04 catalogo, que luego muestran solo lo de esa tienda).
 @Component({
   selector: 'app-superadmin-elegir-empresa',
   imports: [AdminClientes],
@@ -26,7 +28,10 @@ export class SuperadminElegirEmpresa {
   private readonly codigo = toSignal(this.route.paramMap.pipe(map((p) => p.get('codigo') ?? '')), {
     initialValue: '',
   });
-  protected readonly ubicacion = computed(() => buscarCaso('p1', this.codigo()));
+  private readonly parcial: ParcialId = this.route.snapshot.data['parcial'] ?? 'p1';
+  protected readonly ubicacion = computed(() => buscarCaso(this.parcial, this.codigo()));
+  // CU03 del 1er parcial (clientes): debajo de las empresas van todos.
+  protected readonly esClientes = computed(() => this.parcial === 'p1' && this.codigo() === 'CU03');
 
   protected readonly cargando = signal(true);
   protected readonly error = signal('');
@@ -67,7 +72,11 @@ export class SuperadminElegirEmpresa {
   }
 
   protected abrir(e: EmpresaTenant): void {
-    const ruta = this.ubicacion()?.caso.ruta;
+    const caso = this.ubicacion()?.caso;
+    // Si se llego desde una pestana (ej. Inventario del CU04), vuelve a ella.
+    const destino = this.route.snapshot.queryParamMap.get('destino');
+    const pestanas = [caso?.ruta, ...(caso?.subs ?? []).map((s) => s.ruta)];
+    const ruta = destino && pestanas.includes(destino) ? destino : caso?.ruta;
     if (ruta) void this.router.navigate(['/superadmin', ruta], { queryParams: { empresa: e.id } });
   }
 

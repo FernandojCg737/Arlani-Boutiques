@@ -20,7 +20,8 @@ export interface CasoUsoMenu {
   // Número que tenía en el 1er parcial.
   antes?: string;
   subs?: SubAcceso[];
-  // 1er parcial: se elige primero la empresa. Falso para lo personal (perfil).
+  // Se elige primero la empresa (tienda) y la pantalla muestra solo lo suyo.
+  // Falso para lo personal (perfil) y lo de toda la plataforma.
   porEmpresa?: boolean;
   plataformas?: ('WEB' | 'MÓVIL')[];
   descripcion?: string;
@@ -138,13 +139,14 @@ export const PARCIALES: ParcialMenu[] = [
         codigo: 'P3',
         nombre: 'Operación de Tiendas',
         casos: [
-          { codigo: 'CU03', permisos: ['CU04'], nombre: 'Administrar ciudades y sucursales', ruta: 'sucursales', antes: 'CU04', plataformas: ['WEB'] },
+          { codigo: 'CU03', permisos: ['CU04'], nombre: 'Administrar ciudades y sucursales', ruta: 'sucursales', antes: 'CU04', plataformas: ['WEB'], porEmpresa: true },
           {
             codigo: 'CU04', permisos: ['CU05', 'CU08', 'CU12'],
             nombre: 'Catálogo e inventario',
             ruta: 'productos',
             antes: 'CU05 · CU08 · CU12',
             plataformas: ['WEB'],
+            porEmpresa: true,
             subs: [
               { etiqueta: 'Productos', ruta: 'productos' },
               { etiqueta: 'Catálogo y disponibilidad', ruta: 'catalogo' },
