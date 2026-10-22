@@ -124,6 +124,11 @@ export class CatalogoPublico {
     return Array.from(vistas).sort((a, b) => a.localeCompare(b));
   });
 
+  // Un producto ya cargado (de cualquier tienda), sin pedirlo al servidor.
+  buscar(id: string): Product | undefined {
+    return this.todos().find((p) => p.id === id);
+  }
+
   async load(): Promise<void> {
     if (this.cargado) return;
     this.cargado = true;

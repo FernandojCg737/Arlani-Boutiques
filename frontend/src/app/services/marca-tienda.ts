@@ -15,6 +15,8 @@ export interface MarcaEmpresa {
 
 // Sin tienda (SuperAdministrador): la marca de la plataforma.
 const MARCA_PLATAFORMA = { nombre: 'Arlani Boutiques', logo: '/img/arlani-logo-claro.png' };
+// Barra del panel mientras llega la marca: gris neutro, de ninguna tienda.
+const COLOR_CARGANDO = '#2b2b2b';
 
 // Texto blanco legible: el color tiene que tener contraste >= 4.5 con el
 // blanco (WCAG AA). Un color de marca claro se oscurece lo justo.
@@ -79,17 +81,26 @@ export function esLogoOscuro(url: string | null | undefined): Promise<boolean> {
 
 // Marca de la tienda del usuario (logo, nombre, color): el panel, los
 // reportes y los comprobantes se ven con la identidad de cada boutique.
+// La marca se recuerda en el navegador (por usuario): al volver a entrar al
+// panel se pinta al instante y después se actualiza con la del servidor.
+const CLAVE_MARCA = 'arlani_marca_panel';
+
 @Injectable({ providedIn: 'root' })
 export class MarcaTienda {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(Auth);
   private cargadaPara: number | null = null;
+  private pendiente: Promise<void> | null = null;
 
   readonly marca = signal<MarcaEmpresa | null>(null);
+  // Todavía no se sabe la marca (ni recordada ni del servidor): el panel
+  // queda neutro en vez de mostrar el verde de Atelier o el logo de Arlani.
+  readonly cargando = signal(true);
 
-  readonly nombre = computed(() => this.marca()?.nombre ?? MARCA_PLATAFORMA.nombre);
+  readonly nombre = computed(() => (this.cargando() ? '' : (this.marca()?.nombre ?? MARCA_PLATAFORMA.nombre)));
   // Sin logo propio, la tienda se muestra con su inicial (ver el panel).
   readonly logo = computed(() => {
+    if (this.cargando()) return null;
     const m = this.marca();
     return m ? m.logo_url : MARCA_PLATAFORMA.logo;
   });
@@ -108,22 +119,53 @@ export class MarcaTienda {
       });
     });
   }
-  readonly inicial = computed(() => this.nombre().trim()[0]?.toUpperCase() ?? 'A');
+  readonly inicial = computed(() => this.nombre().trim()[0]?.toUpperCase() ?? '');
   // Color para fondos con texto blanco (barra del panel, botones, títulos).
   readonly colorFuerte = computed(() => {
+    if (this.cargando()) return COLOR_CARGANDO;
     const m = this.marca();
     return m ? colorParaTextoBlanco(m.color_marca) : null;
   });
 
-  async cargar(): Promise<void> {
+  cargar(): Promise<void> {
     const usuario = this.auth.currentUser();
-    if (!usuario || this.cargadaPara === usuario.id) return;
+    if (!usuario) return Promise.resolve();
+    if (this.cargadaPara === usuario.id && this.pendiente) return this.pendiente;
     this.cargadaPara = usuario.id;
+
+    const recordada = this.leer(usuario.id);
+    if (recordada !== undefined) {
+      this.marca.set(recordada);
+      this.cargando.set(false);
+    } else {
+      this.cargando.set(true);
+    }
+    this.pendiente = firstValueFrom(this.http.get<MarcaEmpresa>(`${environment.apiUrl}/mi-empresa/marca`))
+      .then((m) => m, () => null) // Sin tienda (SuperAdministrador) o sin conexión: la de la plataforma.
+      .then((m) => {
+        if (this.cargadaPara !== usuario.id) return;
+        this.marca.set(m);
+        this.cargando.set(false);
+        this.guardar(usuario.id, m);
+      });
+    return this.pendiente;
+  }
+
+  // undefined = no hay nada recordado para este usuario.
+  private leer(usuarioId: number): MarcaEmpresa | null | undefined {
     try {
-      this.marca.set(await firstValueFrom(this.http.get<MarcaEmpresa>(`${environment.apiUrl}/mi-empresa/marca`)));
+      const guardada = JSON.parse(localStorage.getItem(CLAVE_MARCA) ?? 'null');
+      return guardada?.usuario === usuarioId ? guardada.marca : undefined;
     } catch {
-      // Sin tienda (SuperAdministrador) o sin conexión: marca de la plataforma.
-      this.marca.set(null);
+      return undefined;
+    }
+  }
+
+  private guardar(usuarioId: number, marca: MarcaEmpresa | null): void {
+    try {
+      localStorage.setItem(CLAVE_MARCA, JSON.stringify({ usuario: usuarioId, marca }));
+    } catch {
+      // Sin localStorage, la marca igual llega del servidor.
     }
   }
 }

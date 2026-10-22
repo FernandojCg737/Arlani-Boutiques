@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthShowcase } from '../../components/auth-showcase/auth-showcase';
 import { Auth } from '../../services/auth';
 import { GoogleIdentity } from '../../services/google-identity';
+import { MarcaTienda } from '../../services/marca-tienda';
 import { esRutaInterna } from '../../services/login-requerido';
 
 @Component({
@@ -17,6 +18,7 @@ export class Login implements AfterViewInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly googleIdentity = inject(GoogleIdentity);
+  private readonly marca = inject(MarcaTienda);
 
   protected readonly email = signal('');
   protected readonly password = signal('');
@@ -38,7 +40,7 @@ export class Login implements AfterViewInit {
     this.loading.set(true);
     try {
       await this.auth.login({ email: this.email(), password: this.password() });
-      this.redirectAfterLogin();
+      await this.redirectAfterLogin();
     } catch (err) {
       this.error.set(this.extractError(err));
     } finally {
@@ -51,7 +53,7 @@ export class Login implements AfterViewInit {
     this.loading.set(true);
     try {
       await this.auth.loginWithGoogle(credential);
-      this.redirectAfterLogin();
+      await this.redirectAfterLogin();
     } catch (err) {
       this.error.set(this.extractError(err));
     } finally {
@@ -59,7 +61,11 @@ export class Login implements AfterViewInit {
     }
   }
 
-  private redirectAfterLogin(): void {
+  private async redirectAfterLogin(): Promise<void> {
+    // Personal de una tienda: su marca llega antes de abrir el panel, asi
+    // entra ya con su logo y su color (sin pasar por otros colores).
+    const tipo = this.auth.currentUser()?.tipo;
+    if (tipo === 'administrador' || tipo === 'encargado_sucursal' || tipo === 'cajero') await this.marca.cargar();
     // `returnUrl` viene de authGuard (rutas protegidas, ej. /checkout) o de
     // acciones que mandaron aca por falta de sesion (agregar al carrito,
     // reservar, probarse una prenda desde la ficha de producto) -- si esta

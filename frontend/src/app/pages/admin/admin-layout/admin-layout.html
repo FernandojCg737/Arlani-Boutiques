@@ -6,7 +6,7 @@
         <span class="admin-topbar__logo" [class.admin-topbar__logo--subido]="marca.logoSubido()">
           <img [src]="logo" [alt]="marca.nombre()" [class.logo-contorno]="marca.logoOscuro()" />
         </span>
-      } @else {
+      } @else if (!marca.cargando()) {
         <i class="admin-topbar__inicial" aria-hidden="true">{{ marca.inicial() }}</i>
         <strong class="admin-topbar__nombre">{{ marca.nombre() }}</strong>
       }
