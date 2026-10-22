@@ -277,6 +277,8 @@ export class AdminVentas implements OnInit {
   );
 
   ngOnInit(): void {
+    // El backend ya manda solo los productos de la empresa del personal.
+    this.catalogo.tienda.set(null);
     this.catalogo.load();
     this.cargarSucursales();
     this.load();

@@ -179,6 +179,12 @@
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
   transform: translateY(8px);
   transition: transform 420ms var(--salida);
+
+  // Logo oscuro: contorno claro (como .logo-contorno) además de la sombra.
+  &.logo-contorno {
+    filter: drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff)
+      drop-shadow(0 -1px 0 #fff) drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+  }
 }
 
 .tarjeta__dominio {
@@ -282,4 +288,34 @@
   .tarjeta__logo {
     transition: none;
   }
+}
+
+// Mas de tres tarjetas (varias boutiques): en escritorio la fila tambien es un
+// carrusel que se desliza, en vez de la grilla fija de tres.
+.vitrina__tarjetas--carrusel {
+  @media (min-width: 960px) {
+    display: flex;
+    max-width: none;
+    padding: 0 clamp(20px, 6vw, 120px);
+    overflow-x: auto;
+
+    .tarjeta {
+      flex: 0 0 auto;
+      width: clamp(260px, 22vw, 320px);
+    }
+
+    .tarjeta--ancha {
+      width: clamp(520px, 44vw, 680px);
+    }
+  }
+}
+
+// Boutique sin logo: su nombre en el cartel.
+.tarjeta__nombre {
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-transform: uppercase;
 }

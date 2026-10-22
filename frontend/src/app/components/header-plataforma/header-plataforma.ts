@@ -191,7 +191,7 @@ export class HeaderPlataforma implements OnDestroy {
   protected buscar(): void {
     const termino = this.busqueda().trim();
     if (!termino) return;
-    void this.router.navigate(['/tienda-atelier-aranier'], { queryParams: { buscar: termino } });
+    void this.router.navigate(['/catalogo'], { queryParams: { buscar: termino } });
     this.cerrarBusqueda();
     this.cerrarTodo();
   }

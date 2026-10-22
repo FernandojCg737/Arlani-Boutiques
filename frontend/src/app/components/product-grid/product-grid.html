@@ -24,7 +24,13 @@
   </div>
 
   @if (visibleProducts().length === 0) {
-    <p class="product-grid-empty">No encontramos productos para "{{ busqueda() }}".</p>
+    <p class="product-grid-empty">
+      @if (busqueda()) {
+        No encontramos productos para "{{ busqueda() }}".
+      } @else {
+        No hay productos con estos filtros.
+      }
+    </p>
   }
 
   <div class="product-grid">
@@ -47,6 +53,14 @@
           </button>
         </div>
         <div class="product-tile__info">
+          @if (esUniversal() && product.tiendaNombre) {
+            <span class="product-tile__tienda">
+              @if (product.tiendaLogo) {
+                <img [src]="product.tiendaLogo" alt="" />
+              }
+              {{ product.tiendaNombre }}
+            </span>
+          }
           <span class="product-tile__brand">{{ product.brand }}</span>
           <span class="product-tile__name">{{ product.name }}</span>
           <span class="product-tile__price">{{ product.price }} Bs</span>

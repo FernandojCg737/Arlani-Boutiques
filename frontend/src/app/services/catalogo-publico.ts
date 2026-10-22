@@ -15,6 +15,10 @@ interface PrendaArApi {
 
 interface ProductoPublico {
   id: number;
+  tienda: string;
+  tienda_nombre: string;
+  tienda_logo: string | null;
+  tienda_color: string;
   nombre: string;
   descripcion: string | null;
   precio: string;
@@ -56,6 +60,10 @@ function toProduct(p: ProductoPublico): Product {
 
   return {
     id: String(p.id),
+    tienda: p.tienda,
+    tiendaNombre: p.tienda_nombre,
+    tiendaLogo: p.tienda_logo,
+    tiendaColor: p.tienda_color,
     name: p.nombre,
     brand: p.marca_nombre,
     price,
@@ -90,8 +98,17 @@ export class CatalogoPublico {
   private readonly http = inject(HttpClient);
   private cargado = false;
 
-  readonly products = signal<Product[]>([]);
+  private readonly todos = signal<Product[]>([]);
   readonly loading = signal(false);
+
+  // Tienda que se está viendo (subdominio): cada boutique muestra solo lo
+  // suyo; null = todas (portada de Arlani). La fija cada página.
+  readonly tienda = signal<string | null>(null);
+
+  readonly products = computed<Product[]>(() => {
+    const tienda = this.tienda();
+    return tienda ? this.todos().filter((p) => p.tienda === tienda) : this.todos();
+  });
 
   readonly categorias = computed(() => {
     const vistas = new Map<string, string>();
@@ -113,9 +130,9 @@ export class CatalogoPublico {
     this.loading.set(true);
     try {
       const res = await firstValueFrom(this.http.get<ProductoPublico[]>(`${environment.apiUrl}/productos/publico`));
-      this.products.set(res.map(toProduct));
+      this.todos.set(res.map(toProduct));
     } catch {
-      this.products.set([]);
+      this.todos.set([]);
     } finally {
       this.loading.set(false);
     }

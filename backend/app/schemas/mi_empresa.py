@@ -1,7 +1,25 @@
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class MarcaEmpresaOut(BaseModel):
+    # Identidad de la tienda para su panel, reportes y comprobantes.
+    nombre: str
+    subdominio: str
+    ciudad: str | None
+    color_marca: str
+    logo_url: str | None
+    email_contacto: str | None
+
+
+class MarcaEmpresaIn(BaseModel):
+    # Lo que no se manda queda igual.
+    color_marca: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+    # Logo nuevo como data URL (cualquier formato de imagen).
+    logo: str | None = Field(default=None, max_length=7_500_000)
+    quitar_logo: bool = False
 
 
 class HistorialSuscripcionOut(BaseModel):
@@ -21,6 +39,7 @@ class PlanDisponibleOut(BaseModel):
     max_sucursales: int
     dias_prueba: int | None
     ia_generativa: bool
+    operacion_offline: bool
 
 
 class MiSuscripcionOut(BaseModel):
@@ -74,4 +93,7 @@ class TiendaPublicaOut(BaseModel):
     logo_url: str | None
     estado: str
     tiene_catalogo: bool
+    # La tienda original tiene su sitio completo (/atelier); las demas
+    # muestran su catalogo dentro de su pagina /tienda-<subdominio>.
+    sitio_propio: bool
     sucursales: list[SucursalPublicaOut]

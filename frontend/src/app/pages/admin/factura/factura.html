@@ -1,4 +1,4 @@
-<section class="factura-page">
+<section class="factura-page" [style.--brand-dark]="marca.colorFuerte()">
   <a routerLink="/admin/ventas" class="volver-link">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <line x1="19" y1="12" x2="5" y2="12" />
@@ -19,11 +19,15 @@
     <article class="factura">
       <header class="factura__header">
         <div class="factura__marca">
-          <img src="/img/logo.png" alt="Atelier Aranier" />
+          @if (marca.logo(); as logo) {
+            <img [src]="logo" [alt]="marca.nombre()" />
+          }
           <div class="factura__marca-datos">
-            <strong>Atelier Aranier</strong>
-            <span>Av. San Martin, 3er Anillo Interno, Equipetrol, Santa Cruz de la Sierra, Bolivia</span>
-            <span>+591 73766956 &middot; contacto&#64;atelieraranier.com</span>
+            <strong>{{ marca.nombre() }}</strong>
+            <span>{{ v.sucursal_nombre }}{{ marca.marca()?.ciudad ? ' · ' + marca.marca()?.ciudad : '' }}, Bolivia</span>
+            @if (marca.marca()?.email_contacto; as correo) {
+              <span>{{ correo }}</span>
+            }
           </div>
         </div>
         <div class="factura__folio">
@@ -82,7 +86,7 @@
       </div>
 
       <footer class="factura__footer">
-        <p>Gracias por tu compra en Atelier Aranier.</p>
+        <p>Gracias por tu compra en {{ marca.nombre() }}.</p>
         <p class="factura__legal">
           Este documento es un comprobante interno de compra y no reemplaza una factura fiscal con validez
           tributaria (NIT).

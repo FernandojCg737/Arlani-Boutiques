@@ -2,6 +2,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   Component,
   DestroyRef,
+  computed,
   ElementRef,
   HostListener,
   OnDestroy,
@@ -18,6 +19,7 @@ import { Auth } from '../../services/auth';
 import { Cart } from '../../services/cart';
 import { LoginRequerido } from '../../services/login-requerido';
 import { Notificaciones, type Notificacion } from '../../services/notificaciones';
+import { TiendaActiva } from '../../services/tienda-activa';
 
 const INTERVALO_NOTIFICACIONES_MS = 30000;
 
@@ -38,6 +40,8 @@ export class Header implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   protected readonly cart = inject(Cart);
   protected readonly auth = inject(Auth);
+  // Boutique que se esta visitando: su logo y su catalogo en el menu.
+  protected readonly tienda = inject(TiendaActiva);
   protected readonly notificaciones = inject(Notificaciones);
   private readonly loginRequerido = inject(LoginRequerido);
 
@@ -90,14 +94,20 @@ export class Header implements OnInit, OnDestroy {
     if (this.intervaloNotificaciones) clearInterval(this.intervaloNotificaciones);
   }
 
-  protected readonly navLinks: NavLink[] = [
-    { label: 'Tienda', path: '/tienda-atelier-aranier' },
-    { label: 'Poleras', path: '/tienda-atelier-aranier', queryParams: { categoria: 'poleras' } },
-    { label: 'Pantalones', path: '/tienda-atelier-aranier', queryParams: { categoria: 'pantalones' } },
-    { label: 'Ofertas', path: '/tienda-atelier-aranier', queryParams: { filtro: 'ofertas' } },
-    { label: 'Cotizaciones', path: '/cotizaciones' },
-    { label: 'Contacto', path: '/contacto' },
-  ];
+  protected readonly navLinks = computed<NavLink[]>(() => {
+    const catalogo = this.tienda.rutaCatalogo();
+    const links: NavLink[] = [
+      { label: 'Tienda', path: catalogo },
+      { label: 'Poleras', path: catalogo, queryParams: { categoria: 'poleras' } },
+      { label: 'Pantalones', path: catalogo, queryParams: { categoria: 'pantalones' } },
+      { label: 'Ofertas', path: catalogo, queryParams: { filtro: 'ofertas' } },
+    ];
+    // Cotizaciones y contacto son de la tienda original.
+    if (this.tienda.esOriginal()) {
+      links.push({ label: 'Cotizaciones', path: '/cotizaciones' }, { label: 'Contacto', path: '/contacto' });
+    }
+    return links;
+  });
 
   ngOnInit(): void {
     this.refreshForCurrentRoute();
@@ -203,7 +213,7 @@ export class Header implements OnInit, OnDestroy {
     const termino = this.searchQuery().trim();
     if (!termino) return;
 
-    this.router.navigate(['/tienda-atelier-aranier'], { queryParams: { buscar: termino } });
+    this.router.navigate([this.tienda.rutaCatalogo()], { queryParams: { buscar: termino } });
     this.closeSearch();
   }
 }

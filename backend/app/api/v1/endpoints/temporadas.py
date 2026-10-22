@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_permiso
 from app.core.audit import log_bitacora
 from app.db.session import get_db
-from app.models import Temporada, Usuario
+from app.models import Empresa, Temporada, Usuario
 from app.schemas.temporadas import TemporadaCreate, TemporadaOut, TemporadaUpdate
 
 router = APIRouter()
@@ -28,8 +28,14 @@ def list_temporadas(
 
 
 @router.get("/publico", response_model=list[TemporadaOut])
-def list_temporadas_publico(db: Session = Depends(get_db)) -> list[TemporadaOut]:
-    return db.query(Temporada).order_by(Temporada.fecha_inicio.desc()).all()
+def list_temporadas_publico(
+    tienda: str | None = Query(default=None, max_length=40), db: Session = Depends(get_db)
+) -> list[TemporadaOut]:
+    # tienda=<subdominio>: solo las temporadas de esa boutique (filtros de su catalogo).
+    query = db.query(Temporada)
+    if tienda:
+        query = query.join(Empresa, Empresa.id == Temporada.empresa_id).filter(Empresa.subdominio == tienda.lower())
+    return query.order_by(Temporada.fecha_inicio.desc()).all()
 
 
 @router.post("", response_model=TemporadaOut, status_code=status.HTTP_201_CREATED)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, joinedload
@@ -7,15 +7,21 @@ from app.api.deps import require_permiso
 from app.core.audit import log_bitacora
 from app.core.errores_db import http_desde_pg
 from app.db.session import get_db
-from app.models import Sucursal, Usuario
+from app.models import Empresa, Sucursal, Usuario
 from app.schemas.sucursales import SucursalCreate, SucursalOut, SucursalPublicaOut, SucursalUpdate
 
 router = APIRouter()
 
 
 @router.get("/publico", response_model=list[SucursalPublicaOut])
-def list_sucursales_publico(db: Session = Depends(get_db)) -> list[SucursalPublicaOut]:
-    sucursales = db.query(Sucursal).filter(Sucursal.estado == "activa").order_by(Sucursal.nombre).all()
+def list_sucursales_publico(
+    tienda: str | None = Query(default=None, max_length=40), db: Session = Depends(get_db)
+) -> list[SucursalPublicaOut]:
+    # tienda=<subdominio>: solo las sucursales de esa boutique (filtros de su catalogo).
+    query = db.query(Sucursal).filter(Sucursal.estado == "activa")
+    if tienda:
+        query = query.join(Empresa, Empresa.id == Sucursal.empresa_id).filter(Empresa.subdominio == tienda.lower())
+    sucursales = query.order_by(Sucursal.nombre).all()
     return [
         SucursalPublicaOut(id=s.id, nombre=s.nombre, direccion=s.direccion, horario_atencion=s.horario_atencion)
         for s in sucursales

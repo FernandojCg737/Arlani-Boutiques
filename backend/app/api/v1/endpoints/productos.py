@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import (
     ADMIN_TIPOS,
+    PERSONAL_DE_TIENDA,
     cliente_sin_permiso,
     get_current_user,
     get_current_user_optional,
@@ -34,6 +35,7 @@ from app.models import (
     Categoria,
     Coleccion,
     Color,
+    Empresa,
     Inventario,
     Marca,
     Producto,
@@ -192,6 +194,10 @@ def create_color(
 def _to_publico(producto: Producto) -> ProductoPublicoOut:
     return ProductoPublicoOut(
         id=producto.id,
+        tienda=producto.empresa.subdominio,
+        tienda_nombre=producto.empresa.nombre,
+        tienda_logo=producto.empresa.logo_url,
+        tienda_color=producto.empresa.color_marca,
         nombre=producto.nombre,
         descripcion=producto.descripcion,
         precio=producto.precio,
@@ -207,14 +213,21 @@ def _to_publico(producto: Producto) -> ProductoPublicoOut:
 
 @router.get("/publico", response_model=list[ProductoPublicoOut])
 def list_productos_publico(
+    tienda: str | None = Query(default=None, max_length=40),
     db: Session = Depends(get_db),
     usuario: Usuario | None = Depends(get_current_user_optional),
 ) -> list[ProductoPublicoOut]:
+    """Productos a la venta de las tiendas activas. tienda=<subdominio>:
+    solo los de esa boutique. El personal de una tienda (punto de venta) ve
+    solo los de su empresa."""
     if cliente_sin_permiso(usuario, "CU08"):
         return []
     query = (
         db.query(Producto)
+        .join(Empresa, Empresa.id == Producto.empresa_id)
+        .filter(Empresa.estado == "activa")
         .options(
+            joinedload(Producto.empresa),
             joinedload(Producto.marca),
             joinedload(Producto.categoria),
             joinedload(Producto.temporada),
@@ -224,6 +237,10 @@ def list_productos_publico(
         )
         .filter(Producto.estado == "activo")
     )
+    if usuario is not None and usuario.empresa_id is not None and usuario.tipo in PERSONAL_DE_TIENDA:
+        query = query.filter(Producto.empresa_id == usuario.empresa_id)
+    elif tienda:
+        query = query.filter(Empresa.subdominio == tienda.strip().lower())
     return [_to_publico(p) for p in query.order_by(Producto.nombre).all()]
 
 
@@ -238,6 +255,7 @@ def get_producto_publico(
     producto = (
         db.query(Producto)
         .options(
+            joinedload(Producto.empresa),
             joinedload(Producto.marca),
             joinedload(Producto.categoria),
             joinedload(Producto.temporada),

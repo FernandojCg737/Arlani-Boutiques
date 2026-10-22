@@ -476,3 +476,15 @@
     color: var(--brand-dark);
   }
 }
+
+// Lista vacia (tienda nueva): que falta registrar y donde.
+.modal-field__falta {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9a5b12;
+
+  a {
+    color: var(--brand-dark);
+    font-weight: 700;
+  }
+}

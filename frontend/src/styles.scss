@@ -29,3 +29,10 @@ body {
   scroll-margin-top: 90px;
   display: block;
 }
+
+// Logo oscuro sobre fondo oscuro: contorno blanco fino alrededor del dibujo y
+// las letras (sigue la forma del PNG transparente). Lo decide esLogoOscuro().
+.logo-contorno {
+  filter: drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff)
+    drop-shadow(0 -1px 0 #fff);
+}

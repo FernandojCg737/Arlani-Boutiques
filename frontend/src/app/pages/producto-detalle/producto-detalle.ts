@@ -12,6 +12,7 @@ import { ReservaForm } from '../../components/reserva-form/reserva-form';
 import { Product } from '../../data/products';
 import { Auth } from '../../services/auth';
 import { isAgotado, toArPrenda } from '../../services/catalogo-publico';
+import { TiendaActiva } from '../../services/tienda-activa';
 import { LoginRequerido } from '../../services/login-requerido';
 
 interface PrendaArApi {
@@ -25,6 +26,10 @@ interface PrendaArApi {
 
 interface ProductoPublico {
   id: number;
+  tienda: string;
+  tienda_nombre: string;
+  tienda_logo: string | null;
+  tienda_color: string;
   nombre: string;
   descripcion: string | null;
   precio: string;
@@ -48,6 +53,10 @@ function toProduct(p: ProductoPublico): Product {
 
   return {
     id: String(p.id),
+    tienda: p.tienda,
+    tiendaNombre: p.tienda_nombre,
+    tiendaLogo: p.tienda_logo,
+    tiendaColor: p.tienda_color,
     name: p.nombre,
     brand: p.marca_nombre,
     price,
@@ -78,6 +87,8 @@ function toProduct(p: ProductoPublico): Product {
   styleUrl: './producto-detalle.scss',
 })
 export class ProductoDetalle implements OnInit {
+  // Tienda que vende el producto: su logo, su color y su catalogo.
+  protected readonly tienda = inject(TiendaActiva);
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -113,6 +124,8 @@ export class ProductoDetalle implements OnInit {
           this.http.get<ProductoPublico>(`${environment.apiUrl}/productos/publico/${id}`),
         );
         const found = toProduct(res);
+        // Su marca, y relacionados y recomendaciones solo de la misma tienda.
+        this.tienda.activar(found.tienda ?? null);
         this.product.set(found);
         this.selectedColor.set(found.colors[0]?.name ?? null);
         this.selectedSize.set(found.sizes[0] ?? null);

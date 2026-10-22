@@ -222,3 +222,16 @@
     transition: none;
   }
 }
+
+// Tienda sin logo: su inicial en su color.
+.promo__inicial {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 800;
+}

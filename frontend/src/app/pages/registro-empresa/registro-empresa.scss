@@ -603,7 +603,7 @@
 }
 
 .colores {
-  margin: 4px 0 0;
+  margin: 4px 0 22px;
   padding: 0;
   border: none;
 
@@ -811,4 +811,303 @@
     font-weight: 700;
     overflow-wrap: anywhere;
   }
+}
+
+// ------------------------------------------------- compra de la suscripción
+
+.campo label small,
+.campo__titulo small {
+  font-weight: 500;
+  color: var(--gris);
+}
+
+.campo__titulo {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.campo__ayuda {
+  font-size: 0.8rem;
+  color: var(--gris);
+}
+
+// Botón con aspecto de enlace ("Ver planes", "Quitar", "Reintentar").
+.enlace-boton {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--coral-oscuro);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+// Selector cromático RGB: rueda de colores que abre el selector del sistema.
+.colores__rgb {
+  position: relative;
+  overflow: hidden;
+  background: conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+
+  // Con un color propio elegido, el centro muestra ese color.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 9px;
+    border-radius: 50%;
+    background: var(--propio, transparent);
+    box-shadow: 0 0 0 2px #fff;
+    opacity: 0;
+    transition: opacity 200ms var(--salida);
+  }
+
+  input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  &:focus-within {
+    outline: 2px solid var(--coral);
+    outline-offset: 4px;
+  }
+}
+
+.colores__rgb--elegido {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 0 0 3px var(--marfil),
+    0 0 0 5px var(--tinta);
+
+  &::after {
+    opacity: 1;
+  }
+}
+
+.colores__hex {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 10px;
+  border: 1.5px solid var(--borde);
+  border-radius: 999px;
+  background: #fff;
+
+  i {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  }
+
+  input {
+    width: 84px;
+    padding: 8px 6px;
+    border: none;
+    background: transparent;
+    color: var(--tinta);
+    font: inherit;
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 0.88rem;
+    text-transform: uppercase;
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  &:focus-within {
+    border-color: var(--coral);
+  }
+}
+
+// Logo
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo__muestra {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 700;
+  transition: background-color 400ms var(--salida);
+
+  img {
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+    object-fit: contain;
+  }
+
+  svg {
+    width: 30px;
+    height: 30px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+}
+
+.logo__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+
+  small {
+    flex-basis: 100%;
+    font-size: 0.8rem;
+    color: var(--gris);
+  }
+
+  input[type='file'] {
+    display: none;
+  }
+}
+
+.logo__nombre {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.boton--chico {
+  padding: 9px 18px;
+  font-size: 0.88rem;
+}
+
+.vista__logo {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+// Cuenta del administrador
+.admin {
+  margin: 8px 0 0;
+  padding: 18px 18px 0;
+  border: 1.5px solid var(--borde);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+
+  legend {
+    padding: 0 6px;
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 0 0 14px;
+    font-size: 0.86rem;
+    color: var(--gris);
+  }
+}
+
+// Confirmar y pagar
+.resumen__marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  i {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+}
+
+.total__montos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+
+  small {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.75);
+
+    b {
+      color: #fff;
+    }
+  }
+}
+
+.pago {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1.5px solid var(--borde);
+  border-radius: 14px;
+  background: #fff;
+
+  small {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.8rem;
+    color: var(--gris);
+    text-align: center;
+  }
+}
+
+.pago__paypal {
+  min-height: 150px;
+}
+
+// Mientras se confirma el pago no se puede volver a pagar.
+.pago__paypal--oculto {
+  display: none;
+}
+
+.pago__procesando {
+  margin: 0;
+  padding: 40px 0;
+  color: var(--tinta);
+  font-weight: 600;
+  text-align: center;
+}
+
+// Resultado
+.listo__correo {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #e3f6ec;
+  color: #134d31;
+  line-height: 1.55;
+
+  svg {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+}
+
+.listo__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }

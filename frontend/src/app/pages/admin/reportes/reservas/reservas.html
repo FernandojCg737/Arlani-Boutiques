@@ -50,9 +50,11 @@
   <article class="reporte">
     <header class="reporte__header">
       <div class="reporte__marca">
-        <img src="/img/logo.png" alt="Atelier Aranier" />
+        @if (marca.logo(); as logo) {
+          <img [src]="logo" [alt]="marca.nombre()" />
+        }
         <div class="reporte__marca-datos">
-          <strong>Atelier Aranier</strong>
+          <strong>{{ marca.nombre() }}</strong>
           <span>Reporte de Reservas</span>
         </div>
       </div>

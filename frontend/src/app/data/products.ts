@@ -17,6 +17,11 @@ export interface ArPrenda {
 
 export interface Product {
   id: string;
+  // Tienda que lo vende (subdominio) y su nombre.
+  tienda?: string;
+  tiendaNombre?: string;
+  tiendaLogo?: string | null;
+  tiendaColor?: string;
   name: string;
   brand?: string;
   price: number;

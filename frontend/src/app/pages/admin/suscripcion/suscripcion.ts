@@ -3,7 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { MarcaEmpresa, MarcaTienda } from '../../../services/marca-tienda';
 import { enlaceTienda, mensajeError, rutaTienda } from '../../../services/plataforma';
+
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 
 interface PlanDisponible {
   codigo: string;
@@ -12,6 +15,7 @@ interface PlanDisponible {
   max_sucursales: number;
   dias_prueba: number | null;
   ia_generativa: boolean;
+  operacion_offline: boolean;
 }
 
 interface HistorialSuscripcion {
@@ -67,6 +71,17 @@ export class AdminSuscripcion {
   protected readonly error = signal('');
   protected readonly copiado = signal(false);
 
+  // Tu marca: logo y color de la tienda (el panel se pinta con ellos).
+  protected readonly marca = inject(MarcaTienda);
+  protected readonly colorNuevo = signal<string | null>(null);
+  protected readonly logoNuevo = signal<string | null>(null);
+  protected readonly guardandoMarca = signal(false);
+  protected readonly avisoMarca = signal('');
+  protected readonly errorMarca = signal('');
+  protected readonly colorVista = computed(() => this.colorNuevo() ?? this.marca.marca()?.color_marca ?? '#1f2a44');
+  protected readonly logoVista = computed(() => this.logoNuevo() ?? this.marca.logo());
+  protected readonly hayCambiosMarca = computed(() => this.colorNuevo() !== null || this.logoNuevo() !== null);
+
   protected readonly textoPeriodo: Record<string, string> = {
     mensual: 'Pago mensual',
     anual: 'Pago anual',
@@ -115,6 +130,54 @@ export class AdminSuscripcion {
       };
     return null;
   });
+
+  protected alElegirLogo(input: HTMLInputElement): void {
+    const archivo = input.files?.[0];
+    input.value = '';
+    this.errorMarca.set('');
+    this.avisoMarca.set('');
+    if (!archivo) return;
+    if (archivo.size > LOGO_MAX_BYTES) {
+      this.errorMarca.set('El logo pesa más de 5 MB. Elige una imagen más liviana.');
+      return;
+    }
+    const lector = new FileReader();
+    lector.onload = () => this.logoNuevo.set(String(lector.result));
+    lector.onerror = () => this.errorMarca.set('No pudimos leer la imagen. Prueba con otra.');
+    lector.readAsDataURL(archivo);
+  }
+
+  protected alElegirColor(valor: string): void {
+    this.avisoMarca.set('');
+    this.colorNuevo.set(valor.toLowerCase());
+  }
+
+  protected descartarMarca(): void {
+    this.colorNuevo.set(null);
+    this.logoNuevo.set(null);
+    this.errorMarca.set('');
+  }
+
+  protected async guardarMarca(): Promise<void> {
+    this.guardandoMarca.set(true);
+    this.errorMarca.set('');
+    try {
+      const nueva = await firstValueFrom(
+        this.http.put<MarcaEmpresa>(`${environment.apiUrl}/mi-empresa/marca`, {
+          color_marca: this.colorNuevo(),
+          logo: this.logoNuevo(),
+        }),
+      );
+      // El panel toma la marca nueva al instante.
+      this.marca.marca.set(nueva);
+      this.descartarMarca();
+      this.avisoMarca.set('Listo: tu panel, tus reportes y tu tienda ya usan tu marca.');
+    } catch (err) {
+      this.errorMarca.set(mensajeError(err, 'No pudimos guardar tu marca. Inténtalo de nuevo.'));
+    } finally {
+      this.guardandoMarca.set(false);
+    }
+  }
 
   constructor() {
     void this.cargar();

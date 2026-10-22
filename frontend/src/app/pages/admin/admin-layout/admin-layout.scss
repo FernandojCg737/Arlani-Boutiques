@@ -239,3 +239,42 @@
     color: var(--brand-dark);
   }
 }
+
+// Tienda sin logo cargado: su inicial y su nombre.
+.admin-topbar__inicial {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.admin-topbar__nombre {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Logo de la tienda. Los subidos (suelen ser mas cuadrados que el de Atelier)
+// van un poco mas grandes; si son oscuros llevan contorno (.logo-contorno).
+.admin-topbar__logo {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.admin-topbar__logo--subido img {
+  height: 40px !important;
+  max-width: 160px;
+  object-fit: contain;
+}
+
+// Con el logo mas alto, la barra mantiene el mismo alto que con el de Atelier.
+.admin-topbar:has(.admin-topbar__logo--subido) {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}

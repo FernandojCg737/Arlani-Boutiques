@@ -70,12 +70,12 @@
         </li>
 
         <li><a class="encabezado__enlace" routerLink="/" fragment="precios">Precios</a></li>
-        <li><a class="encabezado__enlace" routerLink="/tienda-atelier-aranier">Boutiques</a></li>
+        <li><a class="encabezado__enlace" routerLink="/catalogo">Catálogo</a></li>
       </ul>
     </nav>
 
     <div class="encabezado__acciones">
-      <!-- Buscar: igual que en la tienda, abre un campo en línea y manda a /tienda?buscar= -->
+      <!-- Buscar: igual que en la tienda, abre un campo en línea y manda a /catalogo?buscar= -->
       <div class="solo-escritorio">
         @if (!buscando()) {
           <button type="button" class="icono" aria-label="Buscar" (click)="abrirBusqueda()">
@@ -250,7 +250,7 @@
         }
       </details>
       <a class="movil__enlace" routerLink="/" fragment="precios" (click)="cerrarTodo()">Precios</a>
-      <a class="movil__enlace" routerLink="/tienda-atelier-aranier" (click)="cerrarTodo()">Boutiques</a>
+      <a class="movil__enlace" routerLink="/catalogo" (click)="cerrarTodo()">Catálogo</a>
 
       <div class="movil__acciones">
         @if (auth.currentUser()) {

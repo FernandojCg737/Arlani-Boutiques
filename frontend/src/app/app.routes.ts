@@ -32,6 +32,7 @@ import { AdminUsuarios } from './pages/admin/usuarios/usuarios';
 import { AdminVentas } from './pages/admin/ventas/ventas';
 import { AtelierInicio } from './pages/atelier-inicio/atelier-inicio';
 import { Carrito } from './pages/carrito/carrito';
+import { CatalogoUniversal } from './pages/catalogo-universal/catalogo-universal';
 import { Checkout } from './pages/checkout/checkout';
 import { Comprobante } from './pages/comprobante/comprobante';
 import { Cotizaciones } from './pages/cotizaciones/cotizaciones';
@@ -59,6 +60,8 @@ export const routes: Routes = [
   // sesión: sin sesión, authGuard manda a /login y vuelve acá con el plan.
   { path: 'empezar', component: RegistroEmpresa, canActivate: [authGuard], data: { hideChrome: true } },
   { path: 'atelier', component: AtelierInicio },
+  // Catalogo universal: los productos de todas las boutiques.
+  { path: 'catalogo', component: CatalogoUniversal, data: { header: 'plataforma' } },
   // Documentos legales de la plataforma (Google los pide para el login con Google).
   { path: 'privacidad', component: Legal, data: { documento: 'privacidad', header: 'plataforma', encabezadoSolido: true } },
   { path: 'terminos', component: Legal, data: { documento: 'terminos', header: 'plataforma', encabezadoSolido: true } },
@@ -89,7 +92,13 @@ export const routes: Routes = [
   { path: 'login', component: Login, data: { hideChrome: true } },
   { path: 'registro', component: Registro, data: { hideChrome: true } },
   { path: 'recuperar', component: RecuperarPassword, data: { hideChrome: true } },
-  { path: 'perfil', component: Perfil, canActivate: [authGuard] },
+  // Mi cuenta es de la plataforma (una cuenta sirve para todas las boutiques).
+  {
+    path: 'perfil',
+    component: Perfil,
+    canActivate: [authGuard],
+    data: { header: 'plataforma', encabezadoSolido: true },
+  },
   {
     path: 'mis-compras/:id',
     component: Comprobante,

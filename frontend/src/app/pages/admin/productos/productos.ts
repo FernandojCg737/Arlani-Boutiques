@@ -1,5 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 
@@ -77,7 +78,7 @@ const COLOR_OTRO = -1;
 
 @Component({
   selector: 'app-admin-productos',
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './productos.html',
   styleUrl: './productos.scss',
 })
@@ -144,7 +145,8 @@ export class AdminProductos implements OnInit {
     this.fPrecio.set('');
     this.fPrecioOriginal.set('');
     this.fCategoriaId.set(this.catalogo().categorias[0]?.id ?? null);
-    this.fMarcaId.set(this.catalogo().marcas[0]?.id ?? null);
+    // Sin marcas todavia (tienda nueva): "Otro..." elegido, con el campo para escribirla.
+    this.fMarcaId.set(this.catalogo().marcas[0]?.id ?? MARCA_OTRO);
     this.fMarcaNueva.set('');
     this.fProveedorId.set(this.catalogo().proveedores[0]?.id ?? null);
     this.fTemporadaId.set(this.catalogo().temporadas[0]?.id ?? null);
@@ -179,20 +181,20 @@ export class AdminProductos implements OnInit {
   }
 
   protected async submitForm(): Promise<void> {
-    if (
-      !this.fNombre() ||
-      !this.fPrecio() ||
-      !this.fCategoriaId() ||
-      !this.fMarcaId() ||
-      !this.fProveedorId() ||
-      !this.fTemporadaId() ||
-      !this.fColeccionId()
-    ) {
-      this.formError.set('Completa todos los campos obligatorios.');
-      return;
-    }
-    if (this.fMarcaId() === this.marcaOtro && !this.fMarcaNueva().trim()) {
-      this.formError.set('Escribe el nombre de la marca nueva.');
+    // Se dice exactamente que falta (una tienda nueva no tiene proveedores,
+    // temporadas ni colecciones hasta que los registra).
+    const faltan = [
+      !this.fNombre() && 'el nombre',
+      !this.fPrecio() && 'el precio',
+      !this.fCategoriaId() && 'la categoría',
+      (!this.fMarcaId() || (this.fMarcaId() === this.marcaOtro && !this.fMarcaNueva().trim())) &&
+        'el nombre de la marca',
+      !this.fProveedorId() && 'un proveedor',
+      !this.fTemporadaId() && 'una temporada',
+      !this.fColeccionId() && 'una colección',
+    ].filter((f): f is string => !!f);
+    if (faltan.length) {
+      this.formError.set(`Falta ${faltan.join(', ')}.`);
       return;
     }
 

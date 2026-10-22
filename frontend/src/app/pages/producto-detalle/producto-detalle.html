@@ -3,7 +3,7 @@
     <nav class="breadcrumb">
       <a routerLink="/">Inicio</a>
       <span>/</span>
-      <a routerLink="/tienda-atelier-aranier">Tienda</a>
+      <a [routerLink]="tienda.rutaCatalogo()">{{ p.tiendaNombre ?? 'Tienda' }}</a>
       <span>/</span>
       <span class="breadcrumb__current">{{ p.name }}</span>
     </nav>
@@ -38,6 +38,14 @@
         }
 
         <h1>{{ p.name }}</h1>
+
+        @if (p.tienda) {
+          <a class="producto-info__vendedor" [routerLink]="tienda.rutaCatalogo()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5M4 9.5h16M4 9.5V20h16V9.5M9 20v-6h6v6" /></svg>
+            <span>Vendido por <strong>{{ p.tiendaNombre }}</strong></span>
+            <em>Ver su catálogo →</em>
+          </a>
+        }
 
         <div class="producto-info__price">
           {{ p.price }} Bs

@@ -17,7 +17,7 @@ from app.api.v1.endpoints.notificaciones import router as notificaciones_router
 from app.api.v1.endpoints.perfil import router as perfil_router
 from app.api.v1.endpoints.mi_empresa import router as mi_empresa_router
 from app.api.v1.endpoints.mi_empresa import tiendas_router
-from app.api.v1.endpoints.plataforma import registro_router as empresas_registro_router
+from app.api.v1.endpoints.registro_empresa import router as registro_empresa_router
 from app.api.v1.endpoints.plataforma import router as plataforma_router
 from app.api.v1.endpoints.productos import router as productos_router
 from app.api.v1.endpoints.proveedores import router as proveedores_router
@@ -59,7 +59,8 @@ api_router.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["calificaciones"])
 # 2do parcial -- plataforma SaaS: panel del SuperAdministrador (CU09, CU10).
 api_router.include_router(plataforma_router, prefix="/plataforma", tags=["plataforma"])
-api_router.include_router(empresas_registro_router, prefix="/empresas", tags=["plataforma"])
+# Compra de la suscripcion de una boutique desde la portada (/empezar).
+api_router.include_router(registro_empresa_router, prefix="/empresas", tags=["plataforma"])
 # Cada tienda: su suscripcion (Administrador) y su enlace publico /tienda/<subdominio>.
 api_router.include_router(mi_empresa_router, prefix="/mi-empresa", tags=["plataforma"])
 api_router.include_router(tiendas_router, prefix="/tiendas", tags=["plataforma"])

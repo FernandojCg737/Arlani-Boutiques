@@ -156,29 +156,50 @@
 
         <label class="modal-field">
           <span>Proveedor</span>
-          <select (change)="fProveedorId.set(+$any($event.target).value)">
+          <select (change)="fProveedorId.set(+$any($event.target).value)" [disabled]="!catalogo().proveedores.length">
             @for (p of catalogo().proveedores; track p.id) {
               <option [value]="p.id" [selected]="p.id === fProveedorId()">{{ p.nombre }}</option>
+            } @empty {
+              <option>Sin proveedores</option>
             }
           </select>
+          @if (!catalogo().proveedores.length) {
+            <small class="modal-field__falta">
+              Todavía no tienes proveedores. <a routerLink="../proveedores">Regístralo en Proveedores (CU06)</a>.
+            </small>
+          }
         </label>
 
         <label class="modal-field">
           <span>Temporada</span>
-          <select (change)="fTemporadaId.set(+$any($event.target).value)">
+          <select (change)="fTemporadaId.set(+$any($event.target).value)" [disabled]="!catalogo().temporadas.length">
             @for (t of catalogo().temporadas; track t.id) {
               <option [value]="t.id" [selected]="t.id === fTemporadaId()">{{ t.nombre }}</option>
+            } @empty {
+              <option>Sin temporadas</option>
             }
           </select>
+          @if (!catalogo().temporadas.length) {
+            <small class="modal-field__falta">
+              Todavía no tienes temporadas. <a routerLink="../temporadas">Créala en Temporadas y Colecciones (CU07)</a>.
+            </small>
+          }
         </label>
 
         <label class="modal-field">
           <span>Coleccion</span>
-          <select (change)="fColeccionId.set(+$any($event.target).value)">
+          <select (change)="fColeccionId.set(+$any($event.target).value)" [disabled]="!catalogo().colecciones.length">
             @for (c of catalogo().colecciones; track c.id) {
               <option [value]="c.id" [selected]="c.id === fColeccionId()">{{ c.nombre }}</option>
+            } @empty {
+              <option>Sin colecciones</option>
             }
           </select>
+          @if (!catalogo().colecciones.length) {
+            <small class="modal-field__falta">
+              Todavía no tienes colecciones. <a routerLink="../temporadas">Créala en Temporadas y Colecciones (CU07)</a>.
+            </small>
+          }
         </label>
 
         @if (editingProducto()) {

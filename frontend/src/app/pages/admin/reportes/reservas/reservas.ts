@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { MarcaTienda } from '../../../../services/marca-tienda';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../../environments/environment';
@@ -49,6 +50,8 @@ function hoy(): string {
   styleUrl: './reservas.scss',
 })
 export class ReporteReservasPage implements OnInit {
+  // Logo y nombre de la tienda en el encabezado del reporte.
+  protected readonly marca = inject(MarcaTienda);
   private readonly http = inject(HttpClient);
 
   protected readonly fechaDesde = signal(primerDiaMes());

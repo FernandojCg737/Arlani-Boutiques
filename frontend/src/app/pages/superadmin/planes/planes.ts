@@ -9,14 +9,9 @@ interface Borrador {
   ia: boolean;
 }
 
-// Funciones que todos los planes incluyen (requerimiento del proyecto).
-const FUNCIONES_BASE = [
-  'Gestión de productos',
-  'Gestión de ventas',
-  'Reservas',
-  'Operación offline',
-  'Reportes convencionales',
-];
+// Funciones que todos los planes incluyen (requerimiento del proyecto). La
+// operación offline y la IA dependen del plan (columnas de plan_suscripcion).
+const FUNCIONES_BASE = ['Gestión de productos', 'Gestión de ventas', 'Reservas', 'Reportes convencionales'];
 
 // CU10 Gestionar y verificar planes, suscripciones y límites.
 @Component({

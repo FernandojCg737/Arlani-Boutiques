@@ -9,7 +9,7 @@
 // | Gestión de productos       | Sí       | Sí          |
 // | Gestión de ventas          | Sí       | Sí          |
 // | Reservas                   | Sí       | Sí          |
-// | Operación offline          | Sí       | Sí          |
+// | Operación offline          | Sí       | Sí          |  (la Prueba no la incluye)
 // | Reportes convencionales    | Sí       | Sí          |
 // | Reportes generativos con IA| No       | Sí          |
 //
@@ -36,13 +36,9 @@ export interface Plan {
 // Pagando el año se cobran 10 meses (2 de regalo).
 export const MESES_COBRADOS_AL_ANIO = 10;
 
-const FUNCIONES_BASE = [
-  'Gestión de productos',
-  'Gestión de ventas',
-  'Reservas',
-  'Operación offline (vende sin internet)',
-  'Reportes convencionales',
-];
+const OFFLINE = 'Operación offline (vende sin internet)';
+
+const FUNCIONES_BASE = ['Gestión de productos', 'Gestión de ventas', 'Reservas', OFFLINE, 'Reportes convencionales'];
 
 export const PLANES: Plan[] = [
   {
@@ -52,8 +48,8 @@ export const PLANES: Plan[] = [
     precioMensual: 0,
     maxSucursales: 1,
     diasPrueba: 14,
-    incluye: ['1 sucursal activa', ...FUNCIONES_BASE],
-    noIncluye: ['Reportes generativos con IA'],
+    incluye: ['1 sucursal activa', ...FUNCIONES_BASE.filter((f) => f !== OFFLINE)],
+    noIncluye: [OFFLINE, 'Reportes generativos con IA'],
   },
   {
     id: 'basico',

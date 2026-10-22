@@ -107,7 +107,7 @@
         @if (cargandoReservas()) {
           <p class="dash-vacio">Cargando...</p>
         } @else if (reservas().length === 0) {
-          <p class="dash-vacio">Todavia no tienes reservas. <a routerLink="/tienda-atelier-aranier">Ir a la tienda</a></p>
+          <p class="dash-vacio">Todavia no tienes reservas. <a routerLink="/" fragment="boutiques">Ver las boutiques</a></p>
         } @else {
           <ul class="dash-lista">
             @for (r of reservas(); track r.id) {
@@ -139,7 +139,7 @@
         @if (cargandoCompras()) {
           <p class="dash-vacio">Cargando...</p>
         } @else if (compras().length === 0) {
-          <p class="dash-vacio">Todavia no tienes compras. <a routerLink="/tienda-atelier-aranier">Ir a la tienda</a></p>
+          <p class="dash-vacio">Todavia no tienes compras. <a routerLink="/" fragment="boutiques">Ver las boutiques</a></p>
         } @else {
           <ul class="dash-lista">
             @for (v of compras(); track v.id) {
