@@ -1,15 +1,45 @@
 <app-hero
   videoSrc="/video/tienda-hero.mp4"
   posterSrc="/img/tienda-hero-poster.jpg"
-  eyebrow=""
-  title="CATALOGO"
-  subtitle="Explora la coleccion completa. Todos nuestros productos disponibles en un solo lugar."
+  [eyebrow]="antetitulo()"
+  [title]="titulo()"
+  [subtitle]="subtitulo()"
   [showCta]="false"
   align="center"
   size="half"
 />
 
-<section class="tienda-shop">
-  <app-shop-filters class="tienda-shop__filters" />
-  <app-product-grid class="tienda-shop__grid" />
-</section>
+@if (sinProductos()) {
+  <section class="tienda-preparando">
+    <h2>Estamos preparando nuestro catálogo en línea</h2>
+    <p>Muy pronto vas a poder ver y comprar nuestras prendas aquí. Mientras tanto, visítanos en nuestras sucursales.</p>
+  </section>
+} @else {
+  <section class="tienda-shop">
+    <app-shop-filters class="tienda-shop__filters" />
+    <app-product-grid class="tienda-shop__grid" />
+  </section>
+}
+
+@if (sucursales().length) {
+  <section class="tienda-sucursales">
+    <h2>Nuestras sucursales</h2>
+    <ul>
+      @for (s of sucursales(); track s.nombre) {
+        <li>
+          <strong>{{ s.nombre }}</strong>
+          <span>{{ s.direccion }}, {{ s.ciudad }}</span>
+          @if (s.horario_atencion) {
+            <small>{{ s.horario_atencion }}</small>
+          }
+          <div class="tienda-sucursales__acciones">
+            <a [href]="mapa(s)" target="_blank" rel="noopener">Cómo llegar</a>
+            @if (s.telefono) {
+              <a [href]="'tel:' + s.telefono">{{ s.telefono }}</a>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  </section>
+}

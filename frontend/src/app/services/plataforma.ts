@@ -63,6 +63,7 @@ export interface PlanPlataforma {
   maxSucursales: number;
   diasPrueba: number | null;
   iaGenerativa: boolean;
+  operacionOffline: boolean;
   empresas: number;
 }
 
@@ -118,6 +119,7 @@ function aPlan(p: any): PlanPlataforma {
     maxSucursales: p.max_sucursales,
     diasPrueba: p.dias_prueba,
     iaGenerativa: p.ia_generativa,
+    operacionOffline: p.operacion_offline,
     empresas: p.empresas,
   };
 }

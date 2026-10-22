@@ -31,6 +31,8 @@ export class ProductGrid implements OnInit {
   protected readonly loadingMore = signal(false);
   protected readonly busqueda = signal('');
   protected readonly isAgotado = isAgotado;
+  // Catalogo universal: cada prenda dice de que boutique es.
+  protected readonly esUniversal = computed(() => !this.catalogo.tienda());
 
   protected readonly visibleProducts = computed<Product[]>(() => {
     const termino = this.busqueda().trim().toLowerCase();
@@ -40,10 +42,15 @@ export class ProductGrid implements OnInit {
     const sucursal = this.filtros.sucursalSeleccionada();
     const precioMin = this.filtros.precioMin();
     const precioMax = this.filtros.precioMax();
+    const tienda = this.esUniversal() ? this.filtros.tiendaSeleccionada() : null;
 
     const productos = this.catalogo.products().filter((p) => {
+      const coincideTienda = !tienda || p.tienda === tienda;
       const coincideBusqueda =
-        !termino || p.name.toLowerCase().includes(termino) || (p.brand ?? '').toLowerCase().includes(termino);
+        !termino ||
+        p.name.toLowerCase().includes(termino) ||
+        (p.brand ?? '').toLowerCase().includes(termino) ||
+        (this.esUniversal() && (p.tiendaNombre ?? '').toLowerCase().includes(termino));
       const coincideTemporada = !temporada || p.temporada === temporada;
       const coincideCategoria = !categoria || p.category === categoria;
       const coincideMarca = marcas.size === 0 || (p.brand ? marcas.has(p.brand) : false);
@@ -51,6 +58,7 @@ export class ProductGrid implements OnInit {
       const coincidePrecioMin = precioMin === null || p.price >= precioMin;
       const coincidePrecioMax = precioMax === null || p.price <= precioMax;
       return (
+        coincideTienda &&
         coincideBusqueda &&
         coincideTemporada &&
         coincideCategoria &&

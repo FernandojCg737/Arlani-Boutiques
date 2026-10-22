@@ -12,7 +12,12 @@
               [attr.aria-label]="'Ver el catálogo de ' + logo.tienda.nombre"
             >
               @if (logo.tienda.logo) {
-                <img [src]="logo.tienda.logo" [alt]="logo.tienda.nombre" loading="lazy" />
+                <img
+                  [class.cinta__contorno]="logo.tienda.oscuro"
+                  [src]="logo.tienda.logo"
+                  [alt]="logo.tienda.nombre"
+                  loading="lazy"
+                />
               } @else {
                 <span class="cinta__nombre" [style.--color]="logo.tienda.color">
                   <i aria-hidden="true">{{ inicial(logo.tienda.nombre) }}</i>

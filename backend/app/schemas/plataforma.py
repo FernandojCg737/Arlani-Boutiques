@@ -85,6 +85,7 @@ class PlanOut(BaseModel):
     max_sucursales: int
     dias_prueba: int | None
     ia_generativa: bool
+    operacion_offline: bool
     empresas: int
 
 
@@ -108,17 +109,3 @@ class ActividadOut(BaseModel):
     detalle: str | None
     fecha: datetime
     usuario_nombre: str
-
-
-class RegistroEmpresaBoutique(BaseModel):
-    nombre: str = Field(min_length=2, max_length=120)
-    subdominio: str = Field(min_length=3, max_length=40)
-    ciudad: str | None = Field(default=None, max_length=80)
-    sucursales: int = Field(ge=1, le=10)
-    color: str = Field(pattern=COLOR_HEX)
-
-
-class RegistroEmpresaIn(BaseModel):
-    plan: str
-    periodo: Literal["mensual", "anual"] = "mensual"
-    boutique: RegistroEmpresaBoutique

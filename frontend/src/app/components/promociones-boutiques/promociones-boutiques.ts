@@ -4,9 +4,8 @@ import { Product } from '../../data/products';
 import { CatalogoPublico, isAgotado } from '../../services/catalogo-publico';
 
 // Vitrina de promociones de las boutiques de Arlani: productos con descuento
-// del catálogo público (reales, del backend). Por ahora todos son de
-// Atelier Aranier, la única boutique; cuando haya más, cada producto traerá
-// el nombre de su boutique.
+// del catálogo público de todas las tiendas activas, cada uno con el logo y
+// el nombre de la boutique que lo vende.
 @Component({
   selector: 'app-promociones-boutiques',
   imports: [RouterLink],
@@ -17,7 +16,9 @@ export class PromocionesBoutiques implements OnInit {
   private readonly catalogo = inject(CatalogoPublico);
   private readonly carril = viewChild<ElementRef<HTMLElement>>('carril');
 
-  protected readonly boutique = { nombre: 'Atelier Aranier', logo: '/img/logo.png' };
+  protected inicial(nombre: string | undefined): string {
+    return nombre?.trim()[0]?.toUpperCase() ?? '?';
+  }
 
   // Primero los que tienen stock; los agotados no se ofrecen como promoción.
   protected readonly promociones = computed<Product[]>(() =>

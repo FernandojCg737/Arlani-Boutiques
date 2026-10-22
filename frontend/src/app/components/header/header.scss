@@ -500,3 +500,30 @@ $breakpoint-desktop: 960px;
     color: #999;
   }
 }
+
+// Logo de una boutique (suele ser mas cuadrado que el de Atelier): un poco
+// mas alto para que se vea parecido. Sin logo, su nombre.
+.logo img.logo--subido {
+  height: 44px;
+  max-width: 170px;
+  object-fit: contain;
+
+  @media (min-width: $breakpoint-desktop) {
+    height: 52px;
+  }
+}
+
+.logo__nombre {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+// Boutique (tenant): al hacer scroll la barra toma su color (Atelier queda blanca).
+.site-header--tienda.scrolled {
+  background: var(--brand-dark);
+  color: var(--brand-white);
+}

@@ -6,14 +6,18 @@
     <span class="vitrina__cierre">De tu tienda para toda Bolivia.</span>
   </h2>
 
-  <ul class="vitrina__tarjetas">
-    @for (t of tarjetas; track t.imagen) {
+  <ul class="vitrina__tarjetas" [class.vitrina__tarjetas--carrusel]="tarjetas().length > 3">
+    @for (t of tarjetas(); track t.subdominio + t.imagen) {
       <li class="tarjeta" [class.tarjeta--ancha]="t.formato === 'ancha'">
         <a class="tarjeta__enlace" [routerLink]="rutaTienda(t.subdominio)"
           [attr.aria-label]="'Visitar ' + t.boutique + ', ' + enlaceTienda(t.subdominio)">
           <img class="tarjeta__foto" [src]="t.imagen" [alt]="t.alt" loading="lazy" />
           <div class="tarjeta__cartel" [style.background-color]="t.color" aria-hidden="true">
-            <img class="tarjeta__logo" [src]="t.logo" alt="" />
+            @if (t.logo) {
+              <img class="tarjeta__logo" [class.logo-contorno]="t.logoOscuro" [src]="t.logo" alt="" />
+            } @else {
+              <strong class="tarjeta__nombre">{{ t.boutique }}</strong>
+            }
             <span class="tarjeta__dominio">
               {{ enlaceTienda(t.subdominio) }}
               <svg viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8" /></svg>

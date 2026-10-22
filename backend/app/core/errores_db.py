@@ -34,6 +34,13 @@ MENSAJES: dict[str, tuple[int, str]] = {
         "No se puede bajar el límite: hay empresas que ya lo superan.",
     ),
     "plan_valores_invalidos": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Precio o límite de sucursales no válidos."),
+    # Compra de la suscripcion (/empezar)
+    "correo_en_uso": (
+        status.HTTP_409_CONFLICT,
+        "Ese correo ya tiene una cuenta en Arlani. Usa otro correo para el administrador de tu boutique.",
+    ),
+    "pago_requerido": (status.HTTP_402_PAYMENT_REQUIRED, "Este plan requiere el pago de la suscripción."),
+    "monto_pago_incorrecto": (status.HTTP_409_CONFLICT, "El monto pagado no coincide con el precio del plan."),
     "limite_sucursales_plan": (
         status.HTTP_409_CONFLICT,
         "Se alcanzó el límite de sucursales activas del plan. Cambia a un plan superior para habilitar más.",

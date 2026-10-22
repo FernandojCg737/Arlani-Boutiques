@@ -152,6 +152,11 @@ class InventarioCantidadUpdate(BaseModel):
 
 class ProductoPublicoOut(BaseModel):
     id: int
+    # Tienda que lo vende (cada boutique muestra solo lo suyo).
+    tienda: str
+    tienda_nombre: str
+    tienda_logo: str | None
+    tienda_color: str
     nombre: str
     descripcion: str | None
     precio: Decimal

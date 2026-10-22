@@ -236,3 +236,29 @@
 .price-inputs__sep {
   color: #999;
 }
+
+// Catalogo universal: cada boutique con su logo sobre su color.
+.filter-tienda {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-tienda__marca {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+
+  img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+  }
+}

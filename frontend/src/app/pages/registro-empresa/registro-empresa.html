@@ -12,7 +12,11 @@
           [class.progreso__paso--actual]="i === paso() && !creada()"
           [attr.aria-current]="i === paso() ? 'step' : null"
         >
-          <button type="button" [disabled]="i >= paso() || creada()" (click)="irAPaso(i)">
+          <button
+            type="button"
+            [disabled]="i >= paso() || creada() || procesando()"
+            (click)="irAPaso(i)"
+          >
             <span class="progreso__numero">
               @if (i < paso() || creada()) {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" /></svg>
@@ -34,7 +38,13 @@
           <span>{{ prefijoEnlace }}{{ subdominioVista() }}</span>
         </div>
         <div class="vista__cabecera" [style.background-color]="color()">
-          <span class="vista__inicial">{{ (nombreBoutique().trim() || 'T')[0].toUpperCase() }}</span>
+          @if (logo() && !logoSinVista()) {
+            <img class="vista__logo" [src]="logo()" alt="" (error)="logoSinVista.set(true)" />
+          } @else {
+            <span class="vista__inicial">{{
+              (nombreBoutique().trim() || 'T')[0].toUpperCase()
+            }}</span>
+          }
           <strong>{{ nombreBoutique().trim() || 'Tu boutique' }}</strong>
         </div>
         <div class="vista__cuerpo">
@@ -48,7 +58,10 @@
       </div>
       <div class="vista__datos">
         <span>Plan {{ plan().nombre }}</span>
-        <span>{{ sucursales() }} {{ sucursales() === 1 ? 'sucursal' : 'sucursales' }} · {{ ciudad() }}</span>
+        <span
+          >{{ sucursales() }} {{ sucursales() === 1 ? 'sucursal' : 'sucursales' }} ·
+          {{ ciudad() }}</span
+        >
       </div>
     </div>
   </aside>
@@ -60,31 +73,71 @@
       Volver a Arlani
     </a>
 
-    @if (creada()) {
-      <section class="listo">
+    @if (creada(); as c) {
+      <section class="listo" role="status">
         <div class="listo__icono">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" /></svg>
         </div>
-        <h1>¡{{ nombreBoutique().trim() }} ya es parte de Arlani!</h1>
+        <h1>{{ c.metodo === 'paypal' ? '¡Pago confirmado!' : '¡Tu prueba está activa!' }}</h1>
         <p>
-          Ya puedes cargar tus prendas. Tu tienda está en
-          <a [href]="rutaTienda(subdominioCreado())"><strong>{{ prefijoEnlace }}{{ subdominioCreado() }}</strong></a>.
+          <strong>{{ c.empresa_nombre }}</strong> ya es parte de Arlani con el plan
+          {{ c.plan_nombre }}.
+          @if (c.metodo === 'paypal') {
+            Pagaste <strong>US$ {{ c.monto_usd }}</strong> (Bs {{ c.monto_bob }}).
+          }
         </p>
-        <a class="boton boton--lleno" routerLink="/">Volver a Arlani</a>
+
+        @if (c.correo_enviado) {
+          <div class="listo__correo">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6" /></svg>
+            <span>
+              Revisa tu correo <strong>{{ c.correo_destino }}</strong>: te enviamos los datos para entrar
+              como administrador de tu boutique (usuario <strong>{{ c.admin_email }}</strong> y una
+              contraseña). Por seguridad, cambia la contraseña apenas inicies sesión.
+            </span>
+          </div>
+        } @else {
+          <p class="error-envio" role="alert">
+            Tu boutique quedó registrada, pero no pudimos enviar el correo a {{ c.correo_destino }}.
+            Escríbenos y te ayudamos con el acceso.
+          </p>
+        }
+        @if (logo() && !c.logo_guardado) {
+          <p class="campo__aviso">
+            No pudimos guardar tu logo; podrás subirlo después desde tu panel.
+          </p>
+        }
+
+        <div class="listo__acciones">
+          <button type="button" class="boton boton--lleno" (click)="irAlPanel()">
+            Entrar como administrador
+          </button>
+          <a class="boton" [href]="rutaTienda(c.subdominio)" target="_blank" rel="noopener"
+            >Ver mi tienda</a
+          >
+        </div>
       </section>
     } @else {
       <form class="formulario" (submit)="$event.preventDefault()" novalidate>
         @switch (paso()) {
           <!-- ---------------------------------------------------- 1. plan -->
           @case (0) {
-            <h1>Elegí tu plan</h1>
-            <p class="formulario__bajada">Podés cambiarlo cuando quieras desde tu panel.</p>
+            <h1>Elige tu plan</h1>
+            <p class="formulario__bajada">Puedes cambiarlo cuando quieras desde tu panel.</p>
 
             <div class="periodo" role="group" aria-label="Período de pago">
-              <button type="button" [attr.aria-pressed]="periodo() === 'mensual'" (click)="periodo.set('mensual')">
+              <button
+                type="button"
+                [attr.aria-pressed]="periodo() === 'mensual'"
+                (click)="periodo.set('mensual')"
+              >
                 Mensual
               </button>
-              <button type="button" [attr.aria-pressed]="periodo() === 'anual'" (click)="periodo.set('anual')">
+              <button
+                type="button"
+                [attr.aria-pressed]="periodo() === 'anual'"
+                (click)="periodo.set('anual')"
+              >
                 Anual <em>2 meses gratis</em>
               </button>
             </div>
@@ -92,11 +145,20 @@
             <div class="planes" role="radiogroup" aria-label="Plan">
               @for (p of planes; track p.id) {
                 <label class="plan" [class.plan--elegido]="planId() === p.id">
-                  <input type="radio" name="plan" [value]="p.id" [checked]="planId() === p.id" (change)="planId.set(p.id)" />
+                  <input
+                    type="radio"
+                    name="plan"
+                    [value]="p.id"
+                    [checked]="planId() === p.id"
+                    (change)="elegirPlan(p.id)"
+                  />
                   <span class="plan__marca" aria-hidden="true"></span>
                   <span class="plan__texto">
                     <strong>{{ p.nombre }}</strong>
-                    <span>{{ p.resumen }}</span>
+                    <span
+                      >{{ p.resumen }} Hasta {{ p.maxSucursales }}
+                      {{ p.maxSucursales === 1 ? 'sucursal' : 'sucursales' }}.</span
+                    >
                   </span>
                   <span class="plan__precio">
                     @if (esPrueba(p)) {
@@ -114,8 +176,10 @@
 
           <!-- ----------------------------------------------- 2. boutique -->
           @case (1) {
-            <h1>Contanos de tu boutique</h1>
-            <p class="formulario__bajada">Así la van a ver tus clientes. Mirá cómo queda a la izquierda.</p>
+            <h1>Cuéntanos de tu boutique</h1>
+            <p class="formulario__bajada">
+              Así la verán tus clientes. Mira cómo queda a la izquierda.
+            </p>
 
             <div class="campo">
               <label for="nombre-boutique">Nombre de la boutique</label>
@@ -153,7 +217,9 @@
                 <span class="campo__error">{{ msg }}</span>
               } @else if (enlaceOcupado()) {
                 <span class="campo__aviso">
-                  Ya hay una boutique con ese enlace: la tuya quedará como <b>{{ prefijoEnlace }}{{ enlaceFinal() }}</b>.
+                  Ya hay una boutique con ese enlace: la tuya quedará como
+                  <b>{{ prefijoEnlace }}{{ enlaceFinal() }}</b
+                  >.
                 </span>
               }
             </div>
@@ -161,19 +227,25 @@
             <div class="campo__fila">
               <div class="campo">
                 <label for="ciudad">Ciudad</label>
-                <select id="ciudad" [value]="ciudad()" (change)="ciudad.set($any($event.target).value)">
+                <select
+                  id="ciudad"
+                  [value]="ciudad()"
+                  (change)="ciudad.set($any($event.target).value)"
+                >
                   @for (c of ciudades; track c) {
                     <option [value]="c">{{ c }}</option>
                   }
                 </select>
               </div>
               <div class="campo">
-                <label for="sucursales">Sucursales</label>
+                <label for="sucursales"
+                  >Sucursales <small>(máx. {{ plan().maxSucursales }})</small></label
+                >
                 <input
                   id="sucursales"
                   type="number"
                   min="1"
-                  [max]="maxSucursales"
+                  [max]="plan().maxSucursales"
                   inputmode="numeric"
                   [value]="sucursales()"
                   [attr.aria-invalid]="!!error('sucursales')"
@@ -181,20 +253,18 @@
                 />
                 @if (error('sucursales'); as msg) {
                   <span class="campo__error">{{ msg }}</span>
+                } @else {
+                  <span class="campo__ayuda">
+                    El plan {{ plan().nombre }} admite hasta {{ plan().maxSucursales }}.
+                    @if (plan().maxSucursales < 10) {
+                      <button type="button" class="enlace-boton" (click)="irAPaso(0)">
+                        Ver planes
+                      </button>
+                    }
+                  </span>
                 }
               </div>
             </div>
-
-            @if (planSugerido(); as sugerido) {
-              <div class="aviso">
-                <span>
-                  El plan {{ plan().nombre }} cubre hasta {{ plan().maxSucursales }}
-                  {{ plan().maxSucursales === 1 ? 'sucursal' : 'sucursales' }}. Para {{ sucursales() }} te conviene el plan
-                  <strong>{{ sugerido.nombre }}</strong>.
-                </span>
-                <button type="button" (click)="planId.set(sugerido.id)">Cambiar a {{ sugerido.nombre }}</button>
-              </div>
-            }
 
             <fieldset class="colores">
               <legend>Color de tu marca</legend>
@@ -209,39 +279,157 @@
                     (click)="color.set(c.valor)"
                   ></button>
                 }
+                <!-- Selector RGB: cualquier color -->
+                <label
+                  class="colores__muestra colores__rgb"
+                  [class.colores__rgb--elegido]="colorPropio()"
+                  [style.--propio]="colorPropio() ? color() : null"
+                  title="Elegir cualquier color"
+                >
+                  <input
+                    type="color"
+                    aria-label="Elegir cualquier color"
+                    [value]="color()"
+                    (input)="alElegirColor($any($event.target).value)"
+                  />
+                </label>
+                <span class="colores__hex">
+                  <i [style.background-color]="color()" aria-hidden="true"></i>
+                  <input
+                    type="text"
+                    maxlength="7"
+                    spellcheck="false"
+                    aria-label="Código del color (hexadecimal)"
+                    [value]="color()"
+                    (change)="alElegirColor($any($event.target).value)"
+                  />
+                </span>
+              </div>
+            </fieldset>
+
+            <div class="campo">
+              <span class="campo__titulo">Logo de tu boutique <small>(opcional)</small></span>
+              <div class="logo">
+                <div class="logo__muestra" [style.background-color]="color()">
+                  @if (logo() && !logoSinVista()) {
+                    <img [src]="logo()" alt="Logo elegido" (error)="logoSinVista.set(true)" />
+                  } @else if (logo()) {
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5" />
+                    </svg>
+                  } @else {
+                    <span>{{ (nombreBoutique().trim() || 'T')[0].toUpperCase() }}</span>
+                  }
+                </div>
+                <div class="logo__acciones">
+                  <label class="boton boton--chico">
+                    {{ logo() ? 'Cambiar logo' : 'Subir logo' }}
+                    <input
+                      type="file"
+                      accept="image/*,.heic,.heif,.avif,.svg,.tif,.tiff"
+                      (change)="alElegirLogo($any($event.target))"
+                    />
+                  </label>
+                  @if (logo()) {
+                    <button type="button" class="enlace-boton" (click)="quitarLogo()">
+                      Quitar
+                    </button>
+                    <small class="logo__nombre">{{ logoNombre() }}</small>
+                  } @else {
+                    <small
+                      >Cualquier formato de imagen (PNG, JPG, SVG, WEBP, HEIC…), hasta 5 MB.</small
+                    >
+                  }
+                </div>
+              </div>
+              @if (errorLogo()) {
+                <span class="campo__error">{{ errorLogo() }}</span>
+              }
+            </div>
+
+            <fieldset class="admin">
+              <legend>Cuenta del administrador</legend>
+              <p>
+                Con este correo entrarás al panel de tu boutique. La contraseña te la enviaremos a tu
+                correo <strong>{{ auth.currentUser()?.email }}</strong>.
+              </p>
+              <div class="campo__fila">
+                <div class="campo">
+                  <label for="admin-nombre">Nombre</label>
+                  <input
+                    id="admin-nombre"
+                    type="text"
+                    maxlength="150"
+                    autocomplete="name"
+                    [value]="adminNombre()"
+                    [attr.aria-invalid]="!!error('adminNombre')"
+                    (input)="adminNombre.set($any($event.target).value)"
+                  />
+                  @if (error('adminNombre'); as msg) {
+                    <span class="campo__error">{{ msg }}</span>
+                  }
+                </div>
+                <div class="campo">
+                  <label for="admin-email">Correo</label>
+                  <input
+                    id="admin-email"
+                    type="email"
+                    maxlength="150"
+                    autocomplete="email"
+                    placeholder="admin@tuboutique.com"
+                    [value]="adminEmail()"
+                    [attr.aria-invalid]="!!error('adminEmail')"
+                    (input)="adminEmail.set($any($event.target).value)"
+                  />
+                  @if (error('adminEmail'); as msg) {
+                    <span class="campo__error">{{ msg }}</span>
+                  }
+                </div>
               </div>
             </fieldset>
           }
 
-          <!-- ---------------------------------------------- 3. confirmar -->
+          <!-- ---------------------------------------- 3. confirmar y pagar -->
           @case (2) {
-            <h1>Revisá y confirmá</h1>
-            <p class="formulario__bajada">Si algo no está bien, volvé al paso que quieras desde la izquierda.</p>
+            <h1>Confirma y paga</h1>
+            <p class="formulario__bajada">
+              Si algo no está bien, vuelve al paso que quieras desde la izquierda.
+            </p>
 
             <dl class="resumen">
               <div>
                 <dt>Boutique</dt>
-                <dd>{{ nombreBoutique().trim() }}</dd>
+                <dd class="resumen__marca">
+                  <i [style.background-color]="color()" aria-hidden="true"></i>
+                  {{ nombreBoutique().trim() }}
+                </dd>
               </div>
               <div>
                 <dt>Enlace</dt>
-                <dd>{{ prefijoEnlace }}{{ enlaceFinal() }}</dd>
+                <dd>{{ prefijoEnlace }}{{ cotizacion()?.subdominio ?? enlaceFinal() }}</dd>
               </div>
               <div>
                 <dt>Ciudad y sucursales</dt>
-                <dd>{{ ciudad() }} · {{ sucursales() }} {{ sucursales() === 1 ? 'sucursal' : 'sucursales' }}</dd>
+                <dd>
+                  {{ ciudad() }} · {{ sucursales() }}
+                  {{ sucursales() === 1 ? 'sucursal' : 'sucursales' }}
+                </dd>
               </div>
-              @if (auth.currentUser(); as usuario) {
-                <div>
-                  <dt>Administrador</dt>
-                  <dd>{{ usuario.nombre }} · {{ usuario.email }}</dd>
-                </div>
-              }
+              <div>
+                <dt>Administrador</dt>
+                <dd>{{ adminNombre().trim() }} · {{ adminEmail().trim() }}</dd>
+              </div>
               <div>
                 <dt>Plan</dt>
                 <dd>
                   {{ plan().nombre }} ·
-                  {{ esPrueba(plan()) ? plan().diasPrueba + ' días gratis' : periodo() === 'anual' ? 'Anual' : 'Mensual' }}
+                  {{
+                    esPrueba(plan())
+                      ? plan().diasPrueba + ' días gratis'
+                      : periodo() === 'anual'
+                        ? 'Anual'
+                        : 'Mensual'
+                  }}
                 </dd>
               </div>
             </dl>
@@ -252,25 +440,84 @@
                 <strong>Gratis</strong>
               } @else {
                 <span>{{ periodo() === 'anual' ? 'Total por año' : 'Total por mes' }}</span>
-                <strong>Bs {{ (periodo() === 'anual' ? precioAnio() : precioMes()).toLocaleString('es-BO') }}</strong>
+                <span class="total__montos">
+                  <strong
+                    >Bs
+                    {{
+                      (periodo() === 'anual' ? precioAnio() : precioMes()).toLocaleString('es-BO')
+                    }}</strong
+                  >
+                  @if (cotizacion(); as cot) {
+                    <small>
+                      Pagas <b>US$ {{ cot.monto_usd }}</b> con PayPal · tipo de cambio oficial Bs
+                      {{ cot.tipo_cambio }}
+                    </small>
+                  } @else if (cotizando()) {
+                    <small>Calculando el monto en dólares…</small>
+                  }
+                </span>
               }
             </div>
 
             @if (errorEnvio()) {
-              <p class="error-envio" role="alert">{{ errorEnvio() }}</p>
+              <p class="error-envio" role="alert">
+                {{ errorEnvio() }}
+                @if (!cotizacion() && !cotizando()) {
+                  <button type="button" class="enlace-boton" (click)="reintentarCotizacion()">
+                    Reintentar
+                  </button>
+                }
+              </p>
+            }
+
+            @if (mostrarPago() && !esPrueba(plan())) {
+              <section class="pago" aria-label="Pago con PayPal">
+                @if (procesando()) {
+                  <p class="pago__procesando" role="status">
+                    Confirmando tu pago y registrando tu boutique…
+                  </p>
+                }
+                <div
+                  #contenedorPaypal
+                  class="pago__paypal"
+                  [class.pago__paypal--oculto]="procesando()"
+                ></div>
+                <small
+                  >Pago seguro con PayPal o tarjeta. Se cobran US$
+                  {{ cotizacion()?.monto_usd }}.</small
+                >
+              </section>
             }
           }
         }
 
         <div class="acciones">
           @if (paso() > 0) {
-            <button type="button" class="boton" (click)="anterior()">Atrás</button>
+            <button type="button" class="boton" [disabled]="procesando()" (click)="anterior()">
+              Atrás
+            </button>
           }
           @if (paso() < 2) {
-            <button type="submit" class="boton boton--lleno" (click)="siguiente()">Continuar</button>
-          } @else {
-            <button type="submit" class="boton boton--lleno" [disabled]="enviando()" (click)="crear()">
-              {{ enviando() ? 'Creando tu boutique…' : 'Crear mi boutique' }}
+            <button type="submit" class="boton boton--lleno" (click)="siguiente()">
+              Continuar
+            </button>
+          } @else if (esPrueba(plan())) {
+            <button
+              type="submit"
+              class="boton boton--lleno"
+              [disabled]="!cotizacion() || procesando()"
+              (click)="activarPrueba()"
+            >
+              {{ procesando() ? 'Activando tu prueba…' : 'Activar mi prueba gratis' }}
+            </button>
+          } @else if (!mostrarPago()) {
+            <button
+              type="submit"
+              class="boton boton--lleno"
+              [disabled]="!cotizacion()"
+              (click)="pagar()"
+            >
+              Pagar mi suscripción
             </button>
           }
         </div>

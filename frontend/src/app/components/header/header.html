@@ -1,11 +1,20 @@
-<header class="site-header" [class.scrolled]="scrolled()">
+<header class="site-header" [class.scrolled]="scrolled()" [class.site-header--tienda]="!tienda.esOriginal()">
   <div class="header-inner">
-    <a class="logo" routerLink="/atelier" (click)="closeMobileMenu()">
-      <img src="/img/logo.png" alt="Atelier Aranier" />
+    <a class="logo" [routerLink]="tienda.rutaInicio()" (click)="closeMobileMenu()">
+      @if (tienda.logo(); as logo) {
+        <img
+          [src]="logo"
+          [alt]="tienda.nombre()"
+          [class.logo--subido]="!tienda.esOriginal()"
+          [class.logo-contorno]="tienda.logoOscuro()"
+        />
+      } @else {
+        <span class="logo__nombre">{{ tienda.nombre() }}</span>
+      }
     </a>
 
     <nav class="nav-desktop">
-      @for (link of navLinks; track link.label) {
+      @for (link of navLinks(); track link.label) {
         <a [routerLink]="link.path" [queryParams]="link.queryParams">{{ link.label }}</a>
       }
     </nav>
@@ -176,7 +185,7 @@
   </div>
 
   <nav class="mobile-nav">
-    @for (link of navLinks; track link.label) {
+    @for (link of navLinks(); track link.label) {
       <a [routerLink]="link.path" [queryParams]="link.queryParams" (click)="closeMobileMenu()">{{ link.label }}</a>
     }
 

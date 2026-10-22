@@ -1,10 +1,10 @@
 @if (cargando()) {
   <div class="tienda tienda--cargando" aria-busy="true"></div>
 } @else if (tienda(); as t) {
-  <section class="tienda" [style.--color]="t.color_marca">
+  <section class="tienda" [style.--color]="colorPortada(t.color_marca)">
     <div class="tienda__portada">
       @if (t.logo_url) {
-        <img class="tienda__logo" [src]="t.logo_url" [alt]="t.nombre" />
+        <img class="tienda__logo" [class.logo-contorno]="logoOscuro()" [src]="t.logo_url" [alt]="t.nombre" />
       } @else {
         <span class="tienda__inicial" aria-hidden="true">{{ inicial(t.nombre) }}</span>
       }
@@ -21,12 +21,19 @@
           <p>Vuelve a intentarlo más tarde o mira otras boutiques de Arlani.</p>
           <a class="tienda__boton" routerLink="/">Ver boutiques</a>
         </div>
+      } @else if (t.tiene_catalogo) {
+        <div class="tienda__catalogo">
+          <app-shop-filters class="tienda__filtros" />
+          <app-product-grid class="tienda__grilla" />
+        </div>
       } @else {
         <div class="tienda__aviso">
           <h2>Estamos preparando nuestro catálogo en línea</h2>
           <p>Mientras tanto, visítanos en nuestras sucursales.</p>
         </div>
+      }
 
+      @if (t.estado !== 'suspendida') {
         @if (t.sucursales.length) {
           <h2 class="tienda__titulo">Sucursales</h2>
           <ul class="sucursales">

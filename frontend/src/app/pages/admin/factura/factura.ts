@@ -4,6 +4,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { MarcaTienda } from '../../../services/marca-tienda';
 
 interface DetalleVenta {
   id: number;
@@ -46,6 +47,8 @@ const METODO_LABEL: Record<string, string> = {
   styleUrl: './factura.scss',
 })
 export class AdminFactura implements OnInit {
+  // Logo, nombre y contacto de la tienda que emite el comprobante.
+  protected readonly marca = inject(MarcaTienda);
   private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);
 
@@ -55,6 +58,7 @@ export class AdminFactura implements OnInit {
   protected readonly metodoLabel = METODO_LABEL;
 
   ngOnInit(): void {
+    void this.marca.cargar();
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.error.set('Venta no encontrada.');

@@ -131,6 +131,20 @@
         </div>
       }
       <div class="comparacion__fila" role="row">
+        <span role="cell">Operación offline</span>
+        @for (p of planes(); track p.codigo) {
+          @if (p.operacionOffline) {
+            <span role="cell" class="si" aria-label="Sí">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7" /></svg>
+            </span>
+          } @else {
+            <span role="cell" class="no" aria-label="No">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+            </span>
+          }
+        }
+      </div>
+      <div class="comparacion__fila" role="row">
         <span role="cell">Reportes generativos con IA</span>
         @for (p of planes(); track p.codigo) {
           @if (p.iaGenerativa) {

@@ -1,3 +1,11 @@
+// Mi cuenta es de la plataforma Arlani Boutiques: su azul noche (en lugar del
+// verde de la tienda Atelier) y el fondo marfil, como el carrito.
+:host {
+  --brand-dark: #121a2c;
+  display: block;
+  background: #f7f4f2;
+}
+
 .perfil-page {
   max-width: 1100px;
   margin: 0 auto;

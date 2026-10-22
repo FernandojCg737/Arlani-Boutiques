@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.session import get_db
+from app.db.session import get_db, limitar_a_empresa
 from app.models import Usuario
 from app.services.usuarios import codigos_permiso
 
@@ -16,12 +16,22 @@ bearer_scheme = HTTPBearer(auto_error=False)
 # Administrador de una tienda, y ademas gestiona empresas y planes.
 ADMIN_TIPOS = {"administrador", "superadministrador"}
 STAFF_TIPOS = {*ADMIN_TIPOS, "encargado_sucursal", "cajero"}
+# Personal de una tienda: sus peticiones solo ven los datos de su empresa.
+PERSONAL_DE_TIENDA = {"administrador", "encargado_sucursal", "cajero"}
 
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> Usuario:
+    usuario = _usuario_del_token(credentials, db)
+    # El SuperAdministrador y los clientes (sin empresa) ven toda la plataforma.
+    if usuario.empresa_id is not None and usuario.tipo in PERSONAL_DE_TIENDA:
+        limitar_a_empresa(db, usuario.empresa_id)
+    return usuario
+
+
+def _usuario_del_token(credentials: HTTPAuthorizationCredentials | None, db: Session) -> Usuario:
     if credentials is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No autenticado.")
 
@@ -57,7 +67,7 @@ def get_current_user_optional(
     if credentials is None:
         return None
     try:
-        return get_current_user(credentials, db)
+        return _usuario_del_token(credentials, db)
     except HTTPException:
         return None
 

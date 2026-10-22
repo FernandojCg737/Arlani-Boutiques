@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -45,6 +45,8 @@ class Temporada(Base):
     nombre: Mapped[str] = mapped_column(String(100))
     fecha_inicio: Mapped[date] = mapped_column(Date)
     fecha_fin: Mapped[date] = mapped_column(Date)
+    # Cada tienda tiene sus temporadas (la base pone la empresa de quien la crea).
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), server_default=text("fn_empresa_para_alta()"))
 
     colecciones: Mapped[list["Coleccion"]] = relationship(back_populates="temporada")
     productos: Mapped[list["Producto"]] = relationship(back_populates="temporada")
@@ -66,7 +68,9 @@ class Marca(Base):
     __tablename__ = "marca"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100), unique=True)
+    nombre: Mapped[str] = mapped_column(String(100))
+    # Cada tienda tiene sus marcas (unicas por empresa).
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), server_default=text("fn_empresa_para_alta()"))
 
     productos: Mapped[list["Producto"]] = relationship(back_populates="marca")
 
@@ -94,6 +98,8 @@ class Producto(Base):
     proveedor_id: Mapped[int] = mapped_column(ForeignKey("proveedor.id"))
     temporada_id: Mapped[int] = mapped_column(ForeignKey("temporada.id"))
     coleccion_id: Mapped[int] = mapped_column(ForeignKey("coleccion.id"))
+    # Tienda duena del producto (la pone la base: la empresa de quien lo crea).
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), server_default=text("fn_empresa_para_alta()"))
     nombre: Mapped[str] = mapped_column(String(150))
     descripcion: Mapped[str | None] = mapped_column(Text)
     precio: Mapped[Decimal] = mapped_column(Numeric(10, 2))
@@ -105,6 +111,7 @@ class Producto(Base):
     proveedor: Mapped["Proveedor"] = relationship(back_populates="productos")
     temporada: Mapped["Temporada"] = relationship(back_populates="productos")
     coleccion: Mapped["Coleccion"] = relationship(back_populates="productos")
+    empresa: Mapped["Empresa"] = relationship()
     inventarios: Mapped[list["Inventario"]] = relationship(back_populates="producto")
     items_linea: Mapped[list["ItemLinea"]] = relationship(back_populates="producto")
     recomendaciones: Mapped[list["Recomendacion"]] = relationship(back_populates="producto")

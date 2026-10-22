@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BOUTIQUES } from '../../data/boutiques';
+import { esLogoOscuro } from '../../services/marca-tienda';
 import { rutaTienda } from '../../services/plataforma';
 import { TiendaPublicaApi } from '../../services/tienda-publica';
 
@@ -14,6 +15,8 @@ interface TiendaEnCinta {
   // Sin logo se muestra su inicial y su nombre con el color de la marca.
   logo: string | null;
   color: string;
+  // Logo oscuro: lleva contorno claro sobre la cinta oscura.
+  oscuro?: boolean;
 }
 
 interface LogoEnCinta {
@@ -48,16 +51,16 @@ export class CarruselBoutiques {
   private async cargar(): Promise<void> {
     try {
       const tiendas = await this.api.listar();
-      this.logos.set(
-        this.armarCinta(
-          tiendas.map((t) => ({
-            nombre: t.nombre,
-            ruta: rutaTienda(t.subdominio),
-            logo: t.logo_url,
-            color: t.color_marca,
-          })),
-        ),
+      const lista: TiendaEnCinta[] = await Promise.all(
+        tiendas.map(async (t) => ({
+          nombre: t.nombre,
+          ruta: rutaTienda(t.subdominio),
+          logo: t.logo_url,
+          color: t.color_marca,
+          oscuro: t.logo_url?.startsWith('http') ? await esLogoOscuro(t.logo_url) : false,
+        })),
       );
+      this.logos.set(this.armarCinta(lista));
     } catch {
       // sin servidor queda la lista fija
     }

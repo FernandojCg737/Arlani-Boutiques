@@ -31,6 +31,9 @@ export interface TiendaPublica {
   logo_url: string | null;
   estado: 'activa' | 'suspendida';
   tiene_catalogo: boolean;
+  // La tienda original tiene su sitio completo; las demas muestran su
+  // catalogo dentro de su pagina.
+  sitio_propio: boolean;
   sucursales: SucursalPublica[];
 }
 
@@ -74,14 +77,14 @@ export function tiendaMatcher(segmentos: UrlSegment[]): UrlMatchResult | null {
   return { consumed: segmentos, posParams: { subdominio: new UrlSegment(coincide[1], {}) } };
 }
 
-// La ruta del catalogo solo aplica si la tienda esta activa y ya tiene
-// productos; si no, la siguiente ruta muestra su ficha (sucursales, avisos).
+// Toda boutique activa usa la pagina de tienda (su logo, su color, portada con
+// video y catalogo); una suspendida o inexistente, la ficha de la plataforma.
 export const tieneCatalogoGuard: CanMatchFn = async (_route: Route, segmentos: UrlSegment[]) => {
   const subdominio = tiendaMatcher(segmentos)?.posParams?.['subdominio']?.path;
   if (!subdominio) return false;
   try {
     const tienda = await inject(TiendaPublicaApi).obtener(subdominio);
-    return !!tienda && tienda.estado === 'activa' && tienda.tiene_catalogo;
+    return !!tienda && tienda.estado === 'activa';
   } catch {
     return false;
   }

@@ -1,6 +1,8 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from psycopg2.errors import InsufficientPrivilege
+from sqlalchemy.exc import DBAPIError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.v1.router import api_router
@@ -28,6 +30,18 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+
+@app.exception_handler(DBAPIError)
+async def datos_de_otra_tienda(request: Request, exc: DBAPIError) -> JSONResponse:
+    # Row Level Security (migracion a8d3f1c6e924): el personal de una tienda
+    # quiso tocar datos de otra empresa. Cualquier otro error de base sigue
+    # siendo un 500.
+    if isinstance(exc.orig, InsufficientPrivilege) and "row-level security" in str(exc.orig):
+        return JSONResponse(
+            status_code=403, content={"detail": "No tienes acceso a ese dato: pertenece a otra tienda."}
+        )
+    raise exc
 
 
 @app.get("/health", tags=["health"])

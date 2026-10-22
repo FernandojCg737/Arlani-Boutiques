@@ -530,3 +530,101 @@ $gris: #777;
     color: #999;
   }
 }
+
+// ------------------------------------------------------------- tu marca
+.marca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 24px;
+  margin-top: 16px;
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid $borde;
+
+  p {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: $gris;
+  }
+}
+
+.marca__muestra {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 800;
+
+  img {
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    object-fit: contain;
+  }
+}
+
+.marca__datos {
+  flex: 1;
+  min-width: 240px;
+}
+
+.marca__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+
+  input[type='file'] {
+    display: none;
+  }
+}
+
+.marca__color {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid $borde;
+  cursor: pointer;
+
+  input {
+    width: 34px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  span {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    font-size: 13px;
+    text-transform: uppercase;
+    color: var(--brand-dark);
+  }
+}
+
+.marca__descartar {
+  padding: 0;
+  border: none;
+  background: none;
+  color: $gris;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.marca__error {
+  color: #b3261e !important;
+}
+
+.marca__ok {
+  color: #2e7d32 !important;
+}

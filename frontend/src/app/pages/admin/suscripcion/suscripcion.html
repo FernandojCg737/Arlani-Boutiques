@@ -129,6 +129,42 @@
       </div>
     </section>
 
+    <!-- Marca de la tienda -->
+    <section class="marca">
+      <div class="marca__muestra" [style.background-color]="colorVista()">
+        @if (logoVista(); as logo) {
+          <img [src]="logo" [alt]="marca.nombre()" />
+        } @else {
+          <span>{{ marca.inicial() }}</span>
+        }
+      </div>
+      <div class="marca__datos">
+        <span class="etiqueta">Tu marca</span>
+        <p>El logo y el color con los que se ven tu panel, tus reportes y tu tienda.</p>
+        <div class="marca__acciones">
+          <label class="boton boton--borde">
+            {{ marca.logo() ? 'Cambiar logo' : 'Subir logo' }}
+            <input type="file" accept="image/*,.heic,.heif,.avif,.svg,.tif,.tiff" (change)="alElegirLogo($any($event.target))" />
+          </label>
+          <label class="marca__color">
+            <input type="color" [value]="colorVista()" (input)="alElegirColor($any($event.target).value)" aria-label="Color de la marca" />
+            <span>{{ colorVista() }}</span>
+          </label>
+          @if (hayCambiosMarca()) {
+            <button type="button" class="boton boton--lleno" [disabled]="guardandoMarca()" (click)="guardarMarca()">
+              {{ guardandoMarca() ? 'Guardando…' : 'Guardar cambios' }}
+            </button>
+            <button type="button" class="marca__descartar" (click)="descartarMarca()">Descartar</button>
+          }
+        </div>
+        @if (errorMarca()) {
+          <p class="marca__error" role="alert">{{ errorMarca() }}</p>
+        } @else if (avisoMarca()) {
+          <p class="marca__ok" role="status">{{ avisoMarca() }}</p>
+        }
+      </div>
+    </section>
+
     <!-- Planes -->
     <section class="planes">
       <div class="seccion-titulo">
@@ -152,6 +188,9 @@
             </p>
             <ul>
               <li>Hasta {{ p.max_sucursales }} {{ p.max_sucursales === 1 ? 'sucursal' : 'sucursales' }}</li>
+              <li [class.no]="!p.operacion_offline">
+                {{ p.operacion_offline ? 'Operación offline (vende sin internet)' : 'Sin operación offline' }}
+              </li>
               <li [class.no]="!p.ia_generativa">{{ p.ia_generativa ? 'IA generativa incluida' : 'Sin IA generativa' }}</li>
             </ul>
             @if (p.codigo === d.plan_codigo) {

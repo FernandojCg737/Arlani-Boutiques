@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CarruselBoutiques } from '../../components/carrusel-boutiques/carrusel-boutiques';
 import { CtaFinal } from '../../components/cta-final/cta-final';
 import { FuncionesPlataforma } from '../../components/funciones-plataforma/funciones-plataforma';
@@ -7,6 +7,7 @@ import { PorQueArlani } from '../../components/por-que-arlani/por-que-arlani';
 import { PreciosPlanes } from '../../components/precios-planes/precios-planes';
 import { PromocionesBoutiques } from '../../components/promociones-boutiques/promociones-boutiques';
 import { VitrinaBoutiques } from '../../components/vitrina-boutiques/vitrina-boutiques';
+import { CatalogoPublico } from '../../services/catalogo-publico';
 
 // Portada de la plataforma Arlani Boutiques. El inicio de la tienda Atelier
 // Aranier (novedades, descuentos, Instagram...) vive ahora en /atelier.
@@ -26,6 +27,11 @@ import { VitrinaBoutiques } from '../../components/vitrina-boutiques/vitrina-bou
   styleUrl: './home.scss',
 })
 export class Home {
+  constructor() {
+    // La portada de Arlani muestra las promociones de todas las boutiques.
+    inject(CatalogoPublico).tienda.set(null);
+  }
+
   // Completan "TU BOUTIQUE PUEDE SER…" en el hero (van rotando).
   protected readonly frasesHero = ['online', 'imparable', 'inteligente', 'multisucursal', 'tendencia'];
 }

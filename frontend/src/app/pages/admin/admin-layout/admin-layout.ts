@@ -1,6 +1,7 @@
 import { Component, HostListener, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../../../services/auth';
+import { MarcaTienda } from '../../../services/marca-tienda';
 import { ADMIN_MENU, AdminUseCase } from '../admin-menu';
 
 // CU15 (Actualizar Perfil de Usuario) es autoservicio: cualquier personal
@@ -16,7 +17,13 @@ const SIEMPRE_PERMITIDO = new Set(['CU15']);
 })
 export class AdminLayout {
   protected readonly auth = inject(Auth);
+  // Logo, nombre y color de la tienda del usuario (no los de Atelier fijos).
+  protected readonly marca = inject(MarcaTienda);
   private readonly router = inject(Router);
+
+  constructor() {
+    void this.marca.cargar();
+  }
 
   protected readonly menu = ADMIN_MENU;
   protected readonly openPackage = signal<string | null>(null);

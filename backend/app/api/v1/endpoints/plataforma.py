@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_superadmin
+from app.api.deps import require_superadmin
 from app.core.audit import set_client_ip_for_trigger
 from app.core.errores_db import http_desde_pg
 from app.db.session import get_db
@@ -28,13 +28,10 @@ from app.schemas.plataforma import (
     LimiteSucursalesOut,
     PlanOut,
     PlanUpdate,
-    RegistroEmpresaIn,
     ResumenPlataformaOut,
 )
 
 router = APIRouter()
-# Alta de boutiques desde la portada (/empezar): cualquier usuario con sesion.
-registro_router = APIRouter()
 
 
 def _contexto_auditoria(db: Session, usuario: Usuario, request: Request) -> None:
@@ -224,7 +221,7 @@ def limite_sucursales(
 def listar_planes(db: Session = Depends(get_db), _: Usuario = Depends(require_superadmin)) -> list[PlanOut]:
     filas = db.execute(
         text(
-            "SELECT p.id, p.codigo, p.nombre, p.precio_mensual, p.max_sucursales, p.dias_prueba, p.ia_generativa, "
+            "SELECT p.id, p.codigo, p.nombre, p.precio_mensual, p.max_sucursales, p.dias_prueba, p.ia_generativa, p.operacion_offline, "
             "(SELECT count(*) FROM suscripcion su WHERE su.plan_id = p.id AND su.estado = 'activa') AS empresas "
             "FROM plan_suscripcion p WHERE p.activo ORDER BY p.orden"
         )
@@ -252,43 +249,3 @@ def actualizar_plan(
         },
     )
     return next(p for p in listar_planes(db, usuario) if p.codigo == codigo)
-
-
-# ------------------------------------------- alta desde la portada (/empezar)
-
-
-@registro_router.get("/enlace-disponible")
-def enlace_disponible(
-    texto: str, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)
-) -> dict:
-    # Enlace que quedaria para la tienda: si ya lo usa otra, con un numero al
-    # final (el mismo criterio que aplica sp_crear_empresa al guardar).
-    subdominio = db.execute(text("SELECT fn_subdominio_disponible(:t)"), {"t": texto[:80]}).scalar()
-    return {"subdominio": subdominio}
-
-
-@registro_router.post("/registro", status_code=status.HTTP_201_CREATED)
-def registrar_empresa(
-    payload: RegistroEmpresaIn,
-    request: Request,
-    db: Session = Depends(get_db),
-    usuario: Usuario = Depends(get_current_user),
-) -> dict:
-    # El usuario con sesion queda como propietario de la nueva boutique.
-    _contexto_auditoria(db, usuario, request)
-    empresa_id = _ejecutar(
-        db,
-        "SELECT sp_crear_empresa(:nombre, :subdominio, :ciudad, :color, :email, :plan, :periodo, :propietario)",
-        {
-            "nombre": payload.boutique.nombre,
-            "subdominio": payload.boutique.subdominio,
-            "ciudad": payload.boutique.ciudad,
-            "color": payload.boutique.color,
-            "email": usuario.email,
-            "plan": payload.plan,
-            "periodo": payload.periodo,
-            "propietario": usuario.id,
-        },
-    )
-    subdominio = db.execute(text("SELECT subdominio FROM empresa WHERE id = :id"), {"id": empresa_id}).scalar()
-    return {"id": empresa_id, "subdominio": subdominio}

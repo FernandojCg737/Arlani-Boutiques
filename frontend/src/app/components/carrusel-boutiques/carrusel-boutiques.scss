@@ -136,3 +136,20 @@
     animation: none;
   }
 }
+
+// Logo subido por una tienda (cualquier color): sobre una placa clara para
+// que se vea en la cinta oscura.
+// Logo oscuro sobre la cinta oscura: contorno claro (ademas del gris que
+// tienen todos los logos hasta pasar el cursor).
+.cinta__logo img.cinta__contorno {
+  max-height: 56px;
+  filter: grayscale(1) drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff)
+    drop-shadow(0 -1px 0 #fff);
+}
+
+@media (hover: hover) {
+  .cinta__logo:hover img.cinta__contorno {
+    filter: drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff)
+      drop-shadow(0 -1px 0 #fff);
+  }
+}

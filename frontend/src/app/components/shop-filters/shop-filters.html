@@ -4,6 +4,35 @@
     <button type="button" class="shop-filters__clear" (click)="limpiarFiltros()">Limpiar</button>
   </div>
 
+  @if (esUniversal()) {
+    <section class="filter-group">
+      <h3>Boutique</h3>
+      <label class="filter-check" [class.filter-check--active]="!tiendaSeleccionada()">
+        <input type="checkbox" [checked]="!tiendaSeleccionada()" (change)="seleccionarTienda(null)" />
+        <span>Todas las Boutiques</span>
+      </label>
+      @for (t of tiendas(); track t.subdominio) {
+        <label class="filter-check" [class.filter-check--active]="tiendaSeleccionada() === t.subdominio">
+          <input
+            type="checkbox"
+            [checked]="tiendaSeleccionada() === t.subdominio"
+            (change)="seleccionarTienda(t.subdominio)"
+          />
+          <span class="filter-tienda">
+            <span class="filter-tienda__marca" [style.background-color]="t.color">
+              @if (t.logo) {
+                <img [src]="t.logo" alt="" />
+              } @else {
+                {{ inicial(t.nombre) }}
+              }
+            </span>
+            {{ t.nombre }}
+          </span>
+        </label>
+      }
+    </section>
+  }
+
   <section class="filter-group">
     <h3>Sucursal</h3>
     <label class="filter-check filter-check--stacked">

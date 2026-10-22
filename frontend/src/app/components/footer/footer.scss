@@ -162,3 +162,24 @@ a.site-footer__info-row:hover {
     }
   }
 }
+
+// Logo de una boutique (mas cuadrado que el de Atelier) y, sin logo, su nombre.
+.site-footer__logo--subido {
+  height: 64px !important;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+}
+
+.site-footer__nombre {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+// Boutique (tenant): el pie toma su color (Atelier queda negro).
+.site-footer--tienda {
+  background: var(--brand-dark);
+}

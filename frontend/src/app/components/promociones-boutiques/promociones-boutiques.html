@@ -26,8 +26,12 @@
               <img [src]="p.image" [alt]="p.name" loading="lazy" />
               <span class="promo__descuento">{{ p.discountLabel }}</span>
               <span class="promo__boutique">
-                <img [src]="boutique.logo" alt="" />
-                {{ boutique.nombre }}
+                @if (p.tiendaLogo) {
+                  <img [src]="p.tiendaLogo" alt="" />
+                } @else {
+                  <i class="promo__inicial" [style.background-color]="p.tiendaColor">{{ inicial(p.tiendaNombre) }}</i>
+                }
+                {{ p.tiendaNombre }}
               </span>
             </div>
             <span class="promo__nombre">{{ p.name }}</span>

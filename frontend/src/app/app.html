@@ -27,7 +27,8 @@
     <!-- El asistente es de la tienda Atelier Aranier: no va en la portada de Arlani -->
     <app-footer />
     <app-whatsapp-float />
-    @if (auth.hasPermiso('CU19')) {
+    <!-- El asistente conoce el catalogo de Atelier: solo en su tienda -->
+    @if (auth.hasPermiso('CU19') && tiendaActiva.esOriginal()) {
       <app-chatbot-widget />
     }
   }

@@ -12,6 +12,7 @@ import { LoginRequeridoModal } from './components/login-requerido/login-requerid
 import { WhatsappFloat } from './components/whatsapp-float/whatsapp-float';
 import { Auth } from './services/auth';
 import { InactivitySession } from './services/inactivity-session';
+import { TiendaActiva } from './services/tienda-activa';
 
 @Component({
   imports: [RouterOutlet, Header, HeaderPlataforma, Footer, FooterPlataforma, WhatsappFloat, ChatbotWidget, LoginRequeridoModal],
@@ -25,6 +26,7 @@ export class App implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly viewportScroller = inject(ViewportScroller);
   protected readonly auth = inject(Auth);
+  protected readonly tiendaActiva = inject(TiendaActiva);
   // Se inyecta para que arranque: vigila inactividad (30 min) y valida la
   // sesion contra el backend mientras haya un usuario logueado.
   private readonly inactivitySession = inject(InactivitySession);
@@ -63,6 +65,8 @@ export class App implements OnInit {
         while (current.firstChild) current = current.firstChild;
         this.hideChrome.set(!!current.data['hideChrome']);
         this.headerPlataforma.set(current.data['header'] === 'plataforma');
+        // En las paginas de la plataforma no hay marca de tienda.
+        if (current.data['header'] === 'plataforma') this.tiendaActiva.salir();
         this.encabezadoSolido.set(!!current.data['encabezadoSolido']);
       });
   }
