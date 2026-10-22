@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { tiendaDeUrl } from '../pages/superadmin/por-tienda';
 import { Auth } from '../services/auth';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
@@ -14,6 +15,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // que quede en acciones anonimas como registro/login tambien.
   const headers: Record<string, string> = { 'X-Client-Platform': 'web' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  // SuperAdministrador dentro de una tienda (CU03/CU04): el backend lo limita
+  // a esa empresa. Durante una navegación vale la URL de destino, así las
+  // peticiones de la pantalla que se está abriendo ya van con su tienda.
+  if (token && auth.isSuperAdmin() && !req.url.includes('/plataforma/')) {
+    const tienda = tiendaDeUrl(router.currentNavigation()?.finalUrl ?? router.parseUrl(router.url));
+    if (tienda) headers['X-Empresa'] = String(tienda);
+  }
   const authReq = req.clone({ setHeaders: headers });
 
   return next(authReq).pipe(

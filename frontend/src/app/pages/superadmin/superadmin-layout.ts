@@ -48,6 +48,7 @@ export class SuperadminLayout {
     const [, seccion, extra] = segs;
     if (seccion === 'cu' && extra) return buscarCaso('p2', extra);
     if (seccion === 'empresa' && extra) return buscarCaso('p1', extra);
+    if (seccion === 'tiendas' && extra) return buscarCaso('p2', extra);
     return seccion ? ubicarRuta(seccion) : null;
   });
 
@@ -101,9 +102,21 @@ export class SuperadminLayout {
 
   // A dónde lleva un CU del menú.
   protected destino(caso: CasoUsoMenu): string[] {
-    if (this.parcialActivo() === 'p1' && caso.porEmpresa) return ['/superadmin/empresa', caso.codigo];
+    if (caso.porEmpresa) return [this.parcialActivo() === 'p1' ? '/superadmin/empresa' : '/superadmin/tiendas', caso.codigo];
     if (!caso.ruta) return ['/superadmin/cu', caso.codigo];
     return ['/superadmin', caso.ruta];
+  }
+
+  // Pestanas de un CU por tienda (CU04): dentro de la misma tienda se pasa
+  // de una a otra sin volver a elegirla.
+  protected tiendaDeSub(caso: CasoUsoMenu): Record<string, number> | null {
+    const id = this.empresaId();
+    return caso.porEmpresa && id && this.esActual(caso) ? { empresa: id } : null;
+  }
+
+  // Volver a la lista de empresas del CU abierto.
+  protected rutaCambiar(u: UbicacionCu): string[] {
+    return [u.parcial.id === 'p1' ? '/superadmin/empresa' : '/superadmin/tiendas', u.caso.codigo];
   }
 
   protected esActual(caso: CasoUsoMenu): boolean {

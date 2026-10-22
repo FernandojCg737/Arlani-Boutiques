@@ -53,6 +53,7 @@ import { SuperadminElegirEmpresa } from './pages/superadmin/elegir-empresa/elegi
 import { SuperadminEnConstruccion } from './pages/superadmin/en-construccion/en-construccion';
 import { SuperadminPlanes } from './pages/superadmin/planes/planes';
 import { SuperadminLayout } from './pages/superadmin/superadmin-layout';
+import { tiendaElegidaGuard } from './pages/superadmin/por-tienda';
 
 export const routes: Routes = [
   { path: '', component: Home, data: { header: 'plataforma' } },
@@ -163,10 +164,13 @@ export const routes: Routes = [
       { path: 'bitacora', component: AdminBitacora },
       { path: 'empresas', component: SuperadminEmpresas },
       { path: 'planes', component: SuperadminPlanes },
-      { path: 'sucursales', component: AdminSucursales },
-      { path: 'productos', component: AdminProductos },
-      { path: 'catalogo', component: AdminCatalogo },
-      { path: 'inventario', component: AdminInventario },
+      // CU03 y CU04: primero se elige la tienda (tiendas/:codigo) y la
+      // pantalla muestra solo lo de esa tienda (?empresa=<id>).
+      { path: 'tiendas/:codigo', component: SuperadminElegirEmpresa, data: { parcial: 'p2' } },
+      { path: 'sucursales', component: AdminSucursales, canActivate: [tiendaElegidaGuard] },
+      { path: 'productos', component: AdminProductos, canActivate: [tiendaElegidaGuard] },
+      { path: 'catalogo', component: AdminCatalogo, canActivate: [tiendaElegidaGuard] },
+      { path: 'inventario', component: AdminInventario, canActivate: [tiendaElegidaGuard] },
       { path: 'reservas', component: AdminReservas },
       { path: 'ventas', component: AdminVentas },
       { path: 'reportes', component: AdminReportesDashboard },

@@ -1,13 +1,13 @@
 from collections.abc import Callable
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db, limitar_a_empresa
-from app.models import Usuario
+from app.models import Empresa, Usuario
 from app.services.usuarios import codigos_permiso
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -23,11 +23,19 @@ PERSONAL_DE_TIENDA = {"administrador", "encargado_sucursal", "cajero"}
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
+    x_empresa: int | None = Header(default=None, alias="X-Empresa"),
 ) -> Usuario:
     usuario = _usuario_del_token(credentials, db)
     # El SuperAdministrador y los clientes (sin empresa) ven toda la plataforma.
     if usuario.empresa_id is not None and usuario.tipo in PERSONAL_DE_TIENDA:
         limitar_a_empresa(db, usuario.empresa_id)
+    # El SuperAdministrador puede entrar a una tienda (CU03 sucursales, CU04
+    # catalogo): con X-Empresa ve y modifica solo los datos de esa empresa,
+    # con el mismo aislamiento (RLS) que el personal de la tienda.
+    elif x_empresa is not None and usuario.tipo == "superadministrador":
+        if db.query(Empresa.id).filter(Empresa.id == x_empresa).first() is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Empresa no encontrada.")
+        limitar_a_empresa(db, x_empresa)
     return usuario
 
 

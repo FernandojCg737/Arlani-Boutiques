@@ -165,7 +165,7 @@
           </select>
           @if (!catalogo().proveedores.length) {
             <small class="modal-field__falta">
-              Todavía no tienes proveedores. <a routerLink="../proveedores">Regístralo en Proveedores (CU06)</a>.
+              Todavía no tienes proveedores. <a routerLink="../proveedores" queryParamsHandling="preserve">Regístralo en Proveedores (CU06)</a>.
             </small>
           }
         </label>
@@ -181,7 +181,7 @@
           </select>
           @if (!catalogo().temporadas.length) {
             <small class="modal-field__falta">
-              Todavía no tienes temporadas. <a routerLink="../temporadas">Créala en Temporadas y Colecciones (CU07)</a>.
+              Todavía no tienes temporadas. <a routerLink="../temporadas" queryParamsHandling="preserve">Créala en Temporadas y Colecciones (CU07)</a>.
             </small>
           }
         </label>
@@ -197,7 +197,7 @@
           </select>
           @if (!catalogo().colecciones.length) {
             <small class="modal-field__falta">
-              Todavía no tienes colecciones. <a routerLink="../temporadas">Créala en Temporadas y Colecciones (CU07)</a>.
+              Todavía no tienes colecciones. <a routerLink="../temporadas" queryParamsHandling="preserve">Créala en Temporadas y Colecciones (CU07)</a>.
             </small>
           }
         </label>
