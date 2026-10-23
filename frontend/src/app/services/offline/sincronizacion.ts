@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../auth';
@@ -19,12 +19,18 @@ const POR_ENVIAR: EstadoOperacion[] = ['pendiente', 'enviando', 'error'];
 // (el encargado resuelve el conflicto; la compra se paga o se queda sin stock).
 const POR_CONSULTAR: EstadoOperacion[] = ['conflicto', 'por_pagar', 'sin_stock'];
 const LOTE = 50;
-const REINTENTO_MS = 60_000;
-// Si un envío falla teniendo conexión (p. ej. el servidor estaba dormido),
-// se reintenta pronto y cada vez un poco más espaciado.
-const REINTENTOS_RAPIDOS_MS = [3_000, 6_000, 12_000, 24_000, 48_000];
+// Lo pendiente tiene prioridad: se envía apenas vuelve la conexión y, si el
+// servidor no responde (p. ej. estaba dormido), se reintenta a los 3, 6, 12 y
+// 24 s y después cada 15 s mientras quede algo por enviar. (La descarga del
+// catálogo, en cambio, es cada 3 minutos: ver descarga-automatica.ts.)
+const REINTENTO_MS = 15_000;
+const REINTENTOS_RAPIDOS_MS = [3_000, 6_000, 12_000, 24_000];
 // Etiqueta del Background Sync que atiende public/sw-arlani.js.
 const ETIQUETA_SYNC = 'arlani-sync';
+// Un mismo error se anota en el historial como mucho cada 10 minutos.
+const REPETIR_ERROR_MS = 10 * 60_000;
+// "Sincronizando…" solo si el envío tarda de verdad (sin parpadeos).
+const MOSTRAR_OCUPADO_MS = 600;
 
 // CU12 Sincronizar operaciones pendientes. Guarda cada operación hecha sin
 // conexión en IndexedDB con su uuid y la manda al volver la conexión (sola,
@@ -44,6 +50,8 @@ export class Sincronizacion {
   readonly operaciones = signal<OperacionLocal[]>([]);
   readonly registro = signal<RegistroSync[]>([]);
   readonly sincronizando = signal(false);
+  // Para la vista: se enciende solo si la sincronización tarda.
+  readonly ocupado = signal(false);
   // Sube cada vez que termina una sincronización (p. ej. para revisar si
   // quedaron compras por pagar).
   readonly sincronizaciones = signal(0);
@@ -53,6 +61,7 @@ export class Sincronizacion {
   readonly conflictos = computed(() => this.operaciones().filter((o) => o.estado === 'conflicto').length);
 
   private usuarioId: number | null = null;
+  private ultimoErrorAnotado = { detalle: '', en: 0 };
   private reintento: ReturnType<typeof setTimeout> | null = null;
   private reintentosHechos = 0;
 
@@ -81,7 +90,7 @@ export class Sincronizacion {
       this.usuarioId = id;
       this.operaciones.set([]);
       this.registro.set([]);
-      if (id !== null) void this.cargar().then(() => this.sincronizar());
+      if (id !== null) untracked(() => void this.cargar().then(() => this.sincronizar()));
     });
     // El service worker necesita el token para sincronizar sin la app abierta.
     effect(() => {
@@ -130,7 +139,7 @@ export class Sincronizacion {
     if (!porEnviar.length && !porConsultar.length) return;
 
     this.sincronizando.set(true);
-    this.ultimoError.set('');
+    const aviso = setTimeout(() => this.ocupado.set(true), MOSTRAR_OCUPADO_MS);
     const cuenta = { enviadas: 0, confirmadas: 0, conflictos: 0, rechazadas: 0, errores: 0 };
     try {
       for (let i = 0; i < porEnviar.length; i += LOTE) {
@@ -153,6 +162,7 @@ export class Sincronizacion {
         }
         cuenta.enviadas += lote.length;
         this.reintentosHechos = 0;
+        this.ultimoError.set('');
         for (const op of lote) {
           const r = resultados.find((x) => x.uuid === op.uuid);
           if (!r) continue;
@@ -177,14 +187,19 @@ export class Sincronizacion {
         }
       }
     } finally {
-      if (cuenta.enviadas || cuenta.errores) {
-        await this.db.registrar({
-          usuario_id: usuario,
-          fecha: new Date().toISOString(),
-          ...cuenta,
-          detalle: this.ultimoError() || 'Sincronización completada.',
-        });
+      // Al historial: lo que llegó al servidor siempre; un mismo error de
+      // conexión, no en cada reintento.
+      const detalle = this.ultimoError() || 'Sincronización completada.';
+      const errorRepetido =
+        !cuenta.enviadas &&
+        detalle === this.ultimoErrorAnotado.detalle &&
+        Date.now() - this.ultimoErrorAnotado.en < REPETIR_ERROR_MS;
+      if ((cuenta.enviadas || cuenta.errores) && !errorRepetido) {
+        await this.db.registrar({ usuario_id: usuario, fecha: new Date().toISOString(), ...cuenta, detalle });
+        if (!cuenta.enviadas) this.ultimoErrorAnotado = { detalle, en: Date.now() };
       }
+      clearTimeout(aviso);
+      this.ocupado.set(false);
       this.sincronizando.set(false);
       await this.cargar();
       this.sincronizaciones.update((n) => n + 1);

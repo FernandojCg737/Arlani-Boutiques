@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../auth';
@@ -40,9 +40,15 @@ export class DescargaAutomatica {
   constructor() {
     setInterval(() => void this.ejecutar(), CADA_MS);
     window.addEventListener('online', () => void this.ejecutar());
-    effect(() => {
+    // Al iniciar sesión (o abrir la app con sesión). untracked: lo que lee
+    // ejecutar() (p. ej. "descargando") no debe volver a dispararlo.
+    // Solo cuando cambia QUIÉN inició sesión (revalidar la sesión no cuenta).
+    const quien = computed(() => {
       const u = this.auth.currentUser();
-      if (u && PERSONAL.has(u.tipo)) void this.ejecutar();
+      return u && PERSONAL.has(u.tipo) ? u.id : null;
+    });
+    effect(() => {
+      if (quien() !== null) untracked(() => void this.ejecutar());
     });
   }
 
