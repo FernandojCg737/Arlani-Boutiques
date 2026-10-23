@@ -19,12 +19,19 @@ const POR_ENVIAR: EstadoOperacion[] = ['pendiente', 'enviando', 'error'];
 const POR_CONSULTAR: EstadoOperacion[] = ['conflicto'];
 const LOTE = 50;
 const REINTENTO_MS = 60_000;
+// Si un envío falla teniendo conexión (p. ej. el servidor estaba dormido),
+// se reintenta pronto y cada vez un poco más espaciado.
+const REINTENTOS_RAPIDOS_MS = [3_000, 6_000, 12_000, 24_000, 48_000];
+// Etiqueta del Background Sync que atiende public/sw-arlani.js.
+const ETIQUETA_SYNC = 'arlani-sync';
 
 // CU12 Sincronizar operaciones pendientes. Guarda cada operación hecha sin
 // conexión en IndexedDB con su uuid y la manda al volver la conexión (sola,
 // cada minuto mientras queden pendientes, o con "Sincronizar ahora"). Una
 // operación nunca se borra por haber intentado enviarla: solo cambia de
 // estado con la respuesta del servidor; si falla la red vuelve a pendiente.
+// Con la app cerrada, el service worker (Background Sync) las envía apenas
+// vuelve la conexión.
 @Injectable({ providedIn: 'root' })
 export class Sincronizacion {
   private readonly http = inject(HttpClient);
@@ -42,16 +49,27 @@ export class Sincronizacion {
   readonly conflictos = computed(() => this.operaciones().filter((o) => o.estado === 'conflicto').length);
 
   private usuarioId: number | null = null;
+  private reintento: ReturnType<typeof setTimeout> | null = null;
+  private reintentosHechos = 0;
 
   constructor() {
     window.addEventListener('online', () => {
       this.enLinea.set(true);
+      this.reintentosHechos = 0;
       void this.sincronizar();
     });
     window.addEventListener('offline', () => this.enLinea.set(false));
+    // Al volver a la pestaña o a la app instalada.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') void this.sincronizar();
+    });
     setInterval(() => {
       if (this.enLinea() && this.pendientes() > 0) void this.sincronizar();
     }, REINTENTO_MS);
+    // El service worker avisa cuando sincronizó con la app cerrada o en segundo plano.
+    navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
+      if ((e.data as { tipo?: string } | null)?.tipo === 'arlani-sincronizado') void this.cargar();
+    });
     // Las operaciones son de cada usuario: se cargan al iniciar sesión.
     effect(() => {
       const id = this.auth.currentUser()?.id ?? null;
@@ -60,6 +78,13 @@ export class Sincronizacion {
       this.operaciones.set([]);
       this.registro.set([]);
       if (id !== null) void this.cargar().then(() => this.sincronizar());
+    });
+    // El service worker necesita el token para sincronizar sin la app abierta.
+    effect(() => {
+      const id = this.auth.currentUser()?.id ?? null;
+      const token = this.auth.token();
+      if (id !== null && token) void this.db.guardarSesion({ usuario_id: id, token, api: this.api });
+      else void this.db.borrarSesiones();
     });
   }
 
@@ -89,6 +114,7 @@ export class Sincronizacion {
     await this.db.guardarOperacion(nueva);
     await this.cargar();
     if (this.enLinea()) void this.sincronizar();
+    else void this.pedirSyncEnFondo();
     return nueva;
   }
 
@@ -117,9 +143,12 @@ export class Sincronizacion {
           for (const op of lote) await this.db.guardarOperacion({ ...op, estado: 'pendiente', ultimo_intento: ahora, intentos: op.intentos + 1 });
           this.ultimoError.set(this.motivo(err));
           cuenta.errores += lote.length;
+          this.programarReintento();
+          void this.pedirSyncEnFondo();
           break;
         }
         cuenta.enviadas += lote.length;
+        this.reintentosHechos = 0;
         for (const op of lote) {
           const r = resultados.find((x) => x.uuid === op.uuid);
           if (!r) continue;
@@ -154,6 +183,28 @@ export class Sincronizacion {
       }
       this.sincronizando.set(false);
       await this.cargar();
+    }
+  }
+
+  private programarReintento(): void {
+    if (this.reintento || this.reintentosHechos >= REINTENTOS_RAPIDOS_MS.length) return;
+    const espera = REINTENTOS_RAPIDOS_MS[this.reintentosHechos++];
+    this.reintento = setTimeout(() => {
+      this.reintento = null;
+      if (this.enLinea()) void this.sincronizar();
+    }, espera);
+  }
+
+  // Background Sync (Chrome/Edge, también en Android): el navegador despierta
+  // al service worker cuando vuelve la conexión, aunque la app esté cerrada.
+  private async pedirSyncEnFondo(): Promise<void> {
+    try {
+      const registro = await navigator.serviceWorker?.getRegistration();
+      const sync = (registro as (ServiceWorkerRegistration & { sync?: { register(tag: string): Promise<void> } }) | undefined)
+        ?.sync;
+      await sync?.register(ETIQUETA_SYNC);
+    } catch {
+      // Sin soporte: se envía al volver la conexión con la app abierta.
     }
   }
 
