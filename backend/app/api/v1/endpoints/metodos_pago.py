@@ -56,7 +56,7 @@ def _publico(m: MetodoPagoEmpresa) -> dict:
         tipo_cuenta=m.tipo_cuenta,
         titular=m.titular,
         documento_titular=m.documento_titular,
-        requiere_comprobante=m.tipo != "paypal",
+        requiere_comprobante=m.tipo not in ("paypal", "contra_entrega"),
     )
 
 

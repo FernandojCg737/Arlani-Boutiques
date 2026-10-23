@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { mensajeError } from '../../../services/plataforma';
 
-type TipoMetodo = 'paypal' | 'qr' | 'transferencia' | 'otro';
+type TipoMetodo = 'paypal' | 'qr' | 'transferencia' | 'otro' | 'contra_entrega';
 
 interface MetodoPago {
   id: number;
@@ -55,6 +55,7 @@ const NOMBRE_POR_TIPO: Record<TipoMetodo, string> = {
   qr: 'QR',
   transferencia: 'Transferencia bancaria',
   otro: 'Otro método',
+  contra_entrega: 'Contra entrega',
 };
 
 // Gestionar metodos de pago: el Administrador de la tienda registra como le
@@ -76,6 +77,11 @@ export class AdminMetodosPago implements OnInit {
     { tipo: 'qr', titulo: 'QR', detalle: 'El cliente escanea tu QR y sube su comprobante.' },
     { tipo: 'transferencia', titulo: 'Transferencia', detalle: 'Depósito a tu cuenta bancaria con comprobante.' },
     { tipo: 'otro', titulo: 'Otro', detalle: 'Tigo Money, efectivo al retirar… con comprobante.' },
+    {
+      tipo: 'contra_entrega',
+      titulo: 'Contra entrega',
+      detalle: 'Para compras hechas sin conexión: el cliente paga en efectivo al recibir o recoger.',
+    },
   ];
 
   protected readonly metodos = signal<MetodoPago[]>([]);

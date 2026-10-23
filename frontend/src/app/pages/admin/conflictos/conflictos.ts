@@ -33,7 +33,7 @@ interface ItemConflicto {
 export interface OperacionServidor {
   id: number;
   uuid: string;
-  tipo: 'venta' | 'reserva';
+  tipo: 'venta' | 'reserva' | 'pedido';
   estado: string;
   mensaje: string | null;
   sucursal_nombre: string | null;

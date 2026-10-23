@@ -11,9 +11,10 @@ import { mensajeError } from '../../services/plataforma';
 import { ESTADO_OPERACION } from '../admin/sin-conexion/sin-conexion';
 
 // Cliente con sesión sin conexión (P4): descarga el catálogo de las tiendas
-// que trabajan sin conexión (CU11), lo consulta sin internet y reserva
-// prendas; la reserva se guarda en el dispositivo y se envía sola al volver
-// la conexión (CU12), donde la tienda la confirma o la ajusta (CU14).
+// que trabajan sin conexión (CU11), lo consulta sin internet y reserva o
+// compra; se guarda en el dispositivo y se envía sola al volver la conexión
+// (CU12). Una compra no se cobra sin internet: al volver, la app le pide
+// pagarla (en línea) o confirmarla (contra entrega), revisando precio y stock.
 @Component({
   selector: 'app-sin-conexion-cliente',
   imports: [DatePipe, DecimalPipe, RouterLink],
@@ -41,6 +42,25 @@ export class SinConexionCliente implements OnInit {
   protected readonly items = signal<ItemLocal[]>([]);
   protected readonly horario = signal(this.mananaMediodia());
   protected readonly guardando = signal(false);
+  protected readonly modo = signal<'reservar' | 'comprar'>('reservar');
+  protected readonly entrega = signal<'retiro' | 'envio'>('retiro');
+  protected readonly direccionId = signal<number | null>(null);
+  protected readonly formaPago = signal<'en_linea' | 'contra_entrega'>('en_linea');
+
+  protected readonly direcciones = computed(() => this.catalogo()?.direcciones ?? []);
+  protected readonly faltaParaComprar = computed(() => {
+    const falta: string[] = [];
+    if (!this.items().length) falta.push('Elige prendas del catálogo.');
+    if (this.modo() === 'comprar' && this.entrega() === 'envio' && this.direccionId() === null) {
+      falta.push(
+        this.direcciones().length
+          ? 'Elige la dirección de envío.'
+          : 'No tienes direcciones guardadas: agrégalas en Mi cuenta con conexión.',
+      );
+    }
+    if (this.modo() === 'reservar' && !this.horario()) falta.push('Indica hasta cuándo la recoges.');
+    return falta;
+  });
 
   protected readonly tienda = computed<TiendaLocal | null>(
     () => this.catalogo()?.tiendas.find((t) => t.empresa_id === this.tiendaId()) ?? null,
@@ -99,6 +119,8 @@ export class SinConexionCliente implements OnInit {
   protected elegirTienda(id: number): void {
     this.tiendaId.set(id);
     const t = this.catalogo()?.tiendas.find((x) => x.empresa_id === id);
+    if (!t?.acepta_contra_entrega) this.formaPago.set('en_linea');
+    this.direccionId.set(this.catalogo()?.direcciones?.[0]?.id ?? null);
     this.elegirSucursal(t?.sucursales[0]?.id ?? null);
   }
 
@@ -146,16 +168,17 @@ export class SinConexionCliente implements OnInit {
     this.items.update((its) => its.filter((_, k) => k !== i));
   }
 
-  protected async reservar(): Promise<void> {
+  protected async registrar(): Promise<void> {
     const t = this.tienda();
     const s = t?.sucursales.find((x) => x.id === this.sucursalId());
-    if (!t || !s || !this.items().length || !this.horario()) return;
+    if (!t || !s || this.faltaParaComprar().length) return;
+    const compra = this.modo() === 'comprar';
     this.guardando.set(true);
     this.error.set('');
     try {
       const u = this.auth.currentUser()!;
       await this.sync.registrar({
-        tipo: 'reserva',
+        tipo: compra ? 'pedido' : 'reserva',
         empresa_nombre: t.nombre,
         sucursal_id: s.id,
         sucursal_nombre: s.nombre,
@@ -163,18 +186,25 @@ export class SinConexionCliente implements OnInit {
         cliente_nombre: u.nombre,
         factura_nombre: null,
         factura_nit: null,
-        horario_atencion: new Date(this.horario()).toISOString(),
+        horario_atencion: compra ? null : new Date(this.horario()).toISOString(),
+        entrega: compra ? this.entrega() : 'retiro',
+        direccion_id: compra && this.entrega() === 'envio' ? this.direccionId() : null,
+        forma_pago: compra ? this.formaPago() : null,
         items: this.items(),
         total: this.total(),
       });
       this.items.set([]);
-      this.aviso.set(
-        this.sync.enLinea()
-          ? 'Reserva enviada a la tienda.'
-          : 'Reserva guardada en tu dispositivo: se enviará sola cuando vuelvas a tener internet.',
-      );
+      if (this.sync.enLinea()) {
+        this.aviso.set(compra ? 'Compra enviada: revísala y págala en "Compras por pagar".' : 'Reserva enviada a la tienda.');
+      } else if (compra) {
+        this.aviso.set(
+          'Compra guardada en tu dispositivo. Cuando vuelvas a tener internet se envía sola y te pediremos pagarla (revisando precio y stock).',
+        );
+      } else {
+        this.aviso.set('Reserva guardada en tu dispositivo: se enviará sola cuando vuelvas a tener internet.');
+      }
     } catch (err) {
-      this.error.set(mensajeError(err, 'No se pudo guardar la reserva.'));
+      this.error.set(mensajeError(err, 'No se pudo guardar.'));
     } finally {
       this.guardando.set(false);
     }

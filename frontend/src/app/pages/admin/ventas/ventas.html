@@ -207,6 +207,12 @@
               <td>{{ v.atendido_por_nombre ?? '-' }}</td>
               <td>
                 <div class="ventas-acciones">
+                  @if (v.metodo_pago === 'contra_entrega' && v.estado_pago === 'pendiente') {
+                    <button type="button" [disabled]="procesando() === v.id" (click)="contraEntrega(v, 'cobrar')">Cobrado</button>
+                    <button type="button" class="is-danger" [disabled]="procesando() === v.id" (click)="contraEntrega(v, 'anular')">
+                      Anular
+                    </button>
+                  }
                   @if (v.estado_pago === 'verificando') {
                     <button type="button" [disabled]="procesando() === v.id" (click)="aprobarPago(v)">Aprobar</button>
                     <button type="button" class="is-danger" [disabled]="procesando() === v.id" (click)="abrirRechazo(v)">

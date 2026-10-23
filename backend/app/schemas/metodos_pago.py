@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 
-TIPOS = r"^(paypal|qr|transferencia|otro)$"
+# contra_entrega: solo para las compras hechas sin conexion (el cliente paga
+# al recibir o recoger; el personal marca el cobro).
+TIPOS = r"^(paypal|qr|transferencia|otro|contra_entrega)$"
 
 
 class MetodoPagoIn(BaseModel):

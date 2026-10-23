@@ -1,0 +1,155 @@
+<div class="admin-content pagar-compras">
+  <a routerLink="/sin-conexion" class="pagar-compras__volver">← Sin conexión</a>
+  <div class="admin-content__header">
+    <div>
+      <h1>Compras por pagar</h1>
+      <p>
+        Las compras que hiciste sin conexión. Revisamos el precio y el stock de ahora: si una prenda se agotó no se puede
+        comprar; si cambió el precio, te mostramos el anterior y el nuevo antes de pagar.
+      </p>
+    </div>
+    <button type="button" class="pagar-compras__recargar" (click)="cargar()">Revisar de nuevo</button>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  @for (h of hechas(); track h.uuid) {
+    <div class="pagar-compras__hecha">
+      <strong>{{ h.tienda }}:</strong> {{ h.mensaje }}
+      @if (h.venta_id) {
+        <a [routerLink]="['/comprobante', h.venta_id]">Ver comprobante</a>
+      }
+    </div>
+  }
+
+  @if (cargando()) {
+    <p class="offline-vacio">Revisando precio y stock…</p>
+  } @else {
+    @for (c of compras(); track c.uuid) {
+      <article class="compra" [class.is-bloqueada]="c.sin_stock" [style.--marca]="c.color_marca">
+        <header class="compra__cabecera">
+          @if (c.logo_url) {
+            <img [src]="c.logo_url" [alt]="c.tienda" />
+          }
+          <div>
+            <h2>{{ c.tienda }}</h2>
+            <span>
+              Hecha sin conexión el {{ c.registrada_en | date: 'dd/MM/yyyy HH:mm' }} ·
+              {{ c.entrega === 'envio' ? 'Envío a ' + (c.direccion ?? 'tu dirección') : 'Retiro en ' + c.sucursal }} ·
+              {{ c.forma_pago === 'contra_entrega' ? 'Pago contra entrega' : 'Pago en línea' }}
+            </span>
+          </div>
+        </header>
+
+        @if (c.sin_stock) {
+          <p class="compra__alerta is-mal">
+            Ya no hay stock suficiente de alguna prenda: no se puede comprar. Puedes cancelarla y elegir otra cosa.
+          </p>
+        } @else if (c.precio_cambio) {
+          <p class="compra__alerta is-ojo">
+            El precio cambió desde que la armaste: antes Bs {{ c.total_guardado | number: '1.2-2' }}, ahora
+            <strong>Bs {{ c.total_actual | number: '1.2-2' }}</strong>. Si pagas, es con el precio de ahora.
+          </p>
+        }
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Prenda</th>
+                <th>Cant.</th>
+                <th>Precio</th>
+                <th>Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (i of c.items; track $index) {
+                <tr>
+                  <td>{{ i.producto }} <small class="offline-sub">{{ i.talla }} · {{ i.color }}</small></td>
+                  <td>{{ i.cantidad }}</td>
+                  <td>
+                    @if (i.precio_guardado !== i.precio_actual) {
+                      <s class="offline-sub">Bs {{ i.precio_guardado | number: '1.2-2' }}</s>
+                    }
+                    Bs {{ i.precio_actual | number: '1.2-2' }}
+                  </td>
+                  <td>
+                    @if (i.stock >= i.cantidad) {
+                      <span class="offline-chip offline-chip--confirmada">Disponible</span>
+                    } @else {
+                      <span class="offline-chip offline-chip--sin_stock">{{ i.stock === 0 ? 'Agotada' : 'Quedan ' + i.stock }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <p class="compra__total">Total: <strong>Bs {{ c.total_actual | number: '1.2-2' }}</strong></p>
+
+        @if (c.puede_pagar) {
+          @if (c.forma_pago === 'contra_entrega') {
+            <div class="compra__pago">
+              <p class="offline-sub">
+                Al confirmar, la tienda aparta tus prendas. Pagas Bs {{ c.total_actual | number: '1.2-2' }} en efectivo
+                {{ c.entrega === 'envio' ? 'al recibirla' : 'al recogerla en ' + c.sucursal }}.
+              </p>
+              <button type="button" class="ventas-nueva-btn" [disabled]="procesando() === c.uuid" (click)="confirmarContraEntrega(c)">
+                {{ procesando() === c.uuid ? 'Confirmando…' : 'Confirmar compra' }}
+              </button>
+            </div>
+          } @else {
+            <div class="compra__pago">
+              <span class="mostrador-etiqueta">Elige cómo pagar</span>
+              <div class="mostrador-opciones">
+                @for (m of c.metodos; track m.id) {
+                  <button type="button" class="mostrador-opcion" [class.is-activa]="metodoElegido(c)?.id === m.id"
+                          (click)="elegirMetodo(c, m)">
+                    {{ m.nombre }}
+                  </button>
+                }
+              </div>
+              @if (metodoElegido(c); as m) {
+                @if (m.tipo === 'paypal') {
+                  <p class="offline-sub">Cobro en dólares al cambio oficial: US$ {{ c.total_usd }}</p>
+                  <div class="compra__paypal" [id]="'paypal-' + c.uuid"></div>
+                } @else {
+                  @if (m.qr_url) {
+                    <img class="compra__qr" [src]="m.qr_url" alt="QR de cobro de la tienda" />
+                  }
+                  @if (m.banco || m.numero_cuenta) {
+                    <p class="offline-sub">{{ m.banco }} · {{ m.numero_cuenta }} · {{ m.titular }}</p>
+                  }
+                  @if (m.instrucciones) {
+                    <p class="offline-sub">{{ m.instrucciones }}</p>
+                  }
+                  <label class="ventas-campo">
+                    <span>Foto del comprobante</span>
+                    <input type="file" accept="image/*" (change)="alElegirArchivo(c, $event)" />
+                  </label>
+                  <button type="button" class="ventas-nueva-btn" [disabled]="procesando() === c.uuid" (click)="enviarComprobante(c)">
+                    {{ procesando() === c.uuid ? 'Enviando…' : 'Enviar comprobante · Bs ' + (c.total_actual | number: '1.2-2') }}
+                  </button>
+                }
+              }
+            </div>
+          }
+        }
+
+        @if (errorDe()[c.uuid]) {
+          <div class="admin-error">{{ errorDe()[c.uuid] }}</div>
+        }
+        <button type="button" class="offline-link compra__cancelar" [disabled]="procesando() === c.uuid" (click)="cancelar(c)">
+          Cancelar esta compra
+        </button>
+      </article>
+    } @empty {
+      @if (!hechas().length) {
+        <p class="offline-vacio">No tienes compras sin conexión por pagar.</p>
+      }
+    }
+  }
+</div>

@@ -25,6 +25,10 @@ export const ESTADO_OPERACION: Record<string, string> = {
   resuelta: 'Resuelta por la tienda',
   anulada: 'Anulada',
   error: 'Se reintentará',
+  por_pagar: 'Por pagar',
+  sin_stock: 'Sin stock',
+  pagada: 'Pagada',
+  cancelada: 'Cancelada',
 };
 
 // Pasadas estas horas, se avisa que el stock descargado puede estar viejo.

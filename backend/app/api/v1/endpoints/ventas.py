@@ -702,7 +702,12 @@ def checkout_por_tienda(
     metodos: dict[int, list[MetodoPagoEmpresa]] = {}
     for m in (
         db.query(MetodoPagoEmpresa)
-        .filter(MetodoPagoEmpresa.empresa_id.in_(list(grupos)), MetodoPagoEmpresa.activo.is_(True))
+        .filter(
+            MetodoPagoEmpresa.empresa_id.in_(list(grupos)),
+            MetodoPagoEmpresa.activo.is_(True),
+            # Contra entrega es solo para compras hechas sin conexion.
+            MetodoPagoEmpresa.tipo != "contra_entrega",
+        )
         .order_by(MetodoPagoEmpresa.orden, MetodoPagoEmpresa.id)
     ):
         metodos.setdefault(m.empresa_id, []).append(m)
@@ -998,7 +1003,7 @@ async def checkout_tienda_comprobante(
         MetodoPagoEmpresa.empresa_id == empresa_id,
         MetodoPagoEmpresa.activo.is_(True),
     ).first()
-    if metodo is None or metodo.tipo == "paypal":
+    if metodo is None or metodo.tipo in ("paypal", "contra_entrega"):
         raise HTTPException(status.HTTP_409_CONFLICT, "Ese método de pago no está disponible para esta tienda.")
     if file is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Sube la foto de tu comprobante de pago.")
@@ -1208,6 +1213,39 @@ def actualizar_envio(
     venta.envio.actualizado_en = datetime.utcnow()
     db.commit()
     log_bitacora(db, usuario, "ACTUALIZAR", "venta", venta_id, f"Envío a domicilio: {payload.estado}", request)
+    venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
+    return _to_admin_out(venta)
+
+
+@router.post("/{venta_id}/contra-entrega/{accion}", response_model=VentaAdminOut)
+def contra_entrega(
+    venta_id: int,
+    accion: str,
+    request: Request,
+    motivo: str | None = Body(default=None, embed=True, max_length=500),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso("CU11")),
+) -> VentaAdminOut:
+    """Compra sin conexion pagada contra entrega: el personal marca que cobro
+    al entregar (cobrar) o la anula si no se entrego (el stock vuelve)."""
+    if accion not in ("cobrar", "anular"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Acción no válida.")
+    empleado = _get_empleado_o_403(db, usuario)
+    venta = _get_venta_staff_o_404(db, usuario, venta_id)
+    if venta.pago is None or venta.pago.metodo != "contra_entrega" or venta.pago.estado != "pendiente":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta venta no tiene un cobro contra entrega pendiente.")
+    motivo = (motivo or "").strip() or "No se entregó la compra."
+    try:
+        if accion == "cobrar":
+            db.execute(text("SELECT sp_cobrar_contra_entrega(:v, :e)"), {"v": venta_id, "e": empleado.id})
+        else:
+            db.execute(text("SELECT sp_anular_contra_entrega(:v, :e, :m)"), {"v": venta_id, "e": empleado.id, "m": motivo})
+        db.commit()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
+    detalle = "Cobro contra entrega registrado" if accion == "cobrar" else f"Compra contra entrega anulada: {motivo}"
+    log_bitacora(db, usuario, "ACTUALIZAR", "venta", venta_id, detalle, request)
     venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
     return _to_admin_out(venta)
 
