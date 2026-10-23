@@ -63,6 +63,29 @@
   </nav>
 
   <main class="admin-main">
-    <router-outlet />
+    @if (bloqueada()) {
+      <section class="admin-bloqueo" role="alert">
+        <span class="admin-bloqueo__icono" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" /></svg>
+        </span>
+        @if (auth.currentUser()?.tipo === 'administrador') {
+          <h1>Tu tienda está pausada</h1>
+          <p>
+            La suscripción de {{ marca.nombre() }} venció. Mientras no la renueves no puedes vender, registrar
+            movimientos ni atender reservas, y tu tienda no aparece en la plataforma.
+          </p>
+          <a class="admin-bloqueo__boton" routerLink="/admin/suscripcion">Renovar mi suscripción</a>
+        } @else {
+          <h1>La tienda está pausada</h1>
+          <p>
+            La suscripción de {{ marca.nombre() }} venció. El administrador de la tienda debe renovarla para que
+            puedas seguir trabajando.
+          </p>
+          <button type="button" class="admin-bloqueo__boton" (click)="logout()">Cerrar sesión</button>
+        }
+      </section>
+    } @else {
+      <router-outlet />
+    }
   </main>
 </div>

@@ -32,6 +32,9 @@
       }
       @if (auth.hasPermiso('CU11')) {
         <button type="button" [class.is-active]="tab() === 'compras'" (click)="setTab('compras')">Mis Compras</button>
+        <button type="button" [class.is-active]="tab() === 'cambios'" (click)="setTab('cambios')">Mis Cambios</button>
+        <button type="button" [class.is-active]="tab() === 'devoluciones'" (click)="setTab('devoluciones')">Mis Devoluciones</button>
+        <button type="button" [class.is-active]="tab() === 'direcciones'" (click)="setTab('direcciones')">Mis Direcciones</button>
         <button type="button" [class.is-active]="tab() === 'pagos'" (click)="setTab('pagos')">Metodos de Pago</button>
       }
       @if (auth.hasPermiso('CU14')) {
@@ -135,7 +138,63 @@
         }
       }
 
+      @if (tab() === 'direcciones' && auth.hasPermiso('CU11')) {
+        <app-mis-direcciones />
+      }
+
+      @if (tab() === 'cambios' && auth.hasPermiso('CU11')) {
+        <app-mis-cambios />
+      }
+
+      @if (tab() === 'devoluciones' && auth.hasPermiso('CU11')) {
+        @if (cargandoDevoluciones()) {
+          <p class="dash-vacio">Cargando...</p>
+        } @else if (devoluciones().length === 0) {
+          <p class="dash-vacio">
+            Todavía no tienes devoluciones. Desde Mis Compras puedes pedir una hasta 24 horas después de comprar.
+          </p>
+        } @else {
+          <ul class="dash-lista">
+            @for (d of devoluciones(); track d.id) {
+              <li class="dash-card">
+                <div class="dash-card__fila">
+                  <div class="dash-card__info">
+                    <strong>Devolución #{{ d.id }} · {{ d.tienda_nombre }}</strong>
+                    <span>
+                      Compra #{{ d.venta_id }} · pedida el {{ d.fecha_solicitud | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
+                      {{ d.sucursal_nombre }}
+                    </span>
+                    <ul class="dash-card__detalles">
+                      @for (it of d.detalles; track it.id) {
+                        <li class="dash-devuelta">{{ it.cantidad_devuelta }}× {{ it.producto_nombre }} ({{ it.talla_codigo }}, {{ it.color_nombre }})</li>
+                      }
+                    </ul>
+                    <span>
+                      {{ motivoDevolucionLabel[d.motivo] ?? d.motivo }} · Reembolso de
+                      <strong>Bs {{ d.monto_reembolso }}</strong> {{ metodoReembolsoLabel[d.metodo_reembolso] ?? d.metodo_reembolso }}
+                    </span>
+                    @if (d.estado === 'rechazada' && d.observaciones) {
+                      <p class="dash-rechazo">{{ d.observaciones }}</p>
+                    }
+                  </div>
+                  <div class="dash-card__acciones">
+                    <span class="admin-badge admin-badge--devolucion admin-badge--{{ d.estado }}">
+                      {{ estadoDevolucionLabel[d.estado] ?? d.estado }}
+                    </span>
+                    @if (d.fecha_resolucion) {
+                      <small class="dash-resuelta">Resuelta el {{ d.fecha_resolucion | date: 'd MMM yyyy' : '-0400' }}</small>
+                    }
+                  </div>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      }
+
       @if (tab() === 'compras' && auth.hasPermiso('CU11')) {
+        <app-mis-cambios [mostrarLista]="false" (solicitado)="alPedirCambio()" />
+
         @if (cargandoCompras()) {
           <p class="dash-vacio">Cargando...</p>
         } @else if (compras().length === 0) {
@@ -147,40 +206,87 @@
                 <div class="dash-card__fila">
                   <div class="dash-card__info">
                     <strong>Compra #{{ v.id }} · {{ v.total }} Bs</strong>
-                    <span>{{ v.fecha | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} · {{ v.sucursal_nombre }}</span>
+                    <span>
+                      {{ v.fecha | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
+                      {{ v.tienda ? v.tienda.nombre + ', ' : '' }}{{ v.sucursal_nombre }}
+                    </span>
                     <ul class="dash-card__detalles">
                       @for (d of v.detalles; track d.id) {
-                        <li>{{ d.cantidad }}x {{ d.producto_nombre }} ({{ d.talla_codigo }}, {{ d.color_nombre }})</li>
+                        @if (cambioPorLinea().get(d.id); as c) {
+                          <li class="dash-cambiada">
+                            <span class="dash-cambiada__sale">{{ c.cantidad }}× {{ d.producto_nombre }} ({{ d.talla_codigo }}, {{ d.color_nombre }})</span>
+                            <span aria-hidden="true">→</span>
+                            <strong>{{ c.cantidad }}× {{ c.producto_nuevo }} ({{ c.talla_nueva }}, {{ c.color_nuevo }})</strong>
+                            <small>{{ estadoCambioLabel[c.estado] ?? c.estado }}</small>
+                            @if (c.cantidad < d.cantidad) {
+                              <span class="dash-cambiada__resto">y {{ d.cantidad - c.cantidad }}× {{ d.producto_nombre }} sin cambio</span>
+                            }
+                          </li>
+                        } @else {
+                          <li>{{ d.cantidad }}x {{ d.producto_nombre }} ({{ d.talla_codigo }}, {{ d.color_nombre }})</li>
+                        }
                       }
                     </ul>
+                    @if (v.envio; as e) {
+                      <p class="dash-envio">
+                        Envío a {{ e.direccion }}{{ e.ciudad ? ', ' + e.ciudad : '' }} ·
+                        <strong>{{ e.estado === 'entregado' ? 'Entregado' : e.estado === 'enviado' ? 'En camino' : 'Por enviar' }}</strong>
+                      </p>
+                    }
+                    @if (v.estado_pago === 'rechazado') {
+                      <p class="dash-rechazo">
+                        La tienda rechazó tu comprobante{{ v.motivo_rechazo ? ': ' + v.motivo_rechazo : '.' }}
+                      </p>
+                    } @else if (v.estado_pago === 'verificando') {
+                      <p class="dash-revision">La tienda está revisando tu comprobante. Te avisamos cuando lo confirme.</p>
+                    }
                   </div>
                   <div class="dash-card__acciones">
                     <span class="admin-badge admin-badge--{{ v.estado_pago }}">
-                      {{ metodoLabel[v.metodo_pago] ?? v.metodo_pago }} · {{ v.estado_pago }}
+                      {{ v.metodo_pago_nombre ?? metodoLabel[v.metodo_pago] ?? v.metodo_pago }} ·
+                      {{ estadoPagoLabel[v.estado_pago] ?? v.estado_pago }}
                     </span>
-                    @if (v.tiene_devolucion) {
+                    <!-- Una sola solicitud por prenda: si ya se pidio un cambio o una
+                         devolucion (aunque se haya rechazado), no se ofrece otra. -->
+                    @if (v.tiene_devolucion && v.estado_devolucion !== 'rechazada') {
                       <span class="admin-badge admin-badge--devolucion admin-badge--{{ v.estado_devolucion }}">
                         Devolución {{ v.estado_devolucion }}
                       </span>
-                    } @else if (v.estado_pago === 'completado') {
-                      @if (estaEnPlazo24h(v)) {
-                        <button
-                          type="button"
-                          class="dash-devolucion-btn"
-                          (click)="abrirModalDevolucion(v)"
-                          title="Tienes hasta 24 horas después de tu compra para solicitar devolución"
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                            <path d="M3 3v5h5"/>
-                          </svg>
-                          Solicitar Devolución ({{ horasRestantes(v) }})
-                        </button>
-                      } @else {
-                        <span class="dash-plazo-vencido" title="El plazo de 24 horas a partir de la compra para solicitar devolución ha expirado">
-                          Plazo de devolución vencido (24h)
-                        </span>
-                      }
+                    }
+                    @if (v.puede_devolver) {
+                      <button
+                        type="button"
+                        class="dash-devolucion-btn"
+                        (click)="abrirModalDevolucion(v)"
+                        title="Tienes hasta 24 horas después de tu compra para solicitar devolución"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                          <path d="M3 3v5h5"/>
+                        </svg>
+                        Solicitar Devolución ({{ horasRestantes(v) }})
+                      </button>
+                    }
+                    @if (v.estado_pago === 'completado' && vencioPlazo(v) && !algunaSolicitada(v)) {
+                      <span class="dash-plazo-vencido" title="El plazo de 24 horas desde la compra para pedir un cambio o una devolución ya pasó">
+                        Plazo de cambio y devolución vencido (24h)
+                      </span>
+                    }
+                    @if (v.puede_cambiar) {
+                      <button
+                        type="button"
+                        class="dash-devolucion-btn dash-cambio-btn"
+                        (click)="abrirCambio(v)"
+                        title="Puedes cambiar una prenda por otra de la tienda hasta 24 horas después de tu compra"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                          <path d="M17 1l4 4-4 4"/>
+                          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                          <path d="M7 23l-4-4 4-4"/>
+                          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                        </svg>
+                        Cambiar prenda (24h)
+                      </button>
                     }
                     @if (v.estado_pago === 'completado') {
                       <a class="dash-comprobante-link" [routerLink]="['/mis-compras', v.id]">Ver comprobante</a>

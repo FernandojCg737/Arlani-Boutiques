@@ -1,0 +1,99 @@
+// Cambios de prenda: usa la base de Gestión de Ventas (tabla, modal, badges).
+:host {
+  display: block;
+}
+
+.cambios-titulo {
+  margin-bottom: 20px;
+}
+.cambios-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+
+  p {
+    margin: 0;
+    max-width: 70ch;
+    font-size: 13px;
+    color: #666;
+  }
+
+  select {
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 13px;
+  }
+}
+
+.cambios-pendientes {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: #fff4e0;
+  color: #b26a00;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.cambios-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #888;
+}
+
+.cambios-obs {
+  font-style: italic;
+}
+
+.cambios-motivo {
+  max-width: 200px;
+  color: #b3261e;
+}
+
+.cambios-dif {
+  white-space: nowrap;
+  font-weight: 700;
+
+  &.is-cobra {
+    color: #b26a00;
+  }
+
+  &.is-devuelve {
+    color: #2e7d32;
+  }
+}
+
+.cambios-aviso {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #f7f7f5;
+  font-size: 13px;
+  color: #444;
+}
+
+.admin-badge {
+  &--cambio-solicitado,
+  &--cambio-por_pagar,
+  &--cambio-verificando {
+    background: #fff4e0;
+    color: #b26a00;
+  }
+
+  &--cambio-completado {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &--cambio-rechazado,
+  &--cambio-cancelado {
+    background: #fdecea;
+    color: #b3261e;
+  }
+}

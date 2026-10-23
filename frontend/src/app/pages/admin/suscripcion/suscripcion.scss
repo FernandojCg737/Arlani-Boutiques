@@ -628,3 +628,223 @@ $gris: #777;
 .marca__ok {
   color: #2e7d32 !important;
 }
+
+// ---------------------------------------------------- comprar / renovar
+.pago {
+  max-width: 520px;
+  margin: 24px auto 0;
+  padding: 24px;
+  border: 1px solid #e6e1df;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.pago__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--brand-dark);
+  }
+}
+
+.pago__cerrar {
+  border: none;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #888;
+  cursor: pointer;
+}
+
+.pago__periodos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: #fff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+
+    small {
+      font-weight: 500;
+      font-size: 12px;
+      color: #2e7d4f;
+    }
+
+    &.activo {
+      border-color: var(--brand-dark);
+      box-shadow: inset 0 0 0 1px var(--brand-dark);
+    }
+  }
+}
+
+.pago__detalle {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  dt {
+    color: #666;
+  }
+
+  dd {
+    margin: 0;
+    text-align: right;
+    font-weight: 700;
+
+    small {
+      display: block;
+      font-weight: 400;
+      font-size: 12px;
+      color: #888;
+    }
+  }
+}
+
+.pago__nota {
+  margin: 0 0 12px;
+  color: #666;
+}
+
+// ------------------------------------------------ estado de cuenta
+.cuenta__resumen {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  @media (min-width: 800px) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
+.cuenta__saldo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid $borde;
+  border-top: 4px solid #b3261e;
+
+  &--al-dia {
+    border-top-color: #2e7d4f;
+  }
+
+  strong {
+    font-size: clamp(26px, 3.4vw, 34px);
+    font-weight: 800;
+    color: var(--brand-dark);
+    font-variant-numeric: tabular-nums;
+  }
+
+  small {
+    font-size: 12px;
+    color: $gris;
+  }
+
+  .boton {
+    align-self: flex-start;
+    margin-top: 8px;
+  }
+}
+
+.cuenta__cifras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: #fff;
+  border: 1px solid $borde;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 18px 20px;
+    border-bottom: 1px solid #f2f2f2;
+
+    &:nth-child(odd) {
+      border-right: 1px solid #f2f2f2;
+    }
+  }
+
+  strong {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--brand-dark);
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    font-size: 12px;
+    color: $gris;
+  }
+}
+
+.cuenta {
+  .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .pago {
+    margin-bottom: 16px;
+  }
+}
+
+.cuenta__subtitulo {
+  margin: 28px 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+}
+
+.cuenta__abono {
+  color: #2e7d4f;
+  font-weight: 700;
+}
+
+.cuenta__mas {
+  margin-top: 10px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-dark);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pago-exito {
+  max-width: 520px;
+  margin: 24px auto 0;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: #e8f5ec;
+  color: #1f6b3d;
+  font-weight: 600;
+  text-align: center;
+}

@@ -11,6 +11,8 @@ export interface MarcaEmpresa {
   color_marca: string;
   logo_url: string | null;
   email_contacto: string | null;
+  // False: la suscripcion vencio o la tienda esta suspendida.
+  operativa: boolean;
 }
 
 // Sin tienda (SuperAdministrador): la marca de la plataforma.
@@ -126,6 +128,16 @@ export class MarcaTienda {
     const m = this.marca();
     return m ? colorParaTextoBlanco(m.color_marca) : null;
   });
+
+  // La tienda puede operar (suscripcion vigente). Mientras carga, si.
+  readonly operativa = computed(() => this.marca()?.operativa ?? true);
+
+  // Vuelve a pedir la marca (ej. despues de renovar la suscripcion).
+  recargar(): Promise<void> {
+    this.pendiente = null;
+    this.cargadaPara = null;
+    return this.cargar();
+  }
 
   cargar(): Promise<void> {
     const usuario = this.auth.currentUser();

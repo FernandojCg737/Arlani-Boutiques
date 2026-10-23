@@ -19,14 +19,28 @@
   }
 
   @if (venta(); as v) {
-    <article class="comprobante">
+    <article class="comprobante" [style.--brand-dark]="color()">
       <header class="comprobante__header">
         <div class="comprobante__marca">
-          <img src="/img/logo.png" alt="Atelier Aranier" />
+          @if (v.tienda?.logo_url) {
+            <img [src]="v.tienda?.logo_url" [alt]="v.tienda?.nombre" />
+          }
           <div class="comprobante__marca-datos">
-            <strong>Atelier Aranier</strong>
-            <span>Av. San Martin, 3er Anillo Interno, Equipetrol, Santa Cruz de la Sierra, Bolivia</span>
-            <span>+591 73766956 &middot; contacto&#64;atelieraranier.com</span>
+            <strong>{{ v.tienda?.nombre ?? 'Arlani Boutiques' }}</strong>
+            @if (v.tienda?.razon_social) {
+              <span>{{ v.tienda?.razon_social }}</span>
+            }
+            @if (v.tienda?.nit) {
+              <span>NIT {{ v.tienda?.nit }}</span>
+            }
+            <span>
+              {{ v.tienda?.direccion_fiscal || v.sucursal_nombre }}{{ v.tienda?.ciudad ? ', ' + v.tienda?.ciudad : '' }}, Bolivia
+            </span>
+            @if (v.tienda?.telefono || v.tienda?.email_contacto) {
+              <span>
+                {{ v.tienda?.telefono }}{{ v.tienda?.telefono && v.tienda?.email_contacto ? ' · ' : '' }}{{ v.tienda?.email_contacto }}
+              </span>
+            }
           </div>
         </div>
         <div class="comprobante__folio">
@@ -42,8 +56,13 @@
         @if (v.atendido_por_nombre) {
           <span>Atendido por: {{ v.atendido_por_nombre }}</span>
         }
-        <span>Metodo de pago: {{ metodoLabel[v.metodo_pago] ?? v.metodo_pago }}</span>
-        <span class="comprobante__estado">Estado: {{ v.estado_pago }}</span>
+        <span>Método de pago: {{ v.metodo_pago_nombre ?? metodoLabel[v.metodo_pago] ?? v.metodo_pago }}</span>
+        <span class="comprobante__estado comprobante__estado--{{ v.estado_pago }}">
+          Estado: {{ estadoLabel[v.estado_pago] ?? v.estado_pago }}
+        </span>
+        @if (v.estado_pago === 'rechazado' && v.motivo_rechazo) {
+          <span class="comprobante__motivo">Motivo: {{ v.motivo_rechazo }}</span>
+        }
       </div>
 
       <table class="comprobante__tabla">
@@ -77,7 +96,7 @@
       </div>
 
       <footer class="comprobante__footer">
-        <p>Gracias por tu compra en Atelier Aranier.</p>
+        <p>Gracias por tu compra en {{ v.tienda?.nombre ?? 'Arlani Boutiques' }}.</p>
         <p class="comprobante__legal">
           Este documento es un comprobante interno de compra y no reemplaza una factura fiscal con validez
           tributaria (NIT).

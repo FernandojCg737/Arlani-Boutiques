@@ -334,6 +334,59 @@
 }
 
 // Relacion del cliente con la tienda: "7 compras · 1 reserva · ..." y la fecha debajo.
+.ultima-ubicacion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  max-width: 220px;
+  padding: 6px 8px;
+  background: #f4f7fb;
+  font-size: 11px;
+  color: #555;
+
+  strong {
+    color: #1f4e8c;
+  }
+
+  small {
+    color: #888;
+  }
+
+  button {
+    align-self: flex-start;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 700;
+    color: var(--brand-dark);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
+
+.ubicacion-modal {
+  max-width: 640px;
+
+  .modal-actions a {
+    align-self: center;
+    margin-right: auto;
+    font-size: 13px;
+    color: var(--brand-dark);
+  }
+}
+
+.ubicacion-modal__texto {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #555;
+
+  small {
+    color: #888;
+  }
+}
+
 .relacion {
   display: flex;
   flex-direction: column;

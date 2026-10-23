@@ -1,0 +1,271 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P4 · CU21</span>
+      <h1>Métodos de pago</h1>
+      <p>
+        Cómo te pagan tus clientes en línea. PayPal se confirma solo; con QR, transferencia u otros, el cliente sube
+        su comprobante y lo apruebas en Gestión de Ventas.
+      </p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+  @if (aviso()) {
+    <div class="mp-aviso" role="status">{{ aviso() }}</div>
+  }
+
+  <!-- Agregar -->
+  <section class="mp-agregar">
+    <h2>Agregar un método</h2>
+    <div class="mp-tipos">
+      @for (t of tipos; track t.tipo) {
+        <button
+          type="button"
+          class="mp-tipo"
+          [disabled]="t.tipo === 'paypal' && tienePaypal()"
+          [title]="t.tipo === 'paypal' && tienePaypal() ? 'Ya tienes tu cuenta de PayPal: edítala abajo' : ''"
+          (click)="openNew(t.tipo)"
+        >
+          <strong>+ {{ t.titulo }}</strong>
+          <span>{{ t.detalle }}</span>
+        </button>
+      }
+    </div>
+  </section>
+
+  <!-- Registrados -->
+  <section class="mp-lista">
+    <h2>Tus métodos</h2>
+    @if (loading()) {
+      <p class="mp-vacio">Cargando…</p>
+    } @else if (metodos().length === 0) {
+      <p class="mp-vacio">
+        Todavía no registraste métodos de pago: tus clientes no pueden pagarte en línea hasta que agregues al menos uno.
+      </p>
+    } @else {
+      <div class="mp-tarjetas">
+        @for (m of metodos(); track m.id) {
+          <article class="mp-tarjeta" [class.is-inactivo]="!m.activo">
+            <header>
+              <span class="mp-etiqueta mp-etiqueta--{{ m.tipo }}">{{ tituloTipo(m.tipo) }}</span>
+              <span class="admin-badge" [class.is-inactive]="!m.activo">{{ m.activo ? 'activo' : 'inactivo' }}</span>
+            </header>
+            <h3>{{ m.nombre }}</h3>
+            @switch (m.tipo) {
+              @case ('paypal') {
+                <dl>
+                  <dt>Client ID</dt>
+                  <dd class="mp-corto">{{ m.paypal_client_id }}</dd>
+                  <dt>Secret</dt>
+                  <dd>{{ m.paypal_secret_mascara }}</dd>
+                  <dt>Modo</dt>
+                  <dd>{{ m.paypal_modo === 'live' ? 'Real' : 'Sandbox (pruebas)' }}</dd>
+                  <dt>Correo PayPal</dt>
+                  <dd>{{ m.paypal_email ?? 'Falta: edítalo para recibir pagos de "Pagar todo"' }}</dd>
+                </dl>
+                <p class="mp-nota">Se confirma solo: la venta queda pagada al instante.</p>
+              }
+              @case ('qr') {
+                @if (m.qr_url) {
+                  <img class="mp-qr" [src]="m.qr_url" alt="QR de cobro" />
+                }
+                <p class="mp-nota">Con comprobante: lo apruebas en Gestión de Ventas.</p>
+              }
+              @default {
+                <dl>
+                  @if (m.banco) {
+                    <dt>Banco</dt>
+                    <dd>{{ m.banco }}</dd>
+                  }
+                  @if (m.numero_cuenta) {
+                    <dt>Cuenta</dt>
+                    <dd>{{ m.numero_cuenta }}{{ m.tipo_cuenta ? ' · ' + m.tipo_cuenta : '' }}</dd>
+                  }
+                  @if (m.titular) {
+                    <dt>Titular</dt>
+                    <dd>{{ m.titular }}{{ m.documento_titular ? ' · ' + m.documento_titular : '' }}</dd>
+                  }
+                </dl>
+                <p class="mp-nota">Con comprobante: lo apruebas en Gestión de Ventas.</p>
+              }
+            }
+            @if (m.instrucciones) {
+              <p class="mp-instrucciones">{{ m.instrucciones }}</p>
+            }
+            <div class="admin-table__actions">
+              <button type="button" (click)="edit(m)">Editar</button>
+              <button type="button" (click)="alternarActivo(m)">{{ m.activo ? 'Desactivar' : 'Activar' }}</button>
+              <button type="button" class="is-danger" (click)="remove(m)">Eliminar</button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- Facturacion -->
+  <section class="mp-factura">
+    <h2>Datos para tus facturas</h2>
+    <p>Cada factura que emite tu tienda sale con tu logo, tu color y estos datos.</p>
+    <form (submit)="$event.preventDefault(); guardarFacturacion()">
+      <div class="modal-field-row">
+        <label class="modal-field">
+          <span>Razón social</span>
+          <input type="text" maxlength="150" placeholder="Ej. Fashion Store S.R.L." [value]="fact().razon_social ?? ''"
+                 (input)="setFact('razon_social', $any($event.target).value)" />
+        </label>
+        <label class="modal-field">
+          <span>NIT</span>
+          <input type="text" maxlength="20" placeholder="Ej. 1234567012" [value]="fact().nit ?? ''"
+                 (input)="setFact('nit', $any($event.target).value)" />
+        </label>
+      </div>
+      <div class="modal-field-row">
+        <label class="modal-field">
+          <span>Dirección fiscal</span>
+          <input type="text" maxlength="200" placeholder="Ej. Av. Plan 3000 #45" [value]="fact().direccion_fiscal ?? ''"
+                 (input)="setFact('direccion_fiscal', $any($event.target).value)" />
+        </label>
+        <label class="modal-field">
+          <span>Teléfono</span>
+          <input type="text" maxlength="30" placeholder="Ej. 78952146" [value]="fact().telefono ?? ''"
+                 (input)="setFact('telefono', $any($event.target).value)" />
+        </label>
+      </div>
+      <label class="modal-field">
+        <span>Correo de contacto</span>
+        <input type="email" maxlength="150" placeholder="ventas@tutienda.com" [value]="fact().email_contacto ?? ''"
+               (input)="setFact('email_contacto', $any($event.target).value)" />
+      </label>
+      @if (errorFact()) {
+        <div class="admin-error">{{ errorFact() }}</div>
+      }
+      @if (avisoFact()) {
+        <div class="mp-aviso" role="status">{{ avisoFact() }}</div>
+      }
+      <div class="modal-actions">
+        <button type="submit" [disabled]="guardandoFact()">{{ guardandoFact() ? 'Guardando…' : 'Guardar datos' }}</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+@if (showForm()) {
+  <div class="modal-overlay" (click)="closeForm()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2>{{ editando() ? 'Editar' : 'Nuevo' }} método: {{ tituloTipo(f().tipo) }}</h2>
+      <form (submit)="$event.preventDefault(); submit()">
+        <label class="modal-field">
+          <span>Nombre que verá el cliente</span>
+          <input type="text" maxlength="80" [value]="f().nombre" (input)="setF('nombre', $any($event.target).value)" />
+        </label>
+
+        @switch (f().tipo) {
+          @case ('paypal') {
+            <p class="mp-ayuda">
+              Copia las credenciales de tu app en developer.paypal.com (Apps & Credentials). El dinero de tus ventas llega
+              directo a esa cuenta.
+            </p>
+            <label class="modal-field">
+              <span>Client ID</span>
+              <input type="text" [value]="f().paypal_client_id" (input)="setF('paypal_client_id', $any($event.target).value)" />
+            </label>
+            <label class="modal-field">
+              <span>Secret {{ editando() ? '(déjalo vacío para conservar el actual)' : '' }}</span>
+              <input type="password" autocomplete="new-password" [value]="f().paypal_secret"
+                     (input)="setF('paypal_secret', $any($event.target).value)" />
+            </label>
+            <div class="modal-field-row">
+              <label class="modal-field">
+                <span>Modo</span>
+                <select [value]="f().paypal_modo" (change)="setF('paypal_modo', $any($event.target).value)">
+                  <option value="sandbox">Sandbox (pruebas)</option>
+                  <option value="live">Real</option>
+                </select>
+              </label>
+              <label class="modal-field">
+                <span>Correo de tu cuenta PayPal</span>
+                <input type="email" required [value]="f().paypal_email" (input)="setF('paypal_email', $any($event.target).value)" />
+              </label>
+            </div>
+            <p class="mp-ayuda">
+              El correo es el de la cuenta PayPal donde recibes tu dinero: cuando un cliente paga varias tiendas con
+              "Pagar todo", Arlani te envía ahí lo tuyo menos la comisión.
+            </p>
+          }
+          @case ('qr') {
+            <label class="modal-field">
+              <span>Imagen de tu QR de cobro</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="alElegirQr($any($event.target))" />
+            </label>
+            @if (qrNuevo() || editando()?.qr_url) {
+              <img class="mp-qr" [src]="qrNuevo() || editando()?.qr_url" alt="Vista previa del QR" />
+            }
+            <div class="modal-field-row">
+              <label class="modal-field">
+                <span>Banco (opcional)</span>
+                <input type="text" [value]="f().banco" (input)="setF('banco', $any($event.target).value)" />
+              </label>
+              <label class="modal-field">
+                <span>Titular (opcional)</span>
+                <input type="text" [value]="f().titular" (input)="setF('titular', $any($event.target).value)" />
+              </label>
+            </div>
+          }
+          @default {
+            <div class="modal-field-row">
+              <label class="modal-field">
+                <span>Banco{{ f().tipo === 'otro' ? ' o billetera (opcional)' : '' }}</span>
+                <input type="text" [value]="f().banco" (input)="setF('banco', $any($event.target).value)" />
+              </label>
+              <label class="modal-field">
+                <span>Número de cuenta{{ f().tipo === 'otro' ? ' o celular (opcional)' : '' }}</span>
+                <input type="text" [value]="f().numero_cuenta" (input)="setF('numero_cuenta', $any($event.target).value)" />
+              </label>
+            </div>
+            <div class="modal-field-row">
+              <label class="modal-field">
+                <span>Titular{{ f().tipo === 'otro' ? ' (opcional)' : '' }}</span>
+                <input type="text" [value]="f().titular" (input)="setF('titular', $any($event.target).value)" />
+              </label>
+              <label class="modal-field">
+                <span>CI / NIT del titular (opcional)</span>
+                <input type="text" [value]="f().documento_titular" (input)="setF('documento_titular', $any($event.target).value)" />
+              </label>
+            </div>
+            @if (f().tipo === 'transferencia') {
+              <label class="modal-field">
+                <span>Tipo de cuenta (opcional)</span>
+                <input type="text" placeholder="Ej. Caja de ahorro" [value]="f().tipo_cuenta"
+                       (input)="setF('tipo_cuenta', $any($event.target).value)" />
+              </label>
+            }
+          }
+        }
+
+        <label class="modal-field">
+          <span>Instrucciones para el cliente (opcional)</span>
+          <textarea rows="2" maxlength="1000" placeholder="Ej. Escribe tu nombre en la glosa de la transferencia."
+                    [value]="f().instrucciones" (input)="setF('instrucciones', $any($event.target).value)"></textarea>
+        </label>
+        <label class="mp-check">
+          <input type="checkbox" [checked]="f().activo" (change)="setF('activo', $any($event.target).checked)" />
+          Activo (tus clientes pueden elegirlo)
+        </label>
+
+        @if (errorForm()) {
+          <div class="admin-error">{{ errorForm() }}</div>
+        }
+        <div class="modal-actions">
+          <button type="button" class="is-secondary" (click)="closeForm()">Cancelar</button>
+          <button type="submit" [disabled]="saving()">
+            {{ saving() ? (f().tipo === 'paypal' ? 'Verificando con PayPal…' : 'Guardando…') : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

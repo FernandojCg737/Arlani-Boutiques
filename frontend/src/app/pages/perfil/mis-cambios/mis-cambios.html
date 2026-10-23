@@ -1,0 +1,267 @@
+@if (aviso()) {
+  <div class="perfil-alert is-success mc-aviso" role="status">{{ aviso() }}</div>
+}
+@if (cargandoOpciones()) {
+  <p class="dash-vacio">Buscando prendas para el cambio…</p>
+}
+
+@if (mostrarLista() && cargado() && cambios().length === 0) {
+  <p class="dash-vacio">
+    Todavía no pediste cambios. Desde Mis Compras puedes cambiar una prenda hasta 24 horas después de comprarla.
+  </p>
+}
+
+@if (mostrarLista() && cambios().length > 0) {
+  <section class="mc">
+    <ul class="dash-lista">
+      @for (c of cambios(); track c.id) {
+        <li class="dash-card">
+          <div class="dash-card__fila">
+            <div class="dash-card__info">
+              <strong>Cambio #{{ c.id }} · {{ c.tienda.nombre }}</strong>
+              <span>
+                Compra #{{ c.venta_id }} · {{ c.fecha_solicitud + 'Z' | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
+                Recoges en {{ c.sucursal_nombre }}
+              </span>
+              <p class="mc__prendas">
+                <span class="mc__sale">{{ c.cantidad }}× {{ c.producto_original }} ({{ c.talla_original }}, {{ c.color_original }})</span>
+                <span aria-hidden="true">→</span>
+                <span class="mc__entra">{{ c.cantidad }}× {{ c.producto_nuevo }} ({{ c.talla_nueva }}, {{ c.color_nuevo }})</span>
+              </p>
+              @if (numero(c.diferencia) > 0) {
+                <span class="mc__dif">Diferencia a pagar: Bs {{ c.diferencia | number: '1.2-2' }}</span>
+              } @else if (numero(c.diferencia) < 0) {
+                <span class="mc__dif mc__dif--favor">
+                  Te devuelven Bs {{ -numero(c.diferencia) | number: '1.2-2' }}{{ c.reembolso_metodo === 'paypal' ? ' a tu PayPal' : c.reembolso_metodo === 'en_tienda' ? ' en la tienda' : '' }}
+                </span>
+              }
+              @if (c.motivo_rechazo && (c.estado === 'rechazado' || c.estado === 'por_pagar')) {
+                <p class="dash-rechazo">{{ c.estado === 'rechazado' ? 'La tienda rechazó el cambio' : 'La tienda no aceptó tu comprobante' }}: {{ c.motivo_rechazo }}</p>
+              }
+            </div>
+            <div class="dash-card__acciones">
+              <span class="admin-badge mc-estado mc-estado--{{ c.estado }}">{{ estadoLabel[c.estado] }}</span>
+              @if (c.estado === 'completado') {
+                <a class="dash-comprobante-link" [routerLink]="['/mis-cambios', c.id]">Ver comprobante</a>
+              }
+              @if (c.estado === 'solicitado' || c.estado === 'por_pagar') {
+                <button type="button" class="mc__cancelar" (click)="cancelar(c)">Cancelar cambio</button>
+              }
+            </div>
+          </div>
+
+          @if (c.estado === 'por_pagar') {
+            <div class="mc-pago">
+              <p class="mc-pago__titulo">
+                Paga Bs {{ c.diferencia | number: '1.2-2' }} a {{ c.tienda.nombre }} para completar tu cambio:
+              </p>
+              <div class="mc-pago__metodos">
+                @for (m of c.metodos; track m.id) {
+                  <button type="button" class="mc-pago__metodo" [class.is-activo]="esMetodoActivo(c, m)"
+                          [disabled]="procesandoPago()" (click)="elegirMetodo(c, m)">
+                    {{ m.nombre }}
+                    <small>{{ m.requiere_comprobante ? 'Con comprobante' : 'Se confirma al instante' }}</small>
+                  </button>
+                } @empty {
+                  <p class="dash-revision">La tienda todavía no configuró cómo cobrar en línea: paga en la sucursal.</p>
+                }
+              </div>
+
+              @if (pagando(); as p) {
+                @if (p.cambio.id === c.id) {
+                  @if (errorPago()) {
+                    <div class="perfil-alert is-error">{{ errorPago() }}</div>
+                  }
+                  @if (p.metodo.tipo === 'paypal') {
+                    <p class="mc-pago__nota">Pagas US$ {{ c.diferencia_usd }} (al cambio oficial) con PayPal o tarjeta.</p>
+                    @if (procesandoPago()) {
+                      <p class="mc-pago__nota">Confirmando tu pago…</p>
+                    }
+                    <div #paypalCambio class="mc-pago__paypal"></div>
+                  } @else {
+                    @if (p.metodo.qr_url) {
+                      <img class="mc-pago__qr" [src]="p.metodo.qr_url" [alt]="'QR de ' + c.tienda.nombre" />
+                    }
+                    @if (p.metodo.banco || p.metodo.numero_cuenta || p.metodo.titular) {
+                      <p class="mc-pago__datos">
+                        @if (p.metodo.banco) { <span>{{ p.metodo.banco }}</span> }
+                        @if (p.metodo.numero_cuenta) { <span>Cuenta {{ p.metodo.numero_cuenta }}</span> }
+                        @if (p.metodo.titular) { <span>Titular {{ p.metodo.titular }}</span> }
+                      </p>
+                    }
+                    @if (p.metodo.instrucciones) {
+                      <p class="mc-pago__nota">{{ p.metodo.instrucciones }}</p>
+                    }
+                    <label class="mc-pago__archivo">
+                      <span>Foto del comprobante</span>
+                      <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onArchivo($event)" />
+                    </label>
+                    <button type="button" class="perfil-btn-confirmar" [disabled]="!archivo() || procesandoPago()"
+                            (click)="enviarComprobante()">
+                      {{ procesandoPago() ? 'Enviando…' : 'Enviar comprobante' }}
+                    </button>
+                  }
+                }
+              }
+            </div>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+@if (opciones(); as o) {
+  <div class="perfil-modal-overlay" (click)="cerrar()">
+    <div class="perfil-modal perfil-modal--devolucion mc-modal" (click)="$event.stopPropagation()">
+      <div class="perfil-modal__header">
+        <div>
+          <h3>Cambiar una prenda</h3>
+          <p>Compra #{{ o.venta_id }} · {{ o.tienda_nombre }} · hasta el {{ o.plazo_hasta + 'Z' | date: "d MMM, h:mm a" : '-0400' }}</p>
+        </div>
+        <button type="button" class="perfil-modal__close" (click)="cerrar()">✕</button>
+      </div>
+
+      <div class="perfil-modal__body">
+        @if (!o.puede_cambiar) {
+          <div class="perfil-alert is-error">{{ o.motivo_no ?? 'Ya cambiaste todas las prendas de esta compra.' }}</div>
+        } @else {
+          <span class="devolucion-items__label">1. ¿Qué prenda quieres cambiar?</span>
+          <div class="mc-lineas">
+            @for (l of o.lineas; track l.item_linea_id) {
+              <label class="devolucion-item-row" [class.is-selected]="lineaId() === l.item_linea_id">
+                <span class="devolucion-item-row__check">
+                  <input type="radio" name="linea" [checked]="lineaId() === l.item_linea_id" [disabled]="l.disponibles < 1"
+                         (change)="lineaId.set(l.item_linea_id); cantidad.set(1)" />
+                  <span class="devolucion-item-row__info">
+                    <strong>{{ l.producto_nombre }}</strong>
+                    <small>
+                      {{ l.talla_codigo }} · {{ l.color_nombre }} · pagaste Bs {{ l.precio_pagado | number: '1.2-2' }}
+                      {{ l.disponibles < 1 ? '· ya la cambiaste' : '' }}
+                    </small>
+                  </span>
+                </span>
+              </label>
+            }
+          </div>
+          @if (linea(); as l) {
+            @if (l.disponibles > 1) {
+              <div class="devolucion-campo mc-cantidad">
+                <label>Cuántas</label>
+                <input type="number" min="1" [max]="l.disponibles" [value]="cantidad()"
+                       (input)="cantidad.set(+$any($event.target).value)" />
+              </div>
+            }
+
+            <span class="devolucion-items__label">2. ¿Por cuál? (con stock en {{ o.tienda_nombre }})</span>
+            <div class="mc-prendas">
+              @for (p of o.prendas; track p.producto_id) {
+                <button type="button" class="mc-prenda" [class.is-activa]="productoId() === p.producto_id" (click)="elegirProducto(p)">
+                  @if (p.imagen_url) {
+                    <img [src]="p.imagen_url" [alt]="p.nombre" />
+                  }
+                  <strong>{{ p.nombre }}</strong>
+                  <small>Bs {{ p.precio | number: '1.2-2' }}</small>
+                </button>
+              } @empty {
+                <p class="dash-revision">No hay otras prendas con stock en esta sucursal por ahora.</p>
+              }
+            </div>
+            @if (prenda(); as p) {
+              <span class="devolucion-items__label">3. Talla</span>
+              <div class="mc-variantes">
+                @for (t of tallas(); track t.id) {
+                  <button type="button" class="mc-variante mc-talla" [class.is-activa]="tallaId() === t.id"
+                          [disabled]="!tallaDisponible(p, t.id)" (click)="elegirTalla(t.id)"
+                          [title]="tallaDisponible(p, t.id) ? '' : 'En esta talla no hay otro color con stock'">
+                    {{ t.codigo }}
+                  </button>
+                }
+              </div>
+
+              @if (tallaId() !== null) {
+                <span class="devolucion-items__label">4. Color</span>
+                <div class="mc-variantes">
+                  @for (v of colores(); track v.color_id) {
+                    <button type="button" class="mc-variante" [class.is-activa]="colorId() === v.color_id"
+                            [disabled]="!colorDisponible(p, v)" (click)="elegirColor(v)">
+                      {{ v.color_nombre }}
+                      <small>{{ esLaMisma(p, v) ? 'la que tienes' : !colorDisponible(p, v) ? 'sin stock' : 'quedan ' + v.stock }}</small>
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (variante(); as v) {
+                <span class="devolucion-items__label">5. ¿Dónde la recoges?</span>
+                <div class="mc-variantes">
+                  @for (s of v.sucursales; track s.sucursal_id) {
+                    <button type="button" class="mc-variante" [class.is-activa]="sucursalId() === s.sucursal_id"
+                            [disabled]="s.stock < cantidad()" (click)="sucursalId.set(s.sucursal_id)">
+                      {{ s.sucursal_nombre }}
+                      <small>
+                        {{ s.stock < cantidad() ? 'sin stock' : 'quedan ' + s.stock }}{{ s.sucursal_id === o.sucursal_id ? ' · donde compraste' : '' }}
+                      </small>
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (sucursal(); as s) {
+                <p class="mc-eleccion">
+                  Te llevas: <strong>{{ p.nombre }}</strong>, talla <strong>{{ variante()?.talla_codigo }}</strong>, color
+                  <strong>{{ variante()?.color_nombre }}</strong>. La recoges en <strong>{{ s.sucursal_nombre }}</strong>
+                  y ahí entregas la prenda que devuelves.
+                </p>
+              }
+            }
+
+            <div class="devolucion-campos">
+              <div class="devolucion-campo">
+                <label>6. Motivo</label>
+                <select [value]="motivo()" (change)="motivo.set($any($event.target).value)">
+                  <option value="talla">No me quedó la talla</option>
+                  <option value="color">Prefiero otro color</option>
+                  <option value="modelo">Prefiero otro modelo</option>
+                  <option value="defecto">Tiene un defecto</option>
+                  <option value="otro">Otro motivo</option>
+                </select>
+              </div>
+              <div class="devolucion-campo">
+                <label>Detalles (opcional)</label>
+                <textarea rows="2" maxlength="500" [value]="observaciones()" (input)="observaciones.set($any($event.target).value)"></textarea>
+              </div>
+            </div>
+
+            @if (diferencia() !== null) {
+              <div class="devolucion-total-box">
+                @if (diferencia()! > 0) {
+                  <span>La prenda nueva cuesta más: pagas la diferencia</span>
+                  <strong>Bs {{ diferencia() | number: '1.2-2' }}</strong>
+                } @else if (diferencia()! < 0) {
+                  <span>La prenda nueva cuesta menos: te devolvemos</span>
+                  <strong>Bs {{ -diferencia()! | number: '1.2-2' }}</strong>
+                } @else {
+                  <span>Mismo precio</span>
+                  <strong>Sin diferencia</strong>
+                }
+              </div>
+            }
+          }
+          @if (errorModal()) {
+            <div class="perfil-alert is-error">{{ errorModal() }}</div>
+          }
+        }
+      </div>
+
+      <div class="perfil-modal__footer">
+        <button type="button" class="perfil-btn-cancelar" (click)="cerrar()">Cerrar</button>
+        @if (o.puede_cambiar) {
+          <button type="button" class="perfil-btn-confirmar" [disabled]="!listo() || enviando()" (click)="enviar()">
+            {{ enviando() ? 'Enviando…' : 'Pedir el cambio' }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+}

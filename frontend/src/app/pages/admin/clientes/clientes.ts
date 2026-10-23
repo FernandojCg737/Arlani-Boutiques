@@ -4,7 +4,9 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { MapaUbicacion } from '../../../components/mapa-ubicacion/mapa-ubicacion';
 import { Auth } from '../../../services/auth';
+import { enlaceMapa } from '../../../services/mapa';
 
 interface Cliente {
   id: number;
@@ -17,6 +19,20 @@ interface Cliente {
   metodo_registro: string;
   // Solo viene al listar los clientes de una empresa.
   relacion: RelacionTienda | null;
+  // Ubicacion de su ultima compra con envio a domicilio (para el
+  // SuperAdministrador, en cualquier tienda; para una tienda, en la suya).
+  ultima_ubicacion: UltimaUbicacion | null;
+}
+
+interface UltimaUbicacion {
+  venta_id: number;
+  fecha: string;
+  tienda_nombre: string;
+  direccion: string;
+  referencia: string | null;
+  ciudad: string | null;
+  latitud: string;
+  longitud: string;
 }
 
 interface RelacionTienda {
@@ -29,7 +45,7 @@ interface RelacionTienda {
 
 @Component({
   selector: 'app-admin-clientes',
-  imports: [DatePipe],
+  imports: [DatePipe, MapaUbicacion],
   templateUrl: './clientes.html',
   styleUrl: './clientes.scss',
 })
@@ -44,6 +60,10 @@ export class AdminClientes implements OnInit {
 
   // Dentro de la pantalla de empresas del SuperAdministrador (sin encabezado propio).
   readonly embebido = input(false);
+
+  // Cliente cuya ultima ubicacion de envio se ve en el mapa.
+  protected readonly ubicacionVista = signal<Cliente | null>(null);
+  protected readonly enlaceMapa = enlaceMapa;
 
   // Empresa elegida por el SuperAdministrador (null = todos los clientes).
   protected readonly empresaId = computed(() => {

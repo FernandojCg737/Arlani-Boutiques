@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response, UploadFile, status
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, joinedload
 
@@ -225,7 +225,8 @@ def list_productos_publico(
     query = (
         db.query(Producto)
         .join(Empresa, Empresa.id == Producto.empresa_id)
-        .filter(Empresa.estado == "activa")
+        # Tiendas suspendidas o con la suscripcion vencida no venden.
+        .filter(Empresa.estado == "activa", func.fn_empresa_operativa(Empresa.id))
         .options(
             joinedload(Producto.empresa),
             joinedload(Producto.marca),
@@ -263,7 +264,7 @@ def get_producto_publico(
             joinedload(Producto.prenda_ar),
             joinedload(Producto.inventarios).joinedload(Inventario.sucursal),
         )
-        .filter(Producto.id == producto_id, Producto.estado == "activo")
+        .filter(Producto.id == producto_id, Producto.estado == "activo", func.fn_empresa_operativa(Producto.empresa_id))
         .first()
     )
     if producto is None:

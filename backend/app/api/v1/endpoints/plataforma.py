@@ -6,6 +6,8 @@ suscripciones y limites. Las escrituras llaman a funciones/PA de Postgres
 montos/vencimientos, validan limites y registran la bitacora (CU08).
 """
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
@@ -14,10 +16,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_superadmin
 from app.core.audit import set_client_ip_for_trigger
 from app.core.errores_db import http_desde_pg
+from app.core.liquidaciones import enviar_liquidaciones
 from app.db.session import get_db
 from app.models import Usuario
 from app.schemas.plataforma import (
     ActividadOut,
+    ComisionTiendaOut,
     DistribucionPlanOut,
     EmpresaCreate,
     EmpresaEstadoIn,
@@ -26,6 +30,7 @@ from app.schemas.plataforma import (
     EmpresaUpdate,
     IngresoMesOut,
     LimiteSucursalesOut,
+    LiquidacionOut,
     PlanOut,
     PlanUpdate,
     ResumenPlataformaOut,
@@ -78,6 +83,81 @@ def ingresos(
     meses = max(2, min(meses, 24))
     filas = db.execute(text("SELECT * FROM fn_ingresos_mensuales(:m)"), {"m": meses}).mappings().all()
     return [IngresoMesOut(**f) for f in filas]
+
+
+@router.get("/comisiones", response_model=list[ComisionTiendaOut])
+def comisiones_por_tienda(
+    desde: date | None = None,
+    hasta: date | None = None,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_superadmin),
+) -> list[ComisionTiendaOut]:
+    """Lo que gana Arlani por las ventas en linea de cada tienda: comisiones
+    del periodo, lo que la tienda ya pago y lo que debe hoy."""
+    hoy = db.execute(text("SELECT (now() AT TIME ZONE 'America/La_Paz')::date")).scalar()
+    desde = desde or hoy.replace(day=1)
+    hasta = hasta or hoy
+    # Las fechas se guardan en UTC; el periodo se cuenta en hora de Bolivia.
+    filas = db.execute(
+        text(
+            """
+            WITH m AS (
+                SELECT *, (fecha AT TIME ZONE 'UTC' AT TIME ZONE 'America/La_Paz')::date AS dia
+                FROM cuenta_tienda_movimiento
+            )
+            SELECT e.id AS empresa_id, e.nombre, e.subdominio, e.estado,
+                   p.nombre AS plan_nombre, p.comision_pct,
+                   count(m.id) FILTER (WHERE m.tipo = 'comision' AND m.dia BETWEEN :desde AND :hasta) AS ventas,
+                   COALESCE(sum(m.base_bob) FILTER (WHERE m.tipo = 'comision' AND m.dia BETWEEN :desde AND :hasta), 0) AS ventas_bob,
+                   COALESCE(sum(m.monto_bob) FILTER (WHERE m.tipo = 'comision' AND m.dia BETWEEN :desde AND :hasta), 0) AS comisiones_bob,
+                   COALESCE(-sum(m.monto_bob) FILTER (WHERE m.tipo = 'pago' AND m.dia BETWEEN :desde AND :hasta), 0) AS pagado_bob,
+                   COALESCE(sum(m.monto_bob), 0) AS saldo_bob
+            FROM empresa e
+            LEFT JOIN suscripcion s ON s.empresa_id = e.id AND s.estado = 'activa'
+            LEFT JOIN plan_suscripcion p ON p.id = s.plan_id
+            LEFT JOIN m ON m.empresa_id = e.id
+            GROUP BY e.id, e.nombre, e.subdominio, e.estado, p.nombre, p.comision_pct
+            ORDER BY comisiones_bob DESC, e.nombre
+            """
+        ),
+        {"desde": desde, "hasta": hasta},
+    ).mappings().all()
+    return [ComisionTiendaOut(**f) for f in filas]
+
+
+_SQL_LIQUIDACIONES = """
+    SELECT l.id, l.empresa_id, e.nombre AS empresa_nombre, l.fecha, l.paypal_order_id, l.bruto_bob, l.comision_bob,
+           l.neto_bob, l.neto_usd, l.paypal_email, l.estado, l.payout_batch_id, l.error, l.fecha_envio
+    FROM liquidacion_tienda l JOIN empresa e ON e.id = l.empresa_id
+"""
+
+
+@router.get("/liquidaciones", response_model=list[LiquidacionOut])
+def liquidaciones(
+    limite: int = 100, db: Session = Depends(get_db), _: Usuario = Depends(require_superadmin)
+) -> list[LiquidacionOut]:
+    """Envios de Arlani a cada tienda por las compras con "Pagar todo"."""
+    filas = db.execute(
+        text(_SQL_LIQUIDACIONES + " ORDER BY l.fecha DESC, l.id DESC LIMIT :n"), {"n": max(1, min(limite, 500))}
+    ).mappings().all()
+    return [LiquidacionOut(**f) for f in filas]
+
+
+@router.post("/liquidaciones/{liquidacion_id}/reintentar", response_model=LiquidacionOut)
+def reintentar_liquidacion(
+    liquidacion_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_superadmin),
+) -> LiquidacionOut:
+    estado = db.execute(text("SELECT estado FROM liquidacion_tienda WHERE id = :i"), {"i": liquidacion_id}).scalar()
+    if estado is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Liquidación no encontrada.")
+    if estado == "enviada":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta liquidación ya se envió.")
+    enviar_liquidaciones(db, [liquidacion_id])
+    fila = db.execute(text(_SQL_LIQUIDACIONES + " WHERE l.id = :i"), {"i": liquidacion_id}).mappings().one()
+    return LiquidacionOut(**fila)
 
 
 @router.get("/distribucion-planes", response_model=list[DistribucionPlanOut])
@@ -222,7 +302,7 @@ def listar_planes(db: Session = Depends(get_db), _: Usuario = Depends(require_su
     filas = db.execute(
         text(
             "SELECT p.id, p.codigo, p.nombre, p.precio_mensual, p.max_sucursales, p.dias_prueba, p.ia_generativa, p.operacion_offline, "
-            "(SELECT count(*) FROM suscripcion su WHERE su.plan_id = p.id AND su.estado = 'activa') AS empresas "
+            "p.comision_pct, (SELECT count(*) FROM suscripcion su WHERE su.plan_id = p.id AND su.estado = 'activa') AS empresas "
             "FROM plan_suscripcion p WHERE p.activo ORDER BY p.orden"
         )
     ).mappings().all()
@@ -240,12 +320,13 @@ def actualizar_plan(
     _contexto_auditoria(db, usuario, request)
     _ejecutar(
         db,
-        "SELECT sp_actualizar_plan(:codigo, :precio, :max, :ia)",
+        "SELECT sp_actualizar_plan(:codigo, :precio, :max, :ia, :comision)",
         {
             "codigo": codigo,
             "precio": payload.precio_mensual,
             "max": payload.max_sucursales,
             "ia": payload.ia_generativa,
+            "comision": payload.comision_pct,
         },
     )
     return next(p for p in listar_planes(db, usuario) if p.codigo == codigo)

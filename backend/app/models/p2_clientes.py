@@ -39,6 +39,7 @@ class Sucursal(Base):
     longitud: Mapped[float | None] = mapped_column(Float)
 
     ciudad: Mapped["Ciudad"] = relationship(back_populates="sucursales")
+    empresa: Mapped["Empresa | None"] = relationship()
     empleados: Mapped[list["Empleado"]] = relationship(back_populates="sucursal")
     inventarios: Mapped[list["Inventario"]] = relationship(back_populates="sucursal")
     reservas: Mapped[list["Reserva"]] = relationship(back_populates="sucursal")

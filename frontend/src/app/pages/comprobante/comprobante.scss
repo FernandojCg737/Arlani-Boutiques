@@ -122,9 +122,21 @@
 }
 
 .comprobante__estado {
-  text-transform: capitalize;
   font-weight: 700;
   color: #2e7d32;
+
+  &--verificando,
+  &--pendiente {
+    color: #a86b00;
+  }
+
+  &--rechazado {
+    color: #b3261e;
+  }
+}
+
+.comprobante__motivo {
+  color: #b3261e;
 }
 
 .comprobante__tabla {

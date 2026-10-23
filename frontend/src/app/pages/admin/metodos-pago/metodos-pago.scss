@@ -1,0 +1,192 @@
+// Metodos de pago de la tienda (usa la base de estilos de Sucursales).
+section {
+  margin-top: 28px;
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--brand-dark);
+  }
+}
+
+.mp-aviso {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #e8f5ec;
+  color: #1f6b3d;
+  font-weight: 600;
+}
+
+.mp-tipos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.mp-tipo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border: 1px dashed #c9c3c0;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  strong {
+    color: var(--brand-dark);
+  }
+
+  span {
+    font-size: 13px;
+    color: #666;
+  }
+
+  &:hover:not(:disabled) {
+    border-style: solid;
+    border-color: var(--brand-dark);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.mp-vacio {
+  padding: 20px;
+  border-radius: 10px;
+  background: #fff;
+  color: #666;
+}
+
+.mp-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.mp-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid #e6e1df;
+  border-top: 3px solid var(--brand-dark);
+  border-radius: 12px;
+  background: #fff;
+
+  &.is-inactivo {
+    opacity: 0.65;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin: 0;
+    font-size: 13px;
+  }
+
+  dt {
+    color: #888;
+  }
+
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.mp-corto {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mp-etiqueta {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef1f6;
+  font-size: 12px;
+  font-weight: 700;
+  color: #34405e;
+
+  &--paypal {
+    background: #e7f0fb;
+    color: #0b4f9c;
+  }
+
+  &--qr {
+    background: #f1ebfb;
+    color: #5a2f9c;
+  }
+}
+
+.mp-qr {
+  display: block;
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mp-nota {
+  margin: 0;
+  font-size: 12px;
+  color: #2e7d4f;
+}
+
+.mp-instrucciones {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+  font-style: italic;
+}
+
+.mp-ayuda {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.mp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 16px;
+  font-size: 14px;
+}
+
+.mp-factura {
+  padding: 20px;
+  border: 1px solid #e6e1df;
+  border-radius: 12px;
+  background: #fff;
+
+  > p {
+    margin: 0 0 16px;
+    color: #666;
+  }
+}

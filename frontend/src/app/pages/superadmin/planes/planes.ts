@@ -7,6 +7,7 @@ interface Borrador {
   precio: number;
   max: number;
   ia: boolean;
+  comision: number;
 }
 
 // Funciones que todos los planes incluyen (requerimiento del proyecto). La
@@ -53,12 +54,13 @@ export class SuperadminPlanes implements OnInit {
 
   private reiniciarBorradores(planes: PlanPlataforma[]): void {
     const b: Record<string, Borrador> = {};
-    for (const p of planes) b[p.codigo] = { precio: p.precioMensual, max: p.maxSucursales, ia: p.iaGenerativa };
+    for (const p of planes)
+      b[p.codigo] = { precio: p.precioMensual, max: p.maxSucursales, ia: p.iaGenerativa, comision: p.comisionPct };
     this.borradores.set(b);
   }
 
   protected borrador(codigo: string): Borrador {
-    return this.borradores()[codigo] ?? { precio: 0, max: 1, ia: false };
+    return this.borradores()[codigo] ?? { precio: 0, max: 1, ia: false, comision: 3 };
   }
 
   protected editar(codigo: string, cambio: Partial<Borrador>): void {
@@ -72,17 +74,19 @@ export class SuperadminPlanes implements OnInit {
 
   protected cambiado(p: PlanPlataforma): boolean {
     const b = this.borrador(p.codigo);
-    return b.precio !== p.precioMensual || b.max !== p.maxSucursales || b.ia !== p.iaGenerativa;
+    return (
+      b.precio !== p.precioMensual || b.max !== p.maxSucursales || b.ia !== p.iaGenerativa || b.comision !== p.comisionPct
+    );
   }
 
   protected descartar(p: PlanPlataforma): void {
-    this.editar(p.codigo, { precio: p.precioMensual, max: p.maxSucursales, ia: p.iaGenerativa });
+    this.editar(p.codigo, { precio: p.precioMensual, max: p.maxSucursales, ia: p.iaGenerativa, comision: p.comisionPct });
   }
 
   protected async guardar(p: PlanPlataforma): Promise<void> {
     const b = this.borrador(p.codigo);
-    if (!(b.precio >= 0) || !(b.max >= 1)) {
-      this.avisos.error('Revisa el precio y el límite de sucursales.');
+    if (!(b.precio >= 0) || !(b.max >= 1) || !(b.comision >= 0 && b.comision <= 30)) {
+      this.avisos.error('Revisa el precio, el límite de sucursales y la comisión (de 0 % a 30 %).');
       return;
     }
     this.guardando.set(p.codigo);
@@ -91,6 +95,7 @@ export class SuperadminPlanes implements OnInit {
         precio_mensual: b.precio,
         max_sucursales: b.max,
         ia_generativa: b.ia,
+        comision_pct: b.comision,
       });
       this.planes.update((l) => l.map((x) => (x.codigo === p.codigo ? actualizado : x)));
       // Los límites de las empresas dependen del plan: se refrescan.

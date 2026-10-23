@@ -29,7 +29,8 @@ export interface TiendaPublica {
   ciudad: string | null;
   color_marca: string;
   logo_url: string | null;
-  estado: 'activa' | 'suspendida';
+  // 'vencida': la suscripcion de la tienda vencio (no vende, igual que suspendida).
+  estado: 'activa' | 'suspendida' | 'vencida';
   tiene_catalogo: boolean;
   // La tienda original tiene su sitio completo; las demas muestran su
   // catalogo dentro de su pagina.

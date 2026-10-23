@@ -15,7 +15,7 @@
     </div>
 
     <div class="tienda__cuerpo">
-      @if (t.estado === 'suspendida') {
+      @if (t.estado !== 'activa') {
         <div class="tienda__aviso">
           <h2>Esta tienda no está disponible por ahora</h2>
           <p>Vuelve a intentarlo más tarde o mira otras boutiques de Arlani.</p>
@@ -33,7 +33,7 @@
         </div>
       }
 
-      @if (t.estado !== 'suspendida') {
+      @if (t.estado === 'activa') {
         @if (t.sucursales.length) {
           <h2 class="tienda__titulo">Sucursales</h2>
           <ul class="sucursales">

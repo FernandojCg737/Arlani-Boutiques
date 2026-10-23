@@ -1,4 +1,4 @@
-<section class="factura-page" [style.--brand-dark]="marca.colorFuerte()">
+<section class="factura-page" [style.--brand-dark]="color()">
   <a routerLink="/admin/ventas" class="volver-link">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <line x1="19" y1="12" x2="5" y2="12" />
@@ -19,14 +19,24 @@
     <article class="factura">
       <header class="factura__header">
         <div class="factura__marca">
-          @if (marca.logo(); as logo) {
-            <img [src]="logo" [alt]="marca.nombre()" />
+          @if (v.tienda?.logo_url) {
+            <img [src]="v.tienda?.logo_url" [alt]="v.tienda?.nombre" />
           }
           <div class="factura__marca-datos">
-            <strong>{{ marca.nombre() }}</strong>
-            <span>{{ v.sucursal_nombre }}{{ marca.marca()?.ciudad ? ' · ' + marca.marca()?.ciudad : '' }}, Bolivia</span>
-            @if (marca.marca()?.email_contacto; as correo) {
-              <span>{{ correo }}</span>
+            <strong>{{ v.tienda?.nombre }}</strong>
+            @if (v.tienda?.razon_social) {
+              <span>{{ v.tienda?.razon_social }}</span>
+            }
+            @if (v.tienda?.nit) {
+              <span>NIT {{ v.tienda?.nit }}</span>
+            }
+            <span>
+              {{ v.tienda?.direccion_fiscal || v.sucursal_nombre }}{{ v.tienda?.ciudad ? ', ' + v.tienda?.ciudad : '' }}, Bolivia
+            </span>
+            @if (v.tienda?.telefono || v.tienda?.email_contacto) {
+              <span>
+                {{ v.tienda?.telefono }}{{ v.tienda?.telefono && v.tienda?.email_contacto ? ' · ' : '' }}{{ v.tienda?.email_contacto }}
+              </span>
             }
           </div>
         </div>
@@ -50,8 +60,8 @@
           @if (v.atendido_por_nombre) {
             <span>Atendido por: {{ v.atendido_por_nombre }}</span>
           }
-          <span>Metodo de pago: {{ metodoLabel[v.metodo_pago] ?? v.metodo_pago }}</span>
-          <span class="factura__estado">Estado: {{ v.estado_pago }}</span>
+          <span>Método de pago: {{ v.metodo_pago_nombre ?? metodoLabel[v.metodo_pago] ?? v.metodo_pago }}</span>
+          <span class="factura__estado">Estado: {{ estadoLabel[v.estado_pago] ?? v.estado_pago }}</span>
         </div>
       </div>
 
@@ -86,7 +96,7 @@
       </div>
 
       <footer class="factura__footer">
-        <p>Gracias por tu compra en {{ marca.nombre() }}.</p>
+        <p>Gracias por tu compra en {{ v.tienda?.nombre }}.</p>
         <p class="factura__legal">
           Este documento es un comprobante interno de compra y no reemplaza una factura fiscal con validez
           tributaria (NIT).

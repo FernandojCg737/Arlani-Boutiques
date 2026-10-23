@@ -169,7 +169,7 @@
     <section class="planes">
       <div class="seccion-titulo">
         <h2>Planes</h2>
-        <p>El cambio lo aplica el equipo de Arlani: elige un plan y te contactamos por WhatsApp.</p>
+        <p>Renueva o cambia tu plan y págalo con PayPal: se activa al instante.</p>
       </div>
 
       <div class="planes__grid">
@@ -192,23 +192,221 @@
                 {{ p.operacion_offline ? 'Operación offline (vende sin internet)' : 'Sin operación offline' }}
               </li>
               <li [class.no]="!p.ia_generativa">{{ p.ia_generativa ? 'IA generativa incluida' : 'Sin IA generativa' }}</li>
+              <li>Comisión por venta: {{ p.comision_pct | number: '1.0-1' }} %</li>
             </ul>
-            @if (p.codigo === d.plan_codigo) {
-              <span class="plan__accion plan__accion--actual">Plan actual</span>
+            @if (p.dias_prueba) {
+              <span class="plan__accion plan__accion--actual">
+                {{ p.codigo === d.plan_codigo ? (d.operativa ? 'Plan actual' : 'Tu prueba terminó') : 'Solo para tiendas nuevas' }}
+              </span>
+            } @else if (p.codigo === d.plan_codigo) {
+              <button type="button" class="boton" [class.boton--lleno]="!d.operativa" [class.boton--borde]="d.operativa"
+                      (click)="abrirPago(p)">
+                Renovar {{ p.nombre }}
+              </button>
             } @else if (noAlcanza(p)) {
               <span class="plan__accion plan__accion--bloqueado">
                 Tienes {{ d.sucursales_usadas }} sucursales activas; este plan permite {{ p.max_sucursales }}.
               </span>
             } @else {
-              <a class="boton" [class.boton--lleno]="esMejora(p)" [class.boton--borde]="!esMejora(p)"
-                 [href]="enlaceCambio(p)" target="_blank" rel="noopener">
+              <button type="button" class="boton" [class.boton--lleno]="esMejora(p)" [class.boton--borde]="!esMejora(p)"
+                      (click)="abrirPago(p)">
                 {{ esMejora(p) ? 'Mejorar a ' + p.nombre : 'Cambiar a ' + p.nombre }}
-              </a>
+              </button>
             }
           </article>
         }
       </div>
+
+      @if (exitoPago()) {
+        <div class="pago-exito" role="status">{{ exitoPago() }}</div>
+      }
+
+      @if (planPago(); as pp) {
+        <div class="pago" id="pago">
+          <div class="pago__cabecera">
+            <h3>{{ pp.codigo === d.plan_codigo ? 'Renovar' : 'Contratar' }} el plan {{ pp.nombre }}</h3>
+            <button type="button" class="pago__cerrar" (click)="cerrarPago()" aria-label="Cerrar">×</button>
+          </div>
+          <div class="pago__periodos" role="radiogroup" aria-label="Periodo de pago">
+            <button type="button" role="radio" [attr.aria-checked]="periodoPago() === 'mensual'"
+                    [class.activo]="periodoPago() === 'mensual'" (click)="elegirPeriodo('mensual')">
+              Mensual
+            </button>
+            <button type="button" role="radio" [attr.aria-checked]="periodoPago() === 'anual'"
+                    [class.activo]="periodoPago() === 'anual'" (click)="elegirPeriodo('anual')">
+              Anual <small>2 meses gratis</small>
+            </button>
+          </div>
+          @if (cotizando()) {
+            <p class="pago__nota">Calculando el precio…</p>
+          }
+          @if (cotizacion(); as c) {
+            <dl class="pago__detalle">
+              @if (+c.comisiones_bob > 0) {
+                <div>
+                  <dt>Plan {{ c.plan_nombre }}</dt>
+                  <dd>Bs {{ c.plan_bob | number: '1.2-2' }}</dd>
+                </div>
+                <div>
+                  <dt>Comisiones pendientes</dt>
+                  <dd>Bs {{ c.comisiones_bob | number: '1.2-2' }}</dd>
+                </div>
+              }
+              <div>
+                <dt>Total</dt>
+                <dd>Bs {{ c.monto_bob | number: '1.2-2' }} <small>US$ {{ c.monto_usd }} al cambio oficial de {{ c.tipo_cambio }}</small></dd>
+              </div>
+              <div>
+                <dt>Tu plan corre desde</dt>
+                <dd>{{ c.fecha_inicio | date: 'd/M/yyyy' }}</dd>
+              </div>
+            </dl>
+          }
+          @if (errorPago()) {
+            <div class="admin-error">{{ errorPago() }}</div>
+          }
+          @if (procesando()) {
+            <p class="pago__nota">Confirmando tu pago…</p>
+          }
+          <div #paypal class="pago__paypal" [hidden]="!cotizacion() || procesando()"></div>
+        </div>
+      }
     </section>
+
+    <!-- Estado de cuenta: comisiones de Arlani -->
+    @if (cuenta(); as cu) {
+      <section class="cuenta">
+        <div class="seccion-titulo">
+          <h2>Estado de cuenta</h2>
+          <p>
+            Arlani cobra {{ cu.comision_pct ? (cu.comision_pct | number: '1.0-1') + ' %' : 'una comisión' }} por cada venta
+            en línea que se paga (las ventas de mostrador no pagan comisión). El dinero de tus ventas llega directo a
+            tus cuentas y las comisiones las pagas cuando quieras o junto con tu plan. Si el cliente usa "Pagar todo",
+            Arlani cobra y te envía lo tuyo al instante, ya sin la comisión.
+          </p>
+        </div>
+
+        <div class="cuenta__resumen">
+          <div class="cuenta__saldo" [class.cuenta__saldo--al-dia]="+cu.saldo_bob <= 0">
+            <span class="etiqueta">{{ +cu.saldo_bob > 0 ? 'Debes a Arlani' : 'Tu cuenta' }}</span>
+            <strong>Bs {{ cu.saldo_bob | number: '1.2-2' }}</strong>
+            @if (+cu.saldo_bob > 0) {
+              <small>US$ {{ cu.saldo_usd }} al cambio oficial de {{ cu.tipo_cambio }}</small>
+              @if (!pagandoSaldo()) {
+                <button type="button" class="boton boton--lleno" (click)="abrirPagoSaldo()">Pagar con PayPal</button>
+              }
+            } @else {
+              <small>Estás al día.</small>
+            }
+          </div>
+          <div class="cuenta__cifras">
+            <div>
+              <strong>{{ cu.ventas_mes }}</strong>
+              <span>Ventas en línea este mes</span>
+            </div>
+            <div>
+              <strong>Bs {{ cu.ventas_mes_bob | number: '1.2-2' }}</strong>
+              <span>Vendido en línea este mes</span>
+            </div>
+            <div>
+              <strong>Bs {{ cu.comisiones_mes_bob | number: '1.2-2' }}</strong>
+              <span>Comisiones de este mes</span>
+            </div>
+            <div>
+              <strong>Bs {{ cu.pagado_total_bob | number: '1.2-2' }}</strong>
+              <span>Pagado a Arlani</span>
+            </div>
+          </div>
+        </div>
+
+        @if (exitoSaldo()) {
+          <div class="pago-exito" role="status">{{ exitoSaldo() }}</div>
+        }
+        @if (pagandoSaldo()) {
+          <div class="pago">
+            <div class="pago__cabecera">
+              <h3>Pagar comisiones: Bs {{ cu.saldo_bob | number: '1.2-2' }}</h3>
+              <button type="button" class="pago__cerrar" (click)="pagandoSaldo.set(false)" aria-label="Cerrar">×</button>
+            </div>
+            @if (errorSaldo()) {
+              <div class="admin-error">{{ errorSaldo() }}</div>
+            }
+            @if (procesandoSaldo()) {
+              <p class="pago__nota">Confirmando tu pago…</p>
+            }
+            <div #paypalSaldo class="pago__paypal" [hidden]="procesandoSaldo()"></div>
+          </div>
+        }
+
+        <div class="tabla">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Detalle</th>
+                <th class="num">Venta</th>
+                <th class="num">Comisión</th>
+                <th class="num">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of movimientosVisibles(); track m.id) {
+                <tr>
+                  <td>{{ m.fecha + 'Z' | date: 'd MMM y, HH:mm' : '-0400' }}</td>
+                  <td>{{ m.descripcion }}</td>
+                  <td class="num">{{ m.base_bob ? 'Bs ' + (m.base_bob | number: '1.2-2') : '' }}</td>
+                  <td class="num">{{ m.porcentaje ? (m.porcentaje | number: '1.0-1') + ' %' : '' }}</td>
+                  <td class="num" [class.cuenta__abono]="+m.monto_bob < 0">
+                    {{ +m.monto_bob < 0 ? '−' : '' }}Bs {{ absoluto(m.monto_bob) | number: '1.2-2' }}
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="tabla__vacio">Todavía no tienes ventas en línea con comisión.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (cu.movimientos.length > 8) {
+          <button type="button" class="cuenta__mas" (click)="verTodos.set(!verTodos())">
+            {{ verTodos() ? 'Ver menos' : 'Ver todos (' + cu.movimientos.length + ')' }}
+          </button>
+        }
+
+        @if (cu.liquidaciones.length > 0) {
+          <h3 class="cuenta__subtitulo">Lo que Arlani te envió (compras con Pagar todo)</h3>
+          <div class="tabla">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th class="num">Vendido</th>
+                  <th class="num">Comisión retenida</th>
+                  <th class="num">Recibes</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of cu.liquidaciones; track l.id) {
+                  <tr>
+                    <td>{{ l.fecha + 'Z' | date: 'd MMM y, HH:mm' : '-0400' }}</td>
+                    <td class="num">Bs {{ l.bruto_bob | number: '1.2-2' }}</td>
+                    <td class="num">Bs {{ l.comision_bob | number: '1.2-2' }}</td>
+                    <td class="num">
+                      <strong>Bs {{ l.neto_bob | number: '1.2-2' }}</strong> <small>US$ {{ l.neto_usd }}</small>
+                    </td>
+                    <td>
+                      {{ l.estado === 'enviada' ? 'Enviado a ' + l.paypal_email : l.estado === 'pendiente' ? 'En camino' : 'Reintentando el envío' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
 
     <!-- Historial -->
     <section class="historial">

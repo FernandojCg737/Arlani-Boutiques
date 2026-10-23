@@ -32,7 +32,13 @@ from app.models import (
     VentaPresencial,
 )
 from app.models.p4_ventas import DetalleDevolucion, Devolucion
-from app.schemas.devoluciones import DevolucionAdminOut, DevolucionCreate, DevolucionOut, DetalleDevolucionOut
+from app.schemas.devoluciones import (
+    DetalleDevolucionOut,
+    DevolucionAdminOut,
+    DevolucionClienteOut,
+    DevolucionCreate,
+    DevolucionOut,
+)
 
 router = APIRouter()
 
@@ -43,6 +49,33 @@ ESTADOS_DEVOLUCION_VIGENTE = ("solicitada", "aprobada", "completada")
 
 
 # ---------------------------------------------------------------- helpers --
+
+
+def _reembolsar_paypal(db: Session, venta_id: int, monto_bob: Decimal) -> None:
+    """Devuelve `monto_bob` (en US$ al cambio oficial) por PayPal si la venta
+    se cobro con PayPal y se guardo su captura. Si PayPal lo rechaza, la
+    devolucion no se completa."""
+    from app.api.v1.endpoints.ventas import _a_usd, _paypal_de_tienda
+    from app.core.paypal import reembolsar_captura
+
+    fila = db.execute(
+        text(
+            "SELECT p.metodo, p.liquidacion_id, t.captura_id, s.empresa_id FROM pago p "
+            "JOIN venta v ON v.id = p.venta_id JOIN sucursal s ON s.id = v.sucursal_id "
+            "LEFT JOIN transaccion t ON t.pago_id = p.id WHERE p.venta_id = :v"
+        ),
+        {"v": venta_id},
+    ).mappings().first()
+    if fila is None or fila["metodo"] != "paypal" or not fila["captura_id"]:
+        return
+    cuenta = None if fila["liquidacion_id"] else _paypal_de_tienda(db, fila["empresa_id"])[1]
+    monto_usd, _ = _a_usd(db, monto_bob)
+    if not reembolsar_captura(fila["captura_id"], cuenta, monto_usd):
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "PayPal no aceptó el reembolso. Inténtalo de nuevo o elige otro método de reembolso.",
+        )
 
 def _get_empleado_o_403(db: Session, usuario: Usuario) -> Empleado:
     empleado = db.query(Empleado).filter(Empleado.id == usuario.id).first()
@@ -165,6 +198,28 @@ def _rechazar_si_hay_devolucion_vigente(venta: Venta) -> None:
         )
 
 
+def _rechazar_si_prendas_ya_solicitadas(db: Session, payload: DevolucionCreate, incluir_devoluciones: bool = True) -> None:
+    """Politica: una sola solicitud por prenda. Una prenda que ya tuvo un
+    cambio (aunque se haya rechazado) o una devolucion no admite otra. El
+    personal (incluir_devoluciones=False) puede registrar una devolucion de
+    una prenda cuya solicitud se rechazo (ej. defecto), pero nunca de una
+    prenda que se cambio."""
+    ids = [i.item_linea_id for i in payload.items]
+    if db.execute(
+        text("SELECT 1 FROM cambio_prenda WHERE item_linea_id = ANY(:ids) AND estado <> 'cancelado' LIMIT 1"),
+        {"ids": ids},
+    ).first():
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Esa prenda ya tuvo una solicitud de cambio: no admite devolución."
+        )
+    if incluir_devoluciones and db.execute(
+        text("SELECT 1 FROM detalle_devolucion WHERE item_linea_id = ANY(:ids) LIMIT 1"), {"ids": ids}
+    ).first():
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Ya pediste la devolución de esa prenda: solo se permite una solicitud."
+        )
+
+
 def _inventario_de(db: Session, item: ItemLinea, sucursal_id: int) -> Inventario | None:
     return (
         db.query(Inventario)
@@ -268,6 +323,31 @@ def listar_devoluciones(
     return [_to_admin_out(d, db) for d in devoluciones]
 
 
+@router.get("/mias", response_model=list[DevolucionClienteOut])
+def mis_devoluciones(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso_cliente("CU11")),
+) -> list[DevolucionClienteOut]:
+    """Devoluciones del cliente (Mi cuenta > Mis Devoluciones)."""
+    cliente = _get_cliente_o_403(db, usuario)
+    devoluciones = (
+        _query_devolucion(db)
+        .join(Venta, Venta.id == Devolucion.venta_id)
+        .filter(Venta.cliente_id == cliente.id)
+        .order_by(Devolucion.fecha_solicitud.desc())
+        .all()
+    )
+    return [
+        DevolucionClienteOut(
+            **_to_out(d, db).model_dump(),
+            tienda_nombre=d.venta.sucursal.empresa.nombre if d.venta.sucursal.empresa else "",
+            sucursal_nombre=d.venta.sucursal.nombre,
+            venta_fecha=d.venta.fecha,
+        )
+        for d in devoluciones
+    ]
+
+
 @router.get("/{devolucion_id}", response_model=DevolucionAdminOut)
 def obtener_devolucion(
     devolucion_id: int,
@@ -309,6 +389,7 @@ def solicitar_devolucion_cliente(
         )
 
     _rechazar_si_hay_devolucion_vigente(venta)
+    _rechazar_si_prendas_ya_solicitadas(db, payload)
     monto_total, detalles_devolucion = _armar_detalles(db, venta, payload)
 
     devolucion = Devolucion(
@@ -369,6 +450,7 @@ def registrar_devolucion(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Solo se pueden devolver ventas pagadas.")
 
     _rechazar_si_hay_devolucion_vigente(venta)
+    _rechazar_si_prendas_ya_solicitadas(db, payload, incluir_devoluciones=False)
     monto_total, detalles_devolucion = _armar_detalles(db, venta, payload)
 
     devolucion = Devolucion(
@@ -453,6 +535,11 @@ def completar_devolucion(
 
     nuevo_estado = "devuelto" if dev.tipo == "total" else "devuelto_parcial"
     venta.estado = nuevo_estado
+    # Reembolso "al mismo medio" de una venta pagada con PayPal: sale de la
+    # cuenta que cobro (la de la tienda, o la de Arlani si fue "Pagar todo";
+    # en ese caso la tienda queda debiendo el monto, ver trg_devolucion_deuda).
+    if dev.metodo_reembolso == "mismo_medio":
+        _reembolsar_paypal(db, venta.id, Decimal(dev.monto_reembolso))
 
     _notificar(
         db,

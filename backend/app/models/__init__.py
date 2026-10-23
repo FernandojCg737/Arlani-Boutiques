@@ -13,7 +13,7 @@ from app.models.p1_seguridad import (
     rol_permiso,
 )
 from app.models.p2_clientes import Cliente, Ciudad, Sucursal
-from app.models.p6_plataforma import Empresa, PlanSuscripcion, Suscripcion
+from app.models.p6_plataforma import Empresa, MetodoPagoEmpresa, PlanSuscripcion, Suscripcion
 from app.models.p3_catalogo import (
     Categoria,
     Coleccion,
@@ -43,6 +43,7 @@ from app.models.p4_ventas import (
     UsoArPrenda,
     Venta,
     VentaDigital,
+    VentaEnvio,
     VentaPresencial,
 )
 from app.models.p5_analitica import (
@@ -63,6 +64,7 @@ __all__ = [
     "Administrador",
     "SuperAdministrador",
     "Empresa",
+    "MetodoPagoEmpresa",
     "PlanSuscripcion",
     "Suscripcion",
     "EncargadoSucursal",
@@ -94,6 +96,7 @@ __all__ = [
     "Carrito",
     "DetalleCarrito",
     "Venta",
+    "VentaEnvio",
     "VentaPresencial",
     "DetalleVentaPresencial",
     "VentaDigital",

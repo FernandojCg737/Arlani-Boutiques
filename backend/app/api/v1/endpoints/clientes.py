@@ -11,6 +11,7 @@ from app.core.email import nombre_marca, send_email
 from app.core.security import generate_temp_password, hash_password
 from app.db.session import get_db
 from app.models import Cliente, Usuario
+from app.schemas.direcciones import UbicacionClienteOut
 from app.schemas.clientes import (
     ClienteAdminCreate,
     ClienteAdminOut,
@@ -76,13 +77,58 @@ def list_clientes(
         like = f"%{buscar}%"
         query = query.filter(Cliente.nombre.ilike(like) | Cliente.email.ilike(like))
 
+    clientes = query.order_by(Cliente.nombre).all()
+    ubicaciones = _ultimas_ubicaciones(db, usuario, [c.id for c in clientes])
     resultado = []
-    for c in query.order_by(Cliente.nombre).all():
+    for c in clientes:
         out = ClienteAdminOut.model_validate(c)
         if relacion is not None:
             out.relacion = RelacionTiendaOut(**{k: v for k, v in relacion[c.id].items() if k != "cliente_id"})
+        if c.id in ubicaciones:
+            out.ultima_ubicacion = UbicacionClienteOut(**ubicaciones[c.id])
         resultado.append(out)
+    if relacion is not None:
+        # Clientes de una tienda: primero los que operaron mas recientemente;
+        # los que nunca operaron, al final (por nombre, ya vienen ordenados).
+        resultado.sort(
+            key=lambda o: (o.relacion is None or o.relacion.ultima_interaccion is None,
+                           -(o.relacion.ultima_interaccion.timestamp() if o.relacion and o.relacion.ultima_interaccion else 0))
+        )
     return resultado
+
+
+_SQL_ULTIMA_UBICACION = """
+    SELECT DISTINCT ON (v.cliente_id) v.cliente_id, v.id AS venta_id, v.fecha, e.nombre AS tienda_nombre,
+           ve.direccion, ve.referencia, ve.ciudad, ve.latitud, ve.longitud
+    FROM venta_envio ve
+    JOIN venta v ON v.id = ve.venta_id
+    JOIN sucursal s ON s.id = v.sucursal_id
+    JOIN empresa e ON e.id = s.empresa_id
+    WHERE v.cliente_id = ANY(:ids)
+    ORDER BY v.cliente_id, v.fecha DESC
+"""
+
+
+def _ultimas_ubicaciones(db: Session, usuario: Usuario, ids: list[int]) -> dict[int, dict]:
+    """Ubicacion de la ultima compra con envio a domicilio de cada cliente.
+    - Personal de una tienda: solo de compras en SU tienda (RLS).
+    - SuperAdministrador: de cualquier tienda, aunque este mirando una."""
+    if not ids:
+        return {}
+    if usuario.tipo != "superadministrador":
+        filas = db.execute(text(_SQL_ULTIMA_UBICACION), {"ids": ids}).mappings().all()
+        return {f["cliente_id"]: {k: v for k, v in f.items() if k != "cliente_id"} for f in filas}
+    alcance = db.info.get("empresa_scope")
+    if alcance is not None:
+        # Mirando una tienda la sesion corre con el rol de tienda: solo para
+        # esta consulta vuelve al rol del backend (ve todas las tiendas).
+        db.execute(text("RESET ROLE"))
+    try:
+        filas = db.execute(text("SELECT * FROM fn_ultima_ubicacion_clientes(:ids)"), {"ids": ids}).mappings().all()
+    finally:
+        if alcance is not None:
+            db.execute(text("SET LOCAL ROLE arlani_tenant"))
+    return {f["cliente_id"]: {k: v for k, v in f.items() if k != "cliente_id"} for f in filas}
 
 
 @router.post("", response_model=ClienteAdminOut, status_code=status.HTTP_201_CREATED)

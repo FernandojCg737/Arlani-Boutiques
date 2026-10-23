@@ -2,6 +2,8 @@ from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, EmailStr, Field, field_serializer
 
+from app.schemas.direcciones import UbicacionClienteOut
+
 
 class ClienteAdminCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=150)
@@ -28,6 +30,8 @@ class ClienteAdminOut(BaseModel):
     metodo_registro: str
     # Solo cuando se listan los clientes de una empresa.
     relacion: "RelacionTiendaOut | None" = None
+    # Ubicacion de su ultima compra con envio a domicilio (CU03).
+    ultima_ubicacion: UbicacionClienteOut | None = None
 
     model_config = {"from_attributes": True}
 

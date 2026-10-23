@@ -88,7 +88,17 @@
                 </div>
               </td>
               <td>{{ c.telefono || '-' }}</td>
-              <td>{{ c.direccion || '-' }}</td>
+              <td>
+                {{ c.direccion || '-' }}
+                @if (c.ultima_ubicacion; as u) {
+                  <div class="ultima-ubicacion">
+                    <strong>Último envío</strong>
+                    <span>{{ u.direccion }}{{ u.ciudad ? ', ' + u.ciudad : '' }}</span>
+                    <small>Compra #{{ u.venta_id }} en {{ u.tienda_nombre }} · {{ u.fecha + 'Z' | date: 'd MMM y' : '-0400' }}</small>
+                    <button type="button" (click)="ubicacionVista.set(c)">Ver en el mapa</button>
+                  </div>
+                }
+              </td>
               <td>
                 <span class="admin-badge is-neutral">{{ metodoLabel(c.metodo_registro) }}</span>
               </td>
@@ -117,6 +127,24 @@
         }
       </tbody>
     </table>
+    @if (ubicacionVista(); as c) {
+      @if (c.ultima_ubicacion; as u) {
+        <div class="modal-overlay" (click)="ubicacionVista.set(null)">
+          <div class="modal ubicacion-modal" (click)="$event.stopPropagation()">
+            <h2>Ubicación de envío de {{ c.nombre }}</h2>
+            <p class="ubicacion-modal__texto">
+              {{ u.direccion }}{{ u.ciudad ? ', ' + u.ciudad : '' }}{{ u.referencia ? ' · ' + u.referencia : '' }}<br />
+              <small>Compra #{{ u.venta_id }} en {{ u.tienda_nombre }} · {{ u.fecha + 'Z' | date: "d MMM y, HH:mm" : '-0400' }}</small>
+            </p>
+            <app-mapa-ubicacion [punto]="{ lat: +u.latitud, lng: +u.longitud }" [soloLectura]="true" [alto]="320" />
+            <div class="modal-actions">
+              <a [href]="enlaceMapa(u.latitud, u.longitud)" target="_blank" rel="noopener">Abrir en OpenStreetMap</a>
+              <button type="button" (click)="ubicacionVista.set(null)">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      }
+    }
   </div>
 </div>
 

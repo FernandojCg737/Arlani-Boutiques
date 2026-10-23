@@ -101,11 +101,31 @@ class Venta(Base):
     pago: Mapped["Pago | None"] = relationship(back_populates="venta")
     calificacion: Mapped["Calificacion | None"] = relationship(back_populates="venta")
     devoluciones: Mapped[list["Devolucion"]] = relationship(back_populates="venta", cascade="all, delete-orphan")
+    # Envio a domicilio (sin fila = recojo en sucursal).
+    envio: Mapped["VentaEnvio | None"] = relationship(cascade="all, delete-orphan", passive_deletes=True)
 
     __mapper_args__ = {
         "polymorphic_identity": "venta",
         "polymorphic_on": "tipo",
     }
+
+
+class VentaEnvio(Base):
+    """Copia de la direccion y la ubicacion del momento de la compra."""
+
+    __tablename__ = "venta_envio"
+
+    venta_id: Mapped[int] = mapped_column(ForeignKey("venta.id", ondelete="CASCADE"), primary_key=True)
+    destinatario: Mapped[str] = mapped_column(String(150))
+    telefono: Mapped[str | None] = mapped_column(String(30))
+    direccion: Mapped[str] = mapped_column(String(250))
+    referencia: Mapped[str | None] = mapped_column(String(250))
+    ciudad: Mapped[str | None] = mapped_column(String(80))
+    latitud: Mapped[Decimal] = mapped_column(Numeric(9, 6))
+    longitud: Mapped[Decimal] = mapped_column(Numeric(9, 6))
+    estado: Mapped[str] = mapped_column(String(20), default="pendiente")
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class VentaPresencial(Venta):
@@ -180,8 +200,12 @@ class Pago(Base):
     # automaticamente, a diferencia de PayPal.
     comprobante_url: Mapped[str | None] = mapped_column(String(500))
     revisado_por_id: Mapped[int | None] = mapped_column(ForeignKey("empleado.id"))
+    # Metodo de pago de la tienda con el que se pago, y por que se rechazo.
+    metodo_pago_id: Mapped[int | None] = mapped_column(ForeignKey("metodo_pago_empresa.id", ondelete="SET NULL"))
+    motivo_rechazo: Mapped[str | None] = mapped_column(Text)
 
     venta: Mapped["Venta"] = relationship(back_populates="pago")
+    metodo_pago: Mapped["MetodoPagoEmpresa | None"] = relationship()
     transaccion: Mapped["Transaccion | None"] = relationship(back_populates="pago")
     revisado_por: Mapped["Empleado | None"] = relationship()
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -12,6 +12,9 @@ class MarcaEmpresaOut(BaseModel):
     color_marca: str
     logo_url: str | None
     email_contacto: str | None
+    # False si la suscripcion vencio o la tienda esta suspendida: el panel
+    # solo deja entrar a "Mi suscripcion".
+    operativa: bool = True
 
 
 class MarcaEmpresaIn(BaseModel):
@@ -40,6 +43,7 @@ class PlanDisponibleOut(BaseModel):
     dias_prueba: int | None
     ia_generativa: bool
     operacion_offline: bool
+    comision_pct: Decimal
 
 
 class MiSuscripcionOut(BaseModel):
@@ -62,6 +66,9 @@ class MiSuscripcionOut(BaseModel):
     max_sucursales: int | None
     personal: int
     clientes: int
+    # False: la suscripcion vencio (o la tienda esta suspendida) y no opera.
+    operativa: bool
+    comision_pct: Decimal | None
     historial: list[HistorialSuscripcionOut]
     planes: list[PlanDisponibleOut]
 
@@ -97,3 +104,84 @@ class TiendaPublicaOut(BaseModel):
     # muestran su catalogo dentro de su pagina /tienda-<subdominio>.
     sitio_propio: bool
     sucursales: list[SucursalPublicaOut]
+
+
+class RenovacionIn(BaseModel):
+    # La tienda compra o renueva su plan (pago a Arlani con PayPal).
+    plan: str = Field(min_length=2, max_length=30)
+    periodo: str = Field(pattern=r"^(mensual|anual)$")
+
+
+class ConfirmarRenovacionIn(RenovacionIn):
+    order_id: str = Field(min_length=5, max_length=64)
+
+
+class CotizacionRenovacionOut(BaseModel):
+    plan_codigo: str
+    plan_nombre: str
+    periodo: str
+    # Total a cobrar: el plan mas las comisiones pendientes (se pagan juntos).
+    monto_bob: Decimal
+    tipo_cambio: Decimal
+    monto_usd: Decimal
+    plan_bob: Decimal
+    plan_usd: Decimal
+    comisiones_bob: Decimal = Decimal("0")
+    comisiones_usd: Decimal = Decimal("0")
+    # Desde cuando corre el plan: al terminar el actual si renueva el mismo
+    # plan antes de que venza; si no, desde hoy.
+    fecha_inicio: date
+
+
+class MovimientoCuentaOut(BaseModel):
+    id: int
+    fecha: datetime
+    tipo: str
+    venta_id: int | None
+    base_bob: Decimal | None
+    porcentaje: Decimal | None
+    monto_bob: Decimal
+    descripcion: str
+
+
+class LiquidacionRecibidaOut(BaseModel):
+    # Lo que Arlani le envio a la tienda por una compra con "Pagar todo".
+    id: int
+    fecha: datetime
+    bruto_bob: Decimal
+    comision_bob: Decimal
+    neto_bob: Decimal
+    neto_usd: Decimal
+    paypal_email: str
+    estado: str
+
+
+class CuentaTiendaOut(BaseModel):
+    """Estado de cuenta de la tienda con Arlani (comisiones por venta)."""
+
+    liquidaciones: list[LiquidacionRecibidaOut] = []
+    saldo_bob: Decimal
+    saldo_usd: Decimal
+    tipo_cambio: Decimal
+    comision_pct: Decimal | None
+    ventas_mes: int
+    ventas_mes_bob: Decimal
+    comisiones_mes_bob: Decimal
+    pagado_total_bob: Decimal
+    movimientos: list[MovimientoCuentaOut]
+
+
+class OrdenSaldoOut(BaseModel):
+    order_id: str
+    monto_usd: Decimal
+    monto_bob: Decimal
+
+
+class ConfirmarSaldoIn(BaseModel):
+    order_id: str = Field(min_length=5, max_length=64)
+
+
+class OrdenRenovacionOut(BaseModel):
+    order_id: str
+    monto_usd: Decimal
+    monto_bob: Decimal
