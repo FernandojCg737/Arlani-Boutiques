@@ -1,0 +1,285 @@
+// Trabajar sin conexión: usa la base de Gestión de Ventas (tabla, pestañas,
+// catálogo de mostrador, botones).
+:host {
+  display: block;
+}
+
+.offline-estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #e8f5e9;
+  color: #1f5c25;
+  font-size: 13px;
+
+  &.is-offline {
+    background: #fff4e0;
+    color: #8a4f00;
+  }
+
+  &__punto {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  button {
+    margin-left: auto;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
+}
+
+.offline-aviso {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: #f1f5ff;
+  color: #1f2a44;
+  font-size: 13px;
+}
+
+.offline-sucursal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 20px;
+  margin-bottom: 18px;
+
+  .ventas-campo {
+    margin: 0;
+    min-width: 220px;
+  }
+
+  &__datos {
+    flex: 1;
+    min-width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: #555;
+  }
+}
+
+.offline-viejo {
+  color: #8a4f00;
+  font-weight: 600;
+}
+
+.offline-contador {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: #b26a00;
+  color: #fff;
+  font-size: 10px;
+}
+
+.offline-buscar {
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  font: inherit;
+  font-size: 13px;
+}
+
+.offline-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #888;
+}
+
+.offline-uuid {
+  font-family: ui-monospace, monospace;
+}
+
+.offline-mensaje {
+  max-width: 260px;
+  color: #666;
+}
+
+.offline-linea {
+  display: block;
+  font-size: 13px;
+}
+
+.offline-variantes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  span {
+    padding: 2px 6px;
+    background: #f3f3f1;
+    font-size: 11px;
+
+    &.is-agotada {
+      color: #aaa;
+      text-decoration: line-through;
+    }
+  }
+}
+
+.offline-vacio {
+  padding: 24px 0;
+  font-size: 14px;
+  color: #777;
+}
+
+.offline-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: #f1f1f1;
+  color: #555;
+
+  &--pendiente,
+  &--enviando,
+  &--error {
+    background: #fff4e0;
+    color: #b26a00;
+  }
+
+  &--confirmada,
+  &--resuelta {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &--conflicto {
+    background: #fdecea;
+    color: #b3261e;
+  }
+
+  &--rechazada,
+  &--anulada {
+    background: #eee;
+    color: #666;
+  }
+}
+
+.offline-titulo {
+  margin: 24px 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+}
+
+.offline-registro {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 12px;
+  }
+
+  small {
+    width: 100%;
+    color: #888;
+  }
+}
+
+.offline-form {
+  display: grid;
+  gap: 20px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+  }
+
+  &__resumen {
+    padding: 18px;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--brand-dark);
+    }
+
+    .ventas-campo {
+      margin-top: 12px;
+    }
+  }
+}
+
+.offline-sugerencias {
+  margin: -8px 0 8px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #eee;
+
+  button {
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: #fff;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+
+    &:hover {
+      background: #f7f7f5;
+    }
+
+    small {
+      color: #888;
+    }
+  }
+
+  li.offline-sub {
+    padding: 8px 10px;
+  }
+}
+
+.offline-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--brand-dark);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+
+.offline-registrar {
+  width: 100%;
+  margin-top: 12px;
+}

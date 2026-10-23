@@ -23,7 +23,7 @@ export class AdminHome {
     const items: AccesoRapido[] = [];
     for (const pkg of ADMIN_MENU) {
       for (const uc of pkg.useCases) {
-        if (uc.route && (esAdmin || uc.code === 'CU15' || this.auth.hasPermiso(uc.code))) {
+        if (uc.route && (esAdmin || uc.code === 'CU15' || this.auth.hasPermiso(uc.permiso ?? uc.code))) {
           items.push({ code: uc.code, label: uc.label, route: uc.route });
         }
       }

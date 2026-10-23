@@ -1,0 +1,21 @@
+:host {
+  display: block;
+  --brand-dark: #1f2a44;
+}
+
+.cliente-offline {
+  padding-top: 110px;
+
+  &__volver {
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--brand-dark);
+    text-decoration: none;
+  }
+
+  &__fecha {
+    margin: -4px 0 14px;
+    font-size: 12px;
+  }
+}

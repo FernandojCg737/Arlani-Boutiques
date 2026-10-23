@@ -1,0 +1,434 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">{{ esPlataforma ? 'P3 · CU16' : 'P4 · CU22' }}</span>
+      <h1>Arqueo y cierre de caja</h1>
+      <p>
+        La caja física se abre con el fondo inicial al empezar el turno y se cierra contando el efectivo. Sin caja abierta no
+        se puede cobrar en mostrador. La caja online junta las ventas en línea de cada día y se abre y se cierra sola.
+      </p>
+    </div>
+    <button type="button" class="is-secondary caja-recargar" (click)="cargarTodo()">Actualizar</button>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  <h2 class="caja-seccion">Caja actual</h2>
+  @if (cargando()) {
+    <p class="caja-vacio">Cargando...</p>
+  } @else if (panel(); as p) {
+    <div class="caja-grid">
+      @for (s of p.sucursales; track s.id) {
+        <article class="caja-card" [class.is-abierta]="s.caja">
+          <header class="caja-card__cabecera">
+            <div>
+              <strong>{{ s.nombre }}</strong>
+              @if (s.horario_atencion) {
+                <small>Horario: {{ s.horario_atencion }}</small>
+              }
+            </div>
+            <span class="caja-estado" [class.is-abierta]="s.caja">{{ s.caja ? 'Abierta' : 'Cerrada' }}</span>
+          </header>
+
+          @if (s.caja; as c) {
+            <p class="caja-card__quien">
+              Abierta por <strong>{{ c.abierta_por_nombre ?? '—' }}</strong>
+              @if (c.abierta_por_rol) {
+                ({{ rolLabel[c.abierta_por_rol] ?? c.abierta_por_rol }})
+              }
+              <br />
+              el {{ utc(c.abierta_en) | date: "d 'de' MMMM, HH:mm" : '-0400' }}
+            </p>
+            <dl class="caja-cifras">
+              <div><dt>Fondo inicial</dt><dd>Bs {{ c.monto_inicial | number: '1.2-2' }}</dd></div>
+              <div>
+                <dt>Ventas del turno</dt>
+                <dd>{{ c.resumen.ventas }} · Bs {{ c.resumen.total_ventas | number: '1.2-2' }}</dd>
+              </div>
+              <div><dt>En efectivo</dt><dd>Bs {{ c.resumen.efectivo | number: '1.2-2' }}</dd></div>
+              <div><dt>Por QR</dt><dd>Bs {{ c.resumen.qr | number: '1.2-2' }}</dd></div>
+              @if (numero(c.resumen.ingresos) > 0 || numero(c.resumen.retiros) > 0) {
+                <div>
+                  <dt>Ingresos / retiros</dt>
+                  <dd>+{{ c.resumen.ingresos | number: '1.2-2' }} / −{{ c.resumen.retiros | number: '1.2-2' }}</dd>
+                </div>
+              }
+              @if (numero(c.resumen.devoluciones_efectivo) > 0) {
+                <div><dt>Devoluciones en efectivo</dt><dd>−Bs {{ c.resumen.devoluciones_efectivo | number: '1.2-2' }}</dd></div>
+              }
+              <div class="caja-cifras__total">
+                <dt>Efectivo que debe haber</dt>
+                <dd>Bs {{ c.resumen.efectivo_esperado | number: '1.2-2' }}</dd>
+              </div>
+            </dl>
+            <div class="ventas-acciones caja-card__acciones">
+              <button type="button" class="is-secondary" [disabled]="cargandoDetalle() === c.id" (click)="verDetalle(c)">
+                Ver ventas
+              </button>
+              @if (p.puede_operar) {
+                <button type="button" class="is-secondary" (click)="abrirAccion({ tipo: 'movimiento', caja: c })">
+                  Ingreso / retiro
+                </button>
+                <button type="button" (click)="abrirAccion({ tipo: 'cerrar', caja: c })">Cerrar caja</button>
+              }
+            </div>
+          } @else {
+            <p class="caja-card__cerrada">Sin caja abierta: no se puede cobrar en mostrador en esta sucursal.</p>
+            @if (p.puede_operar) {
+              <div class="ventas-acciones caja-card__acciones">
+                <button type="button" (click)="abrirAccion({ tipo: 'abrir', sucursal: s })">Abrir caja</button>
+              </div>
+            }
+          }
+        </article>
+      } @empty {
+        <p class="caja-vacio">No hay sucursales activas.</p>
+      }
+
+      @if (esAdmin) {
+        <article class="caja-card caja-card--online" [class.is-abierta]="p.online">
+          <header class="caja-card__cabecera">
+            <div>
+              <strong>Caja online · hoy</strong>
+              <small>Tienda en línea, también con las sucursales cerradas</small>
+            </div>
+            <span class="caja-estado is-abierta">Automática</span>
+          </header>
+          @if (p.online; as o) {
+            <dl class="caja-cifras">
+              <div>
+                <dt>Ventas en línea</dt>
+                <dd>{{ o.resumen.ventas }} · Bs {{ o.resumen.total_ventas | number: '1.2-2' }}</dd>
+              </div>
+              <div><dt>PayPal</dt><dd>Bs {{ o.resumen.paypal | number: '1.2-2' }}</dd></div>
+              <div><dt>QR</dt><dd>Bs {{ o.resumen.qr | number: '1.2-2' }}</dd></div>
+              @if (numero(o.resumen.otros) > 0) {
+                <div><dt>Otros</dt><dd>Bs {{ o.resumen.otros | number: '1.2-2' }}</dd></div>
+              }
+            </dl>
+            <div class="ventas-acciones caja-card__acciones">
+              <button type="button" class="is-secondary" [disabled]="cargandoDetalle() === o.id" (click)="verDetalle(o)">
+                Ver ventas
+              </button>
+            </div>
+          } @else {
+            <p class="caja-card__cerrada">Se abre sola con la primera venta en línea de hoy y se cierra a medianoche.</p>
+          }
+        </article>
+      }
+    </div>
+  }
+
+  <div class="caja-historial-cabecera">
+    <h2 class="caja-seccion">Historial de cajas</h2>
+    <div class="admin-filtros">
+      @if (esAdmin && panel(); as p) {
+        <select [value]="filtroSucursal()" (change)="filtroSucursal.set($any($event.target).value); cargarHistorial()"
+                aria-label="Filtrar por sucursal">
+          <option value="">Todas las sucursales</option>
+          @for (s of p.sucursales; track s.id) {
+            <option [value]="s.id">{{ s.nombre }}</option>
+          }
+        </select>
+        <select [value]="filtroTipo()" (change)="filtroTipo.set($any($event.target).value); cargarHistorial()"
+                aria-label="Filtrar por tipo de caja">
+          <option value="">Físicas y online</option>
+          <option value="fisica">Solo cajas físicas</option>
+          <option value="online">Solo cajas online</option>
+        </select>
+      }
+    </div>
+  </div>
+
+  <div class="admin-table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Caja</th>
+          <th>Apertura</th>
+          <th>Cierre</th>
+          <th>Ventas</th>
+          <th>Efectivo esperado</th>
+          <th>Contado</th>
+          <th>Diferencia</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (cargandoHistorial()) {
+          <tr>
+            <td colspan="8" class="admin-table__empty">Cargando...</td>
+          </tr>
+        } @else {
+          @for (c of historial(); track c.id) {
+            <tr>
+              <td>
+                <strong>#{{ c.id }} · {{ c.tipo === 'online' ? 'Caja online' : c.sucursal_nombre }}</strong>
+                <span class="caja-estado caja-estado--mini" [class.is-abierta]="c.estado === 'abierta'">
+                  {{ c.estado === 'abierta' ? 'Abierta' : 'Cerrada' }}
+                </span>
+              </td>
+              <td>
+                {{ utc(c.abierta_en) | date: 'dd/MM/yyyy HH:mm' : '-0400' }}
+                <small class="caja-sub">
+                  @if (c.tipo === 'online') {
+                    Automática
+                  } @else {
+                    {{ c.abierta_por_nombre ?? '—' }}
+                    @if (c.abierta_por_rol) {
+                      · {{ rolLabel[c.abierta_por_rol] ?? c.abierta_por_rol }}
+                    }
+                    · fondo Bs {{ c.monto_inicial | number: '1.2-2' }}
+                  }
+                </small>
+              </td>
+              <td>
+                @if (c.cerrada_en) {
+                  {{ utc(c.cerrada_en) | date: 'dd/MM/yyyy HH:mm' : '-0400' }}
+                  <small class="caja-sub">{{ c.tipo === 'online' ? 'Automática' : (c.cerrada_por_nombre ?? '—') }}</small>
+                } @else {
+                  <span class="caja-sub">En curso</span>
+                }
+              </td>
+              <td>
+                {{ c.resumen.ventas }}
+                <small class="caja-sub caja-nowrap">Bs {{ c.resumen.total_ventas | number: '1.2-2' }}</small>
+              </td>
+              @if (c.tipo === 'fisica' && c.estado === 'cerrada') {
+                <td>Bs {{ c.efectivo_esperado | number: '1.2-2' }}</td>
+                <td>Bs {{ c.efectivo_contado | number: '1.2-2' }}</td>
+                <td class="caja-dif" [class.is-falta]="numero(c.diferencia) < 0" [class.is-sobra]="numero(c.diferencia) > 0">
+                  @if (numero(c.diferencia) === 0) {
+                    Cuadra
+                  } @else {
+                    {{ numero(c.diferencia) > 0 ? 'Sobran' : 'Faltan' }} Bs {{ (numero(c.diferencia) < 0 ? -numero(c.diferencia) : numero(c.diferencia)) | number: '1.2-2' }}
+                  }
+                </td>
+              } @else if (c.tipo === 'fisica') {
+                <td>Bs {{ c.resumen.efectivo_esperado | number: '1.2-2' }}</td>
+                <td colspan="2"><span class="caja-sub">Se cuenta al cerrar</span></td>
+              } @else {
+                <td colspan="3"><span class="caja-sub">Sin efectivo: PayPal Bs {{ c.resumen.paypal | number: '1.2-2' }} · QR Bs {{ c.resumen.qr | number: '1.2-2' }}</span></td>
+              }
+              <td>
+                <div class="ventas-acciones">
+                  <button type="button" class="is-secondary" [disabled]="cargandoDetalle() === c.id" (click)="verDetalle(c)">
+                    Ver detalle
+                  </button>
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="admin-table__empty">Todavía no hay cajas registradas.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Abrir, ingreso/retiro o cerrar (arqueo) -->
+@if (accion(); as a) {
+  <div class="ventas-overlay" (click)="cerrarAccion()">
+    <div class="ventas-modal" (click)="$event.stopPropagation()">
+      @switch (a.tipo) {
+        @case ('abrir') {
+          <h2>Abrir caja · {{ a.sucursal.nombre }}</h2>
+          <p class="ventas-modal__subtitulo">
+            Cuenta el efectivo con el que empiezas (el cambio). Queda registrado quién abrió la caja y a qué hora.
+          </p>
+          <label class="ventas-campo">
+            <span>Fondo inicial (Bs)</span>
+            <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ej. 200"
+                   [value]="monto()" (input)="monto.set($any($event.target).value)" />
+          </label>
+        }
+        @case ('movimiento') {
+          <h2>Ingreso o retiro de efectivo</h2>
+          <p class="ventas-modal__subtitulo">Ej. llevar plata al banco o pagar algo menor con la caja.</p>
+          <div class="caja-opciones">
+            <button type="button" [class.is-active]="tipoMovimiento() === 'retiro'" (click)="tipoMovimiento.set('retiro')">
+              Retiro
+            </button>
+            <button type="button" [class.is-active]="tipoMovimiento() === 'ingreso'" (click)="tipoMovimiento.set('ingreso')">
+              Ingreso
+            </button>
+          </div>
+          <label class="ventas-campo">
+            <span>Monto (Bs)</span>
+            <input type="number" min="0.01" step="0.01" inputmode="decimal"
+                   [value]="monto()" (input)="monto.set($any($event.target).value)" />
+          </label>
+          <label class="ventas-campo">
+            <span>Motivo</span>
+            <input type="text" maxlength="200" placeholder="Ej. Depósito al banco"
+                   [value]="texto()" (input)="texto.set($any($event.target).value)" />
+          </label>
+        }
+        @case ('cerrar') {
+          <h2>Cerrar caja · {{ a.caja.sucursal_nombre }}</h2>
+          <p class="ventas-modal__subtitulo">
+            Cuenta el efectivo que hay en la caja. El sistema lo compara con lo que debería haber y guarda la diferencia.
+          </p>
+          <dl class="caja-cifras caja-cifras--modal">
+            <div><dt>Fondo inicial</dt><dd>Bs {{ a.caja.monto_inicial | number: '1.2-2' }}</dd></div>
+            <div><dt>Ventas en efectivo</dt><dd>+Bs {{ a.caja.resumen.efectivo | number: '1.2-2' }}</dd></div>
+            @if (numero(a.caja.resumen.ingresos) > 0) {
+              <div><dt>Ingresos</dt><dd>+Bs {{ a.caja.resumen.ingresos | number: '1.2-2' }}</dd></div>
+            }
+            @if (numero(a.caja.resumen.retiros) > 0) {
+              <div><dt>Retiros</dt><dd>−Bs {{ a.caja.resumen.retiros | number: '1.2-2' }}</dd></div>
+            }
+            @if (numero(a.caja.resumen.devoluciones_efectivo) > 0) {
+              <div><dt>Devoluciones en efectivo</dt><dd>−Bs {{ a.caja.resumen.devoluciones_efectivo | number: '1.2-2' }}</dd></div>
+            }
+            <div class="caja-cifras__total">
+              <dt>Debe haber</dt>
+              <dd>Bs {{ a.caja.resumen.efectivo_esperado | number: '1.2-2' }}</dd>
+            </div>
+          </dl>
+          <label class="ventas-campo">
+            <span>Efectivo contado (Bs)</span>
+            <input type="number" min="0" step="0.01" inputmode="decimal"
+                   [value]="monto()" (input)="monto.set($any($event.target).value)" />
+          </label>
+          @if (diferenciaCierre() !== null) {
+            <p class="caja-dif caja-dif--aviso" [class.is-falta]="diferenciaCierre()! < -0.005"
+               [class.is-sobra]="diferenciaCierre()! > 0.005">
+              @if (diferenciaCierre()! > -0.005 && diferenciaCierre()! < 0.005) {
+                La caja cuadra.
+              } @else {
+                {{ diferenciaCierre()! > 0 ? 'Sobran' : 'Faltan' }} Bs
+                {{ (diferenciaCierre()! < 0 ? -diferenciaCierre()! : diferenciaCierre()!) | number: '1.2-2' }}
+              }
+            </p>
+          }
+          <label class="ventas-campo">
+            <span>Observación {{ diferenciaCierre() !== null && (diferenciaCierre()! <= -0.005 || diferenciaCierre()! >= 0.005) ? '(obligatoria si hay diferencia)' : '(opcional)' }}</span>
+            <textarea rows="2" maxlength="500" [value]="texto()" (input)="texto.set($any($event.target).value)"></textarea>
+          </label>
+        }
+      }
+      @if (errorAccion()) {
+        <div class="admin-error">{{ errorAccion() }}</div>
+      }
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" [disabled]="procesando()" (click)="cerrarAccion()">Cancelar</button>
+        <button type="button" [disabled]="procesando()" (click)="confirmar()">
+          {{ procesando() ? 'Guardando…' : a.tipo === 'abrir' ? 'Abrir caja' : a.tipo === 'cerrar' ? 'Cerrar caja' : 'Registrar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Detalle de una caja: arqueo, movimientos y todas sus ventas -->
+@if (detalle(); as d) {
+  <div class="ventas-overlay" (click)="cerrarDetalle()">
+    <div class="ventas-modal caja-detalle" (click)="$event.stopPropagation()">
+      <h2>Caja #{{ d.id }} · {{ d.tipo === 'online' ? 'Caja online' : d.sucursal_nombre }}</h2>
+      <p class="ventas-modal__subtitulo">
+        @if (d.tipo === 'online') {
+          Ventas en línea del {{ d.fecha + 'T12:00:00Z' | date: "d 'de' MMMM 'de' yyyy" : '-0400' }} · se abre y se cierra sola.
+        } @else {
+          Abierta el {{ utc(d.abierta_en) | date: "d/MM/yyyy 'a las' HH:mm" : '-0400' }} por
+          {{ d.abierta_por_nombre ?? '—' }}{{ d.abierta_por_rol ? ' (' + (rolLabel[d.abierta_por_rol] ?? d.abierta_por_rol) + ')' : '' }}
+          @if (d.cerrada_en) {
+            · cerrada el {{ utc(d.cerrada_en) | date: "d/MM/yyyy 'a las' HH:mm" : '-0400' }} por {{ d.cerrada_por_nombre ?? '—' }}
+          } @else {
+            · sigue abierta
+          }
+        }
+      </p>
+
+      <dl class="caja-cifras caja-cifras--detalle">
+        <div><dt>Ventas</dt><dd>{{ d.resumen.ventas }} · Bs {{ d.resumen.total_ventas | number: '1.2-2' }}</dd></div>
+        <div><dt>Efectivo</dt><dd>Bs {{ d.resumen.efectivo | number: '1.2-2' }}</dd></div>
+        <div><dt>QR</dt><dd>Bs {{ d.resumen.qr | number: '1.2-2' }}</dd></div>
+        <div><dt>PayPal</dt><dd>Bs {{ d.resumen.paypal | number: '1.2-2' }}</dd></div>
+        @if (d.tipo === 'fisica') {
+          <div><dt>Fondo inicial</dt><dd>Bs {{ d.monto_inicial | number: '1.2-2' }}</dd></div>
+          <div>
+            <dt>Efectivo esperado</dt>
+            <dd>Bs {{ (d.efectivo_esperado ?? d.resumen.efectivo_esperado) | number: '1.2-2' }}</dd>
+          </div>
+          @if (d.estado === 'cerrada') {
+            <div><dt>Contado</dt><dd>Bs {{ d.efectivo_contado | number: '1.2-2' }}</dd></div>
+            <div class="caja-dif" [class.is-falta]="numero(d.diferencia) < 0" [class.is-sobra]="numero(d.diferencia) > 0">
+              <dt>Diferencia</dt>
+              <dd>{{ numero(d.diferencia) === 0 ? 'Cuadra' : (numero(d.diferencia) > 0 ? '+' : '') + (d.diferencia | number: '1.2-2') }}</dd>
+            </div>
+          }
+        }
+      </dl>
+      @if (d.observacion) {
+        <p class="caja-obs">Observación: "{{ d.observacion }}"</p>
+      }
+
+      @if (d.movimientos.length) {
+        <h3 class="caja-subtitulo">Ingresos y retiros</h3>
+        <ul class="caja-movimientos">
+          @for (m of d.movimientos; track m.id) {
+            <li>
+              <span>{{ utc(m.fecha) | date: 'HH:mm' : '-0400' }} · {{ m.motivo }} · {{ m.usuario_nombre ?? '—' }}</span>
+              <strong [class.is-falta]="m.tipo === 'retiro'">{{ m.tipo === 'retiro' ? '−' : '+' }}Bs {{ m.monto | number: '1.2-2' }}</strong>
+            </li>
+          }
+        </ul>
+      }
+
+      <h3 class="caja-subtitulo">Ventas de esta caja</h3>
+      <div class="admin-table-wrap">
+        <table class="admin-table caja-ventas">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fecha y hora</th>
+              <th>Tipo</th>
+              <th>Cliente</th>
+              <th>Atendió</th>
+              <th>Pago</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (v of d.ventas_detalle; track v.id) {
+              <tr [class.caja-tardia]="v.fuera_de_arqueo">
+                <td>{{ v.id }}</td>
+                <td>{{ utc(v.fecha) | date: 'dd/MM HH:mm' : '-0400' }}</td>
+                <td>
+                  {{ v.tipo === 'venta_digital' ? 'En línea' : 'Mostrador' }}
+                  <small class="caja-sub">
+                    {{ v.origen === 'offline' ? 'OFFLINE' : 'ONLINE' }}{{ v.fuera_de_arqueo ? ' · tardía, fuera del arqueo' : '' }}
+                  </small>
+                </td>
+                <td>{{ v.cliente }}</td>
+                <td>{{ v.atendido_por ?? '—' }}</td>
+                <td>
+                  {{ v.metodo_pago ? (metodoLabel[v.metodo_pago] ?? v.metodo_pago) : '—' }}
+                  @if (v.estado_pago && v.estado_pago !== 'completado') {
+                    <small class="caja-sub">{{ v.estado_pago }}</small>
+                  }
+                </td>
+                <td>Bs {{ v.total | number: '1.2-2' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="admin-table__empty">Esta caja no tiene ventas.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" (click)="imprimir()">Imprimir</button>
+        <button type="button" (click)="cerrarDetalle()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}

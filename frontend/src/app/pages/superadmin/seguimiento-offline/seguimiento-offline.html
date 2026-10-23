@@ -1,0 +1,139 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P4 · {{ vista() === 'descargas' ? 'CU11' : 'CU12' }} · Seguimiento offline</span>
+      <h1>{{ vista() === 'descargas' ? 'Datos descargados sin conexión' : 'Sincronización de la tienda' }}</h1>
+      <p>
+        Quién de esta tienda tiene datos en su dispositivo para trabajar sin internet, de cuándo son, y cómo llegan sus
+        ventas y reservas al sincronizar.
+      </p>
+    </div>
+    <button type="button" class="caja-recargar seguimiento-recargar" (click)="cargar()">Actualizar</button>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  @if (cargando()) {
+    <p class="offline-vacio">Cargando...</p>
+  } @else if (datos(); as d) {
+    <p class="seguimiento-plan" [class.is-sin]="!d.plan_offline">
+      Plan {{ d.plan ?? 'sin suscripción activa' }} ·
+      {{ d.plan_offline ? 'operación sin conexión habilitada' : 'no incluye operación sin conexión' }}
+    </p>
+
+    <div class="seguimiento-kpis">
+      <div><span>Descargas (30 días)</span><strong>{{ d.resumen.descargas_30d }}</strong><small>{{ d.resumen.usuarios_con_datos }} usuarios con datos</small></div>
+      <div><span>Última descarga</span><strong>{{ hace(d.resumen.ultima_descarga) }}</strong>
+        <small>{{ d.resumen.ultima_descarga ? (d.resumen.ultima_descarga | date: 'dd/MM/yyyy HH:mm') : '—' }}</small></div>
+      <div><span>Operaciones recibidas</span><strong>{{ d.resumen.operaciones }}</strong>
+        <small>{{ d.resumen.confirmadas }} confirmadas · {{ d.resumen.resueltas }} resueltas</small></div>
+      <div [class.is-alerta]="d.resumen.conflictos > 0"><span>En conflicto</span><strong>{{ d.resumen.conflictos }}</strong>
+        <small>{{ d.resumen.anuladas }} anuladas · {{ d.resumen.rechazadas }} rechazadas</small></div>
+      <div><span>Reenvíos sin duplicar</span><strong>{{ d.resumen.reenvios }}</strong><small>misma operación enviada otra vez</small></div>
+      <div><span>Última sincronización</span><strong>{{ hace(d.resumen.ultima_sincronizacion) }}</strong>
+        <small>{{ d.resumen.ultima_sincronizacion ? (d.resumen.ultima_sincronizacion | date: 'dd/MM/yyyy HH:mm') : '—' }}</small></div>
+    </div>
+
+    @if (d.resumen.conflictos > 0) {
+      <p class="seguimiento-conflictos">
+        Hay {{ d.resumen.conflictos }} {{ d.resumen.conflictos === 1 ? 'operación' : 'operaciones' }} en conflicto esperando
+        que la tienda las resuelva.
+        <a routerLink="/superadmin/conflictos" [queryParams]="{ empresa: empresa }">Ver conflictos (CU14)</a>
+      </p>
+    }
+
+    <nav class="ventas-tabs">
+      <button type="button" [class.is-active]="vista() === 'descargas'" (click)="vista.set('descargas')">Descargas (CU11)</button>
+      <button type="button" [class.is-active]="vista() === 'sincronizacion'" (click)="vista.set('sincronizacion')">
+        Sincronización por usuario (CU12)
+      </button>
+    </nav>
+
+    @if (vista() === 'descargas') {
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Quién</th>
+              <th>Qué descargó</th>
+              <th>Prendas</th>
+              <th>Clientes</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (x of d.descargas; track $index) {
+              <tr>
+                <td>
+                  {{ x.fecha | date: 'dd/MM/yyyy HH:mm' }}
+                  <small class="offline-sub">{{ hace(x.fecha) }}</small>
+                </td>
+                <td>
+                  <strong>{{ x.usuario_nombre ?? '—' }}</strong>
+                  <small class="offline-sub">{{ x.usuario_tipo ? (tipoUsuario[x.usuario_tipo] ?? x.usuario_tipo) : '' }}</small>
+                </td>
+                <td>{{ x.tipo === 'personal' ? 'Paquete de ' + x.sucursal_nombre : 'Catálogo para reservar (app del cliente)' }}</td>
+                <td>{{ x.productos }}</td>
+                <td>{{ x.tipo === 'personal' ? x.clientes : '—' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="admin-table__empty">Nadie de esta tienda descargó datos para trabajar sin conexión todavía.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Sus datos offline</th>
+              <th>Última sincronización</th>
+              <th>Operaciones</th>
+              <th>Reenvíos</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of d.usuarios; track $index) {
+              <tr>
+                <td>
+                  <strong>{{ u.usuario_nombre }}</strong>
+                  <small class="offline-sub">{{ tipoUsuario[u.usuario_tipo] ?? u.usuario_tipo }}{{ u.sucursal_nombre ? ' · ' + u.sucursal_nombre : '' }}</small>
+                </td>
+                <td [class.seguimiento-viejo]="viejo(u.ultima_descarga)">
+                  {{ u.ultima_descarga ? 'Descargados ' + hace(u.ultima_descarga) : 'Sin descarga registrada' }}
+                  <small class="offline-sub">{{ u.descargas }} {{ u.descargas === 1 ? 'descarga' : 'descargas' }}</small>
+                </td>
+                <td>
+                  {{ hace(u.ultima_sincronizacion) }}
+                  @if (u.ultima_sincronizacion) {
+                    <small class="offline-sub">{{ u.ultima_sincronizacion | date: 'dd/MM/yyyy HH:mm' }}</small>
+                  }
+                </td>
+                <td>
+                  <strong>{{ u.operaciones }}</strong>
+                  <small class="offline-sub">
+                    {{ u.confirmadas }} confirmadas · {{ u.resueltas }} resueltas · {{ u.no_registradas }} no registradas
+                  </small>
+                  @if (u.conflictos > 0) {
+                    <span class="offline-chip offline-chip--conflicto">{{ u.conflictos }} en conflicto</span>
+                  }
+                </td>
+                <td>{{ u.reenvios }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="admin-table__empty">Todavía no llegó nada sincronizado de esta tienda.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>

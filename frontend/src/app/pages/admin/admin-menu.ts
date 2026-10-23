@@ -2,6 +2,8 @@ export interface AdminUseCase {
   code: string;
   label: string;
   route?: string;
+  // Permiso que habilita el CU, si no es el mismo codigo (CUs del 2do parcial).
+  permiso?: string;
 }
 
 export interface AdminPackage {
@@ -49,6 +51,9 @@ export const ADMIN_MENU: AdminPackage[] = [
       { code: 'CU11', label: 'Gestion de Ventas', route: '/admin/ventas' },
       { code: 'CU13', label: 'Administrar Carrito de Compras', route: '/admin/carritos' },
       { code: 'CU21', label: 'Gestionar Metodos de Pago', route: '/admin/metodos-pago' },
+      { code: 'CU22', label: 'Arqueo y Cierre de Caja', route: '/admin/caja', permiso: '2P-CU16' },
+      { code: 'CU23', label: 'Trabajar sin Conexion', route: '/admin/sin-conexion', permiso: '2P-CU12' },
+      { code: 'CU24', label: 'Operaciones Offline y Conflictos', route: '/admin/conflictos', permiso: '2P-CU13' },
     ],
   },
   {

@@ -20,8 +20,10 @@
     "@angular/forms": "^22.1.0",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "@angular/service-worker": "^22.1.4",
     "@decartai/sdk": "^0.1.22",
     "chart.js": "^4.5.1",
+    "idb": "^8.0.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

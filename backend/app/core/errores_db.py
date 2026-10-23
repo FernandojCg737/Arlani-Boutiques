@@ -73,6 +73,16 @@ MENSAJES: dict[str, tuple[int, str]] = {
     "cambio_no_pendiente": (status.HTTP_409_CONFLICT, "Este cambio ya fue atendido."),
     "cambio_sin_pago_pendiente": (status.HTTP_409_CONFLICT, "Este cambio no tiene una diferencia por pagar."),
     "destino_invalido": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Elige qué hacer con la prenda devuelta."),
+    # Caja (CU16)
+    "caja_cerrada": (
+        status.HTTP_409_CONFLICT,
+        "La caja de esta sucursal está cerrada: ábrela en Arqueo y cierre de caja para poder cobrar en mostrador.",
+    ),
+    "caja_ya_abierta": (status.HTTP_409_CONFLICT, "Esta sucursal ya tiene una caja abierta."),
+    "caja_no_abierta": (status.HTTP_409_CONFLICT, "Esa caja ya está cerrada."),
+    "caja_no_encontrada": (status.HTTP_404_NOT_FOUND, "Caja no encontrada."),
+    "caja_monto_invalido": (status.HTTP_422_UNPROCESSABLE_ENTITY, "El monto no puede ser negativo."),
+    "sucursal_no_encontrada": (status.HTTP_404_NOT_FOUND, "Sucursal no encontrada."),
     # "Pagar todo": liquidacion a cada tienda
     "liquidacion_invalida": (status.HTTP_409_CONFLICT, "No se pudo liquidar la compra a una de las tiendas."),
     "tienda_sin_paypal_email": (

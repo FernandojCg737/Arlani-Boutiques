@@ -181,6 +181,17 @@
   padding: 8px 20px 20px;
 }
 
+// La sucursal no tiene la caja abierta: el pedido se prepara cuando abra.
+.checkout-cerrada {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+  background: #fff8ec;
+  border-left: 3px solid #e0a040;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6b4a12;
+}
+
 .checkout-items {
   list-style: none;
   margin: 0 0 8px;

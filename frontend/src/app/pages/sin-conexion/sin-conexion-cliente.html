@@ -1,0 +1,183 @@
+<div class="admin-content cliente-offline">
+  <a routerLink="/perfil" class="cliente-offline__volver">← Mi cuenta</a>
+  <div class="admin-content__header">
+    <div>
+      <h1>Sin conexión</h1>
+      <p>
+        Guarda el catálogo en tu dispositivo para verlo sin internet y reservar prendas. Tus reservas se envían solas a
+        la tienda cuando vuelvas a tener conexión.
+      </p>
+    </div>
+    <button type="button" class="ventas-nueva-btn" [disabled]="!sync.enLinea() || descargando()" (click)="descargar()">
+      {{ descargando() ? 'Descargando…' : catalogo() ? 'Actualizar catálogo' : 'Descargar catálogo' }}
+    </button>
+  </div>
+
+  <div class="offline-estado" [class.is-offline]="!sync.enLinea()">
+    <span class="offline-estado__punto"></span>
+    <strong>{{ sync.enLinea() ? 'Con conexión' : 'Sin conexión' }}</strong>
+    <span>
+      · {{ sync.pendientes() }} {{ sync.pendientes() === 1 ? 'reserva pendiente' : 'reservas pendientes' }} de enviar
+    </span>
+    <button type="button" [disabled]="!sync.enLinea() || sync.sincronizando()" (click)="sync.sincronizar()">
+      {{ sync.sincronizando() ? 'Enviando…' : 'Enviar ahora' }}
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+  @if (aviso()) {
+    <p class="offline-aviso">{{ aviso() }}</p>
+  }
+
+  @if (catalogo(); as c) {
+    <p class="offline-sub cliente-offline__fecha">
+      Catálogo guardado {{ hace(c.descargado_en) }} ({{ c.descargado_en | date: 'dd/MM/yyyy HH:mm' }}).
+      @if (desactualizado() || !sync.enLinea()) {
+        <span class="offline-viejo">El stock puede haber cambiado: la tienda lo confirma al recibir tu reserva.</span>
+      }
+    </p>
+
+    @if (!c.tiendas.length) {
+      <p class="offline-vacio">Ninguna tienda trabaja sin conexión por ahora.</p>
+    } @else {
+      <nav class="ventas-tabs">
+        @for (t of c.tiendas; track t.empresa_id) {
+          <button type="button" [class.is-active]="tiendaId() === t.empresa_id" (click)="elegirTienda(t.empresa_id)">
+            {{ t.nombre }}
+          </button>
+        }
+      </nav>
+
+      @if (tienda(); as t) {
+        <div class="offline-sucursal">
+          <label class="ventas-campo">
+            <span>Sucursal donde la recoges</span>
+            <select [value]="sucursalId() ?? ''" (change)="elegirSucursal(+$any($event.target).value)">
+              @for (s of t.sucursales; track s.id) {
+                <option [value]="s.id">{{ s.nombre }}</option>
+              }
+            </select>
+          </label>
+          <input class="offline-buscar" type="search" placeholder="Buscar prenda…" [value]="buscar()"
+                 (input)="buscar.set($any($event.target).value)" />
+        </div>
+
+        <div class="offline-form">
+          <div>
+            <div class="mostrador-catalogo">
+              @for (p of productos(); track p.producto_id) {
+                <button type="button" class="mostrador-prenda" [class.is-activa]="productoSel()?.producto_id === p.producto_id"
+                        (click)="elegirProducto(p)">
+                  @if (p.imagen_url && sync.enLinea()) {
+                    <img [src]="p.imagen_url" [alt]="p.nombre" />
+                  } @else {
+                    <span class="mostrador-prenda__sin-foto">{{ p.nombre.charAt(0) }}</span>
+                  }
+                  <strong>{{ p.nombre }}</strong>
+                  <small>Bs {{ p.precio | number: '1.2-2' }}</small>
+                </button>
+              } @empty {
+                <p class="offline-vacio">No hay prendas con stock conocido en esta sucursal.</p>
+              }
+            </div>
+            @if (productoSel(); as p) {
+              <div class="mostrador-elegir">
+                <p class="mostrador-elegir__titulo">{{ p.nombre }} · Bs {{ p.precio | number: '1.2-2' }}</p>
+                <span class="mostrador-etiqueta">Talla y color</span>
+                <div class="mostrador-opciones">
+                  @for (v of p.variantes; track v.talla_id + '-' + v.color_id) {
+                    <button type="button" class="mostrador-opcion" [class.is-activa]="varianteSel() === v"
+                            [disabled]="disponible(p, v) < 1" (click)="varianteSel.set(v); cantidad.set(1)">
+                      {{ v.talla_codigo }} · {{ v.color_nombre }}
+                      <small>{{ disponible(p, v) < 1 ? 'sin stock' : 'quedan ' + disponible(p, v) }}</small>
+                    </button>
+                  }
+                </div>
+                @if (varianteSel(); as v) {
+                  <div class="mostrador-agregar">
+                    <label>
+                      <span class="mostrador-etiqueta">Cantidad</span>
+                      <input type="number" min="1" [max]="disponible(p, v)" [value]="cantidad()"
+                             (input)="cantidad.set(+$any($event.target).value)" />
+                    </label>
+                    <button type="button" class="ventas-agregar-btn" [disabled]="cantidad() < 1 || cantidad() > disponible(p, v)"
+                            (click)="agregar()">
+                      Agregar a la reserva
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <aside class="offline-form__resumen">
+            <h2>Mi reserva</h2>
+            @if (items().length) {
+              <ul class="ventas-detalles ventas-detalles--form">
+                @for (i of items(); track $index) {
+                  <li>
+                    <span>{{ i.cantidad }}× {{ i.producto_nombre }} ({{ i.talla }}, {{ i.color }})</span>
+                    <button type="button" (click)="quitar($index)" aria-label="Quitar">&times;</button>
+                  </li>
+                }
+              </ul>
+              <p class="ventas-seleccion">Total a pagar al recoger: Bs {{ total() | number: '1.2-2' }}</p>
+            } @else {
+              <p class="offline-sub">Elige prendas del catálogo.</p>
+            }
+            <label class="ventas-campo">
+              <span>La recojo hasta</span>
+              <input type="datetime-local" [value]="horario()" (input)="horario.set($any($event.target).value)" />
+            </label>
+            <button type="button" class="ventas-nueva-btn offline-registrar" [disabled]="guardando() || !items().length"
+                    (click)="reservar()">
+              {{ guardando() ? 'Guardando…' : 'Reservar' }}
+            </button>
+          </aside>
+        </div>
+      }
+    }
+  } @else {
+    <p class="offline-vacio">Descarga el catálogo mientras tienes internet para poder usarlo sin conexión.</p>
+  }
+
+  <h2 class="offline-titulo">Mis reservas sin conexión</h2>
+  <div class="admin-table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Reserva</th>
+          <th>Prendas</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (o of misOperaciones(); track o.uuid) {
+          <tr>
+            <td>
+              <strong>{{ o.empresa_nombre }}</strong>
+              <small class="offline-sub">{{ o.sucursal_nombre }} · {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }}</small>
+            </td>
+            <td>
+              @for (i of o.items; track $index) {
+                <span class="offline-linea">{{ i.cantidad }}× {{ i.producto_nombre }} ({{ i.talla }}, {{ i.color }})</span>
+              }
+            </td>
+            <td>
+              <span class="offline-chip offline-chip--{{ o.estado }}">{{ estadoLabel[o.estado] }}</span>
+              @if (o.mensaje) {
+                <small class="offline-sub offline-mensaje">{{ o.mensaje }}</small>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="3" class="admin-table__empty">Todavía no hiciste reservas sin conexión.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

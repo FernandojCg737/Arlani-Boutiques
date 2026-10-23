@@ -398,11 +398,11 @@ export class AdminVentas implements OnInit {
 
   private async cargarSucursales(): Promise<void> {
     try {
-      // Solo las sucursales de la tienda (las publicas son de todas las tiendas).
-      const res = await firstValueFrom(
-        this.http.get<{ sucursales: Sucursal[] }>(`${environment.apiUrl}/productos/catalogo-base`),
+      // Solo las sucursales de la tienda (las publicas son de todas las
+      // tiendas); el Cajero y el Encargado, solo la suya.
+      this.sucursales.set(
+        await firstValueFrom(this.http.get<Sucursal[]>(`${environment.apiUrl}/ventas/presencial/sucursales`)),
       );
-      this.sucursales.set(res.sucursales);
     } catch {
       this.sucursales.set([]);
     }

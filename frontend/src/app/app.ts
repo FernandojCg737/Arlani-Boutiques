@@ -12,6 +12,7 @@ import { LoginRequeridoModal } from './components/login-requerido/login-requerid
 import { WhatsappFloat } from './components/whatsapp-float/whatsapp-float';
 import { Auth } from './services/auth';
 import { InactivitySession } from './services/inactivity-session';
+import { Sincronizacion } from './services/offline/sincronizacion';
 import { TiendaActiva } from './services/tienda-activa';
 
 @Component({
@@ -30,6 +31,8 @@ export class App implements OnInit {
   // Se inyecta para que arranque: vigila inactividad (30 min) y valida la
   // sesion contra el backend mientras haya un usuario logueado.
   private readonly inactivitySession = inject(InactivitySession);
+  // P4 offline: manda sola las operaciones guardadas sin conexion (CU12).
+  private readonly sincronizacion = inject(Sincronizacion);
 
   // Paginas de auth (login/registro) usan su propia pantalla completa, sin
   // el header/footer del sitio: se marcan con data: { hideChrome: true }.
