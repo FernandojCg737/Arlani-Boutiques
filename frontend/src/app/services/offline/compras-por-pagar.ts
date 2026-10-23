@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../auth';
@@ -36,13 +36,18 @@ export class ComprasPorPagar {
   });
 
   constructor() {
+    // Solo cuando cambia quién inició sesión (no al revalidar la sesión).
+    const cliente = computed(() => {
+      const u = this.auth.currentUser();
+      return u?.tipo === 'cliente' ? u.id : null;
+    });
     effect(() => {
-      // Depende del usuario, de la conexión y de cada sincronización terminada.
-      const usuario = this.auth.currentUser();
+      // Depende del cliente, de la conexión y de cada sincronización terminada.
+      const id = cliente();
       const enLinea = this.sync.enLinea();
       this.sync.sincronizaciones();
-      if (usuario?.tipo === 'cliente' && enLinea) void this.revisar();
-      else if (usuario?.tipo !== 'cliente') this.compras.set([]);
+      if (id !== null && enLinea) untracked(() => void this.revisar());
+      else if (id === null) untracked(() => this.compras.set([]));
     });
   }
 

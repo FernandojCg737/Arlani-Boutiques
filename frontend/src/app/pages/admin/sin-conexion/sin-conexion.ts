@@ -1,6 +1,6 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Auth } from '../../../services/auth';
@@ -113,7 +113,7 @@ export class AdminSinConexion implements OnInit {
     // Llegó una descarga automática: se muestra el catálogo nuevo (el carrito
     // de la venta en curso no se toca).
     effect(() => {
-      if (this.automatica.ultima() && this.sucursalId() !== null) void this.recargarPaquete();
+      if (this.automatica.ultima() && this.sucursalId() !== null) untracked(() => void this.recargarPaquete());
     });
   }
 

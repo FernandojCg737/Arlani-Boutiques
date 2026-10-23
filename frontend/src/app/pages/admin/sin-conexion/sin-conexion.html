@@ -24,8 +24,8 @@
         · {{ sync.conflictos() }} en conflicto
       }
     </span>
-    <button type="button" [disabled]="!sync.enLinea() || sync.sincronizando()" (click)="sync.sincronizar()">
-      {{ sync.sincronizando() ? 'Sincronizando…' : 'Sincronizar ahora' }}
+    <button type="button" [disabled]="!sync.enLinea() || sync.ocupado()" (click)="sync.sincronizar()">
+      {{ sync.ocupado() ? 'Sincronizando…' : 'Sincronizar ahora' }}
     </button>
   </div>
 

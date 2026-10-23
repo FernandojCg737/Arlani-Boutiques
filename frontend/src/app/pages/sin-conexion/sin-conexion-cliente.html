@@ -20,8 +20,8 @@
     <span>
       · {{ sync.pendientes() }} {{ sync.pendientes() === 1 ? 'operación pendiente' : 'operaciones pendientes' }} de enviar
     </span>
-    <button type="button" [disabled]="!sync.enLinea() || sync.sincronizando()" (click)="sync.sincronizar()">
-      {{ sync.sincronizando() ? 'Enviando…' : 'Enviar ahora' }}
+    <button type="button" [disabled]="!sync.enLinea() || sync.ocupado()" (click)="sync.sincronizar()">
+      {{ sync.ocupado() ? 'Enviando…' : 'Enviar ahora' }}
     </button>
   </div>
 
