@@ -25,6 +25,14 @@
     </div>
   </div>
 
+  @if (conOrigen()) {
+    <app-selector-origen que="reservas" [origen]="origen()" (cambio)="cambiarOrigen($event)" />
+  } @else if (esPlataforma && planSinOffline()) {
+    <p class="sin-offline">
+      El plan {{ planSinOffline() }} de esta tienda no incluye la operación sin conexión: todas sus reservas son en línea.
+    </p>
+  }
+
   @if (error()) {
     <div class="admin-error">{{ error() }}</div>
   }
@@ -49,7 +57,13 @@
           </tr>
         } @else if (items().length === 0) {
           <tr>
-            <td colspan="7" class="admin-table__empty">No hay reservas para estos filtros.</td>
+            <td colspan="7" class="admin-table__empty">
+              {{
+                conOrigen() && origen() === 'offline'
+                  ? 'Todavía no hay reservas hechas sin conexión: aparecen aquí cuando se sincronizan (CU12).'
+                  : 'No hay reservas para estos filtros.'
+              }}
+            </td>
           </tr>
         } @else {
           @for (r of items(); track r.id) {

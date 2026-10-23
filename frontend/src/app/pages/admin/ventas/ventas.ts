@@ -1,12 +1,12 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { CatalogoPublico } from '../../../services/catalogo-publico';
 import { enlaceMapa } from '../../../services/mapa';
 import { AdminCambios } from '../cambios/cambios';
+import { Origen, SelectorOrigen } from '../../../components/selector-origen/selector-origen';
 
 interface DetalleVentaItem {
   id: number;
@@ -72,13 +72,29 @@ interface ClienteBusqueda {
   email: string;
 }
 
-interface DisponibilidadItem {
-  sucursal_id: number;
+interface VarianteMostrador {
   talla_id: number;
   talla_codigo: string;
   color_id: number;
   color_nombre: string;
-  cantidad: number;
+  stock: number;
+}
+
+interface QrTienda {
+  id: number;
+  nombre: string;
+  qr_url: string;
+  instrucciones: string | null;
+  banco: string | null;
+  titular: string | null;
+}
+
+interface ProductoMostrador {
+  producto_id: number;
+  nombre: string;
+  precio: string;
+  imagen_url: string | null;
+  variantes: VarianteMostrador[];
 }
 
 interface ItemNuevaVenta {
@@ -163,13 +179,33 @@ type Vista = 'ventas' | 'reservas' | 'devoluciones' | 'cambios';
 // en efectivo.
 @Component({
   selector: 'app-admin-ventas',
-  imports: [DatePipe, DecimalPipe, RouterLink, AdminCambios],
+  imports: [DatePipe, DecimalPipe, RouterLink, AdminCambios, SelectorOrigen],
   templateUrl: './ventas.html',
   styleUrl: './ventas.scss',
 })
 export class AdminVentas implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly catalogo = inject(CatalogoPublico);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  // ONLINE / OFFLINE (las hechas sin conexion llegan al sincronizar, CU12):
+  // solo si el plan de la tienda incluye la operacion sin conexion (Basico y
+  // Profesional). Lo ve el personal (CU11) y el SuperAdministrador (CU06).
+  protected readonly conOrigen = signal(false);
+  protected readonly esPlataforma = this.route.snapshot.data['origenes'] === true;
+  protected readonly planSinOffline = signal<string | null>(null);
+  protected readonly origen = signal<Origen>(
+    this.route.snapshot.queryParamMap.get('origen') === 'offline' ? 'offline' : 'online',
+  );
+
+  protected cambiarOrigen(o: Origen): void {
+    if (o === this.origen()) return;
+    this.origen.set(o);
+    // OFFLINE muestra solo las ventas sincronizadas.
+    if (o === 'offline') this.vista.set('ventas');
+    void this.router.navigate([], { queryParams: { origen: o }, queryParamsHandling: 'merge', replaceUrl: true });
+    this.filtrar();
+  }
 
   protected readonly items = signal<VentaItem[]>([]);
   protected readonly total = signal(0);
@@ -270,22 +306,71 @@ export class AdminVentas implements OnInit {
   protected readonly sucursalNuevaId = signal<number | null>(null);
   protected readonly metodoPagoEdit = signal('efectivo');
   protected readonly estadoPagoEdit = signal('completado');
-  protected readonly productoBusqueda = signal('');
-  protected readonly varianteSeleccionada = signal('');
-  protected readonly variantesDisponibles = signal<DisponibilidadItem[]>([]);
-  protected readonly productoParaVariantes = signal<{ id: number; nombre: string; precio: number } | null>(null);
   protected readonly cantidadNueva = signal(1);
   protected readonly itemsNuevaVenta = signal<ItemNuevaVenta[]>([]);
   protected readonly guardandoVenta = signal(false);
   protected readonly errorNuevaVenta = signal('');
 
-  protected readonly productosSugeridos = computed(() => {
+  // Catalogo de la sucursal: prendas con stock, como al pedir un cambio
+  // (producto -> talla -> color, con cuantas quedan).
+  protected readonly catalogoMostrador = signal<ProductoMostrador[]>([]);
+  protected readonly cargandoCatalogo = signal(false);
+  protected readonly productoBusqueda = signal('');
+  protected readonly productoElegidoId = signal<number | null>(null);
+  protected readonly tallaElegida = signal<number | null>(null);
+  protected readonly colorElegido = signal<number | null>(null);
+
+  protected readonly productosFiltrados = computed(() => {
     const termino = this.productoBusqueda().trim().toLowerCase();
-    if (!termino) return [];
-    return this.catalogo
-      .products()
-      .filter((p) => p.name.toLowerCase().includes(termino))
-      .slice(0, 8);
+    const todos = this.catalogoMostrador();
+    return termino ? todos.filter((p) => p.nombre.toLowerCase().includes(termino)) : todos;
+  });
+  protected readonly productoElegido = computed(
+    () => this.catalogoMostrador().find((p) => p.producto_id === this.productoElegidoId()) ?? null,
+  );
+  protected readonly tallasProducto = computed(() => {
+    const vistas = new Map<number, string>();
+    for (const v of this.productoElegido()?.variantes ?? []) vistas.set(v.talla_id, v.talla_codigo);
+    return [...vistas].map(([id, codigo]) => ({ id, codigo }));
+  });
+  protected readonly coloresTalla = computed(() =>
+    (this.productoElegido()?.variantes ?? []).filter((v) => v.talla_id === this.tallaElegida()),
+  );
+  protected readonly varianteElegida = computed(
+    () => this.coloresTalla().find((v) => v.color_id === this.colorElegido()) ?? null,
+  );
+
+  // Cobro de la venta de mostrador: efectivo o QR (foto del comprobante opcional).
+  protected readonly metodoCobro = signal<'efectivo' | 'qr'>('efectivo');
+  protected readonly fotoComprobante = signal<string | null>(null);
+  // QR de cobro de la tienda (Metodos de pago) que se le muestra al cliente.
+  protected readonly qrsTienda = signal<QrTienda[]>([]);
+  protected readonly qrElegidoId = signal<number | null>(null);
+  protected readonly qrElegido = computed(
+    () => this.qrsTienda().find((q) => q.id === this.qrElegidoId()) ?? this.qrsTienda()[0] ?? null,
+  );
+
+  // Cliente de la venta de mostrador: con cuenta (se busca) o sin cuenta
+  // (solo su nombre); en ambos casos, NIT o CI opcional para la factura.
+  protected readonly tipoCliente = signal<'cuenta' | 'sin_cuenta'>('sin_cuenta');
+  protected readonly facturaNombre = signal('');
+  protected readonly facturaNit = signal('');
+
+  // Lo que falta para poder cobrar (se le dice al empleado bajo el boton).
+  protected readonly faltaParaCobrar = computed(() => {
+    if (this.editando()) return this.itemsNuevaVenta().length ? [] : ['Agrega al menos una prenda.'];
+    const falta: string[] = [];
+    if (this.tipoCliente() === 'sin_cuenta') {
+      if (this.facturaNombre().trim().length < 2) falta.push('Escribe el nombre del cliente.');
+    } else if (!this.clienteSeleccionado()) {
+      falta.push(
+        this.clienteBusqueda().trim()
+          ? 'Elige al cliente en la lista de sugerencias (toca su nombre).'
+          : 'Busca y elige al cliente por su nombre o correo.',
+      );
+    }
+    if (this.itemsNuevaVenta().length === 0) falta.push('Agrega al menos una prenda a la venta.');
+    return falta;
   });
 
   protected readonly totalNuevaVenta = computed(() =>
@@ -293,17 +378,31 @@ export class AdminVentas implements OnInit {
   );
 
   ngOnInit(): void {
-    // El backend ya manda solo los productos de la empresa del personal.
-    this.catalogo.tienda.set(null);
-    this.catalogo.load();
     this.cargarSucursales();
-    this.load();
+    void this.iniciar();
+  }
+
+  private async iniciar(): Promise<void> {
+    try {
+      const r = await firstValueFrom(
+        this.http.get<{ offline: boolean; plan: string | null }>(`${environment.apiUrl}/ventas/origenes`),
+      );
+      this.conOrigen.set(r.offline);
+      this.planSinOffline.set(r.offline ? null : r.plan);
+    } catch {
+      this.conOrigen.set(false);
+    }
+    if (!this.conOrigen() && this.origen() === 'offline') this.origen.set('online');
+    await this.load();
   }
 
   private async cargarSucursales(): Promise<void> {
     try {
-      const res = await firstValueFrom(this.http.get<Sucursal[]>(`${environment.apiUrl}/sucursales/publico`));
-      this.sucursales.set(res);
+      // Solo las sucursales de la tienda (las publicas son de todas las tiendas).
+      const res = await firstValueFrom(
+        this.http.get<{ sucursales: Sucursal[] }>(`${environment.apiUrl}/productos/catalogo-base`),
+      );
+      this.sucursales.set(res.sucursales);
     } catch {
       this.sucursales.set([]);
     }
@@ -331,6 +430,7 @@ export class AdminVentas implements OnInit {
       if (this.filtroTipo()) params['tipo'] = this.filtroTipo();
       if (this.filtroEstadoPago()) params['estado_pago'] = this.filtroEstadoPago();
       if (this.filtroSucursal()) params['sucursal_id'] = this.filtroSucursal();
+      if (this.conOrigen()) params['origen'] = this.origen();
 
       const res = await firstValueFrom(this.http.get<VentaPage>(`${environment.apiUrl}/ventas`, { params }));
       this.items.set(res.items);
@@ -438,7 +538,24 @@ export class AdminVentas implements OnInit {
     this.estadoPagoEdit.set('completado');
     this.itemsNuevaVenta.set([]);
     this.errorNuevaVenta.set('');
+    this.metodoCobro.set('efectivo');
+    this.fotoComprobante.set(null);
+    this.tipoCliente.set('sin_cuenta');
+    this.facturaNombre.set('');
+    this.facturaNit.set('');
     this.limpiarSeleccionProducto();
+    void this.cargarCatalogoMostrador();
+    void this.cargarQrsTienda();
+  }
+
+  private async cargarQrsTienda(): Promise<void> {
+    try {
+      const qrs = await firstValueFrom(this.http.get<QrTienda[]>(`${environment.apiUrl}/ventas/presencial/qr`));
+      this.qrsTienda.set(qrs);
+      this.qrElegidoId.set(qrs[0]?.id ?? null);
+    } catch {
+      this.qrsTienda.set([]);
+    }
   }
 
   // ---------- Editar venta existente ----------
@@ -463,6 +580,7 @@ export class AdminVentas implements OnInit {
     );
     this.errorNuevaVenta.set('');
     this.limpiarSeleccionProducto();
+    void this.cargarCatalogoMostrador();
   }
 
   protected async eliminarVenta(venta: VentaItem): Promise<void> {
@@ -487,6 +605,8 @@ export class AdminVentas implements OnInit {
 
   protected async buscarClientes(): Promise<void> {
     const termino = this.clienteBusqueda().trim();
+    // Si cambia lo escrito, el cliente elegido antes ya no vale.
+    if (this.clienteSeleccionado() && this.clienteSeleccionado()!.nombre !== termino) this.clienteSeleccionado.set(null);
     if (termino.length < 2) {
       this.clienteResultados.set([]);
       return;
@@ -497,6 +617,14 @@ export class AdminVentas implements OnInit {
           params: { buscar: termino },
         }),
       );
+      // Lo escrito es exactamente un cliente (nombre o correo): queda elegido.
+      const exacto = res.filter(
+        (c) => c.nombre.toLowerCase() === termino.toLowerCase() || c.email.toLowerCase() === termino.toLowerCase(),
+      );
+      if (exacto.length === 1 && this.clienteBusqueda().trim() === termino) {
+        this.seleccionarCliente(exacto[0]);
+        return;
+      }
       this.clienteResultados.set(res);
     } catch {
       this.clienteResultados.set([]);
@@ -510,52 +638,111 @@ export class AdminVentas implements OnInit {
   }
 
   private limpiarSeleccionProducto(): void {
-    this.productoBusqueda.set('');
-    this.productoParaVariantes.set(null);
-    this.variantesDisponibles.set([]);
-    this.varianteSeleccionada.set('');
+    this.productoElegidoId.set(null);
+    this.tallaElegida.set(null);
+    this.colorElegido.set(null);
     this.cantidadNueva.set(1);
   }
 
-  protected async seleccionarProducto(p: { id: string; name: string; price: number }): Promise<void> {
+  // Prendas con stock en la sucursal elegida (se recarga al cambiarla).
+  protected async cargarCatalogoMostrador(): Promise<void> {
     const sucursalId = this.sucursalNuevaId();
-    this.productoBusqueda.set(p.name);
-    this.productoParaVariantes.set({ id: Number(p.id), nombre: p.name, precio: p.price });
-    this.variantesDisponibles.set([]);
-    this.varianteSeleccionada.set('');
-
+    this.catalogoMostrador.set([]);
+    this.limpiarSeleccionProducto();
+    if (!sucursalId) return;
+    this.cargandoCatalogo.set(true);
     try {
-      const res = await firstValueFrom(
-        this.http.get<DisponibilidadItem[]>(`${environment.apiUrl}/reservas/disponibilidad/${p.id}`),
+      this.catalogoMostrador.set(
+        await firstValueFrom(
+          this.http.get<ProductoMostrador[]>(`${environment.apiUrl}/ventas/presencial/catalogo`, {
+            params: { sucursal_id: String(sucursalId) },
+          }),
+        ),
       );
-      const filtradas = sucursalId ? res.filter((v) => v.sucursal_id === sucursalId) : res;
-      this.variantesDisponibles.set(filtradas);
-      if (filtradas[0]) this.varianteSeleccionada.set(`${filtradas[0].talla_id}-${filtradas[0].color_id}`);
     } catch {
-      this.variantesDisponibles.set([]);
+      this.catalogoMostrador.set([]);
+    } finally {
+      this.cargandoCatalogo.set(false);
     }
   }
 
-  protected agregarItem(): void {
-    const producto = this.productoParaVariantes();
-    const clave = this.varianteSeleccionada();
-    const variante = this.variantesDisponibles().find((v) => `${v.talla_id}-${v.color_id}` === clave);
-    if (!producto || !variante) return;
+  protected cambiarSucursal(id: number): void {
+    this.sucursalNuevaId.set(id);
+    // Las prendas ya agregadas eran de la otra sucursal.
+    if (!this.editando()) this.itemsNuevaVenta.set([]);
+    void this.cargarCatalogoMostrador();
+  }
 
-    this.itemsNuevaVenta.update((items) => [
-      ...items,
-      {
-        producto_id: producto.id,
-        producto_nombre: producto.nombre,
-        talla_id: variante.talla_id,
-        talla_codigo: variante.talla_codigo,
-        color_id: variante.color_id,
-        color_nombre: variante.color_nombre,
-        cantidad: this.cantidadNueva(),
-        precio_unitario: producto.precio,
-      },
-    ]);
+  protected elegirProducto(p: ProductoMostrador): void {
+    this.productoElegidoId.set(p.producto_id);
+    this.tallaElegida.set(null);
+    this.colorElegido.set(null);
+    this.cantidadNueva.set(1);
+    const tallas = new Set(p.variantes.filter((v) => this.disponibles(p, v) > 0).map((v) => v.talla_id));
+    if (tallas.size === 1) this.elegirTalla([...tallas][0]);
+  }
+
+  protected elegirTalla(id: number): void {
+    this.tallaElegida.set(id);
+    const p = this.productoElegido();
+    const colores = (p?.variantes ?? []).filter((v) => v.talla_id === id && p && this.disponibles(p, v) > 0);
+    this.colorElegido.set(colores.length === 1 ? colores[0].color_id : null);
+    this.cantidadNueva.set(1);
+  }
+
+  // Stock de la variante menos lo que ya se agrego a esta venta.
+  protected disponibles(p: ProductoMostrador, v: VarianteMostrador): number {
+    const enVenta = this.itemsNuevaVenta()
+      .filter((i) => i.producto_id === p.producto_id && i.talla_id === v.talla_id && i.color_id === v.color_id)
+      .reduce((s, i) => s + i.cantidad, 0);
+    return v.stock - (this.editando() ? 0 : enVenta);
+  }
+
+  protected tallaConStock(p: ProductoMostrador, tallaId: number): boolean {
+    return p.variantes.some((v) => v.talla_id === tallaId && this.disponibles(p, v) > 0);
+  }
+
+  protected agregarItem(): void {
+    const producto = this.productoElegido();
+    const variante = this.varianteElegida();
+    const cantidad = this.cantidadNueva();
+    if (!producto || !variante || cantidad < 1 || cantidad > this.disponibles(producto, variante)) return;
+
+    // La misma prenda (talla y color) se suma en una sola linea.
+    this.itemsNuevaVenta.update((items) => {
+      const igual = items.find(
+        (i) => i.producto_id === producto.producto_id && i.talla_id === variante.talla_id && i.color_id === variante.color_id,
+      );
+      if (igual) return items.map((i) => (i === igual ? { ...i, cantidad: i.cantidad + cantidad } : i));
+      return [
+        ...items,
+        {
+          producto_id: producto.producto_id,
+          producto_nombre: producto.nombre,
+          talla_id: variante.talla_id,
+          talla_codigo: variante.talla_codigo,
+          color_id: variante.color_id,
+          color_nombre: variante.color_nombre,
+          cantidad,
+          precio_unitario: Number(producto.precio),
+        },
+      ];
+    });
     this.limpiarSeleccionProducto();
+  }
+
+  // Foto del comprobante del QR (desde la camara en el celular o tablet).
+  protected alTomarFoto(input: HTMLInputElement): void {
+    const archivo = input.files?.[0];
+    input.value = '';
+    if (!archivo) return;
+    if (archivo.size > 5 * 1024 * 1024) {
+      this.errorNuevaVenta.set('La foto pesa más de 5 MB. Toma otra con menos resolución.');
+      return;
+    }
+    const lector = new FileReader();
+    lector.onload = () => this.fotoComprobante.set(String(lector.result));
+    lector.readAsDataURL(archivo);
   }
 
   protected quitarItem(index: number): void {
@@ -566,8 +753,8 @@ export class AdminVentas implements OnInit {
     const sucursalId = this.sucursalNuevaId();
     const items = this.itemsNuevaVenta();
     const edit = this.editando();
-    if (!sucursalId || items.length === 0) return;
-    if (!edit && !this.clienteSeleccionado()) return;
+    if (!sucursalId || items.length === 0 || this.faltaParaCobrar().length > 0) return;
+    const conCuenta = this.tipoCliente() === 'cuenta';
 
     const itemsPayload = items.map((i) => ({
       producto_id: i.producto_id,
@@ -591,9 +778,14 @@ export class AdminVentas implements OnInit {
       } else {
         await firstValueFrom(
           this.http.post(`${environment.apiUrl}/ventas/presencial`, {
-            cliente_id: this.clienteSeleccionado()!.id,
+            cliente_id: conCuenta ? this.clienteSeleccionado()!.id : null,
+            factura_nombre: conCuenta ? null : this.facturaNombre().trim(),
+            factura_nit: this.facturaNit().trim() || null,
             sucursal_id: sucursalId,
             items: itemsPayload,
+            metodo_pago: this.metodoCobro(),
+            metodo_pago_id: this.metodoCobro() === 'qr' ? (this.qrElegido()?.id ?? null) : null,
+            comprobante: this.metodoCobro() === 'qr' ? this.fotoComprobante() : null,
           }),
         );
       }

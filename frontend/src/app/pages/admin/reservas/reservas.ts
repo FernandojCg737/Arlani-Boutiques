@@ -1,8 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { Origen, SelectorOrigen } from '../../../components/selector-origen/selector-origen';
 
 interface DetalleReservaItem {
   id: number;
@@ -40,12 +42,31 @@ interface Opcion {
 
 @Component({
   selector: 'app-admin-reservas',
-  imports: [DatePipe],
+  imports: [DatePipe, SelectorOrigen],
   templateUrl: './reservas.html',
   styleUrl: './reservas.scss',
 })
 export class AdminReservas implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  // ONLINE / OFFLINE (las hechas sin conexion llegan al sincronizar, CU12):
+  // solo si el plan de la tienda incluye la operacion sin conexion (Basico y
+  // Profesional). Lo ve el personal (CU10) y el SuperAdministrador (CU05).
+  protected readonly conOrigen = signal(false);
+  protected readonly esPlataforma = this.route.snapshot.data['origenes'] === true;
+  protected readonly planSinOffline = signal<string | null>(null);
+  protected readonly origen = signal<Origen>(
+    this.route.snapshot.queryParamMap.get('origen') === 'offline' ? 'offline' : 'online',
+  );
+
+  protected cambiarOrigen(o: Origen): void {
+    if (o === this.origen()) return;
+    this.origen.set(o);
+    void this.router.navigate([], { queryParams: { origen: o }, queryParamsHandling: 'merge', replaceUrl: true });
+    this.filtrar();
+  }
 
   protected readonly items = signal<ReservaItem[]>([]);
   protected readonly sucursales = signal<Opcion[]>([]);
@@ -76,7 +97,21 @@ export class AdminReservas implements OnInit {
 
   ngOnInit(): void {
     this.cargarCatalogo();
-    this.load();
+    void this.iniciar();
+  }
+
+  private async iniciar(): Promise<void> {
+    try {
+      const r = await firstValueFrom(
+        this.http.get<{ offline: boolean; plan: string | null }>(`${environment.apiUrl}/ventas/origenes`),
+      );
+      this.conOrigen.set(r.offline);
+      this.planSinOffline.set(r.offline ? null : r.plan);
+    } catch {
+      this.conOrigen.set(false);
+    }
+    if (!this.conOrigen() && this.origen() === 'offline') this.origen.set('online');
+    await this.load();
   }
 
   protected filtrar(): void {
@@ -117,6 +152,7 @@ export class AdminReservas implements OnInit {
       };
       if (this.filtroEstado()) params['estado'] = this.filtroEstado();
       if (this.filtroSucursal()) params['sucursal_id'] = this.filtroSucursal();
+      if (this.conOrigen()) params['origen'] = this.origen();
 
       const res = await firstValueFrom(this.http.get<ReservaPage>(`${environment.apiUrl}/reservas`, { params }));
       this.items.set(res.items);

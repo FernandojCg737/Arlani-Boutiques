@@ -36,6 +36,9 @@ class Reserva(Base):
     horario_atencion: Mapped[datetime] = mapped_column(DateTime)
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # 'online' (con conexion) u 'offline' (sin conexion, llego al sincronizar, CU12).
+    origen: Mapped[str] = mapped_column(String(10), default="online", server_default="online")
+    sincronizado_en: Mapped[datetime | None] = mapped_column(DateTime)
 
     cliente: Mapped["Cliente"] = relationship(back_populates="reservas")
     sucursal: Mapped["Sucursal"] = relationship(back_populates="reservas")
@@ -95,6 +98,12 @@ class Venta(Base):
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")
     tipo: Mapped[str] = mapped_column(String(30))
+    # 'online' (con conexion) u 'offline' (sin conexion, llego al sincronizar, CU12).
+    origen: Mapped[str] = mapped_column(String(10), default="online", server_default="online")
+    sincronizado_en: Mapped[datetime | None] = mapped_column(DateTime)
+    # A nombre de quien y con que NIT/CI sale la factura (mostrador).
+    factura_nombre: Mapped[str | None] = mapped_column(String(150))
+    factura_nit: Mapped[str | None] = mapped_column(String(20))
 
     cliente: Mapped["Cliente"] = relationship(back_populates="ventas")
     sucursal: Mapped["Sucursal"] = relationship(back_populates="ventas")

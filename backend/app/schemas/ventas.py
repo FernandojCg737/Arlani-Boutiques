@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from app.schemas.metodos_pago import MetodoPagoPublicoOut
 
@@ -106,6 +106,9 @@ class VentaOut(BaseModel):
     motivo_rechazo: str | None = None
     # Envio a domicilio (None = recojo en sucursal).
     envio: EnvioOut | None = None
+    # A nombre de quien y con que NIT/CI sale la factura (mostrador).
+    factura_nombre: str | None = None
+    factura_nit: str | None = None
 
     @field_serializer("fecha")
     def _serialize_fecha(self, value: datetime) -> str:
@@ -156,14 +159,47 @@ def rechazar_items_repetidos(items: list) -> list:
 
 
 class VentaPresencialCreate(BaseModel):
-    cliente_id: int
+    # Cliente con cuenta; sin cuenta, basta el nombre para la factura.
+    cliente_id: int | None = None
+    factura_nombre: str | None = Field(default=None, max_length=150)
+    factura_nit: str | None = Field(default=None, max_length=20, pattern=r"^[0-9A-Za-z\-]*$")
     sucursal_id: int
     items: list[ItemVentaPresencialCreate] = Field(min_length=1)
+    # Se cobra al instante: en efectivo o con el QR de la tienda. Con QR el
+    # empleado puede adjuntar la foto del comprobante (data URL), opcional.
+    metodo_pago: str = Field(default="efectivo", pattern="^(efectivo|qr)$")
+    # QR de la tienda que se le mostro al cliente (Metodos de pago).
+    metodo_pago_id: int | None = None
+    comprobante: str | None = Field(default=None, max_length=8_000_000)
 
     @field_validator("items")
     @classmethod
     def _sin_items_repetidos(cls, value: list[ItemVentaPresencialCreate]) -> list[ItemVentaPresencialCreate]:
         return rechazar_items_repetidos(value)
+
+    @model_validator(mode="after")
+    def _con_cliente_o_nombre(self) -> "VentaPresencialCreate":
+        if self.cliente_id is None and len((self.factura_nombre or "").strip()) < 2:
+            raise ValueError("Elige un cliente registrado o escribe el nombre del cliente.")
+        return self
+
+
+class VarianteMostradorOut(BaseModel):
+    talla_id: int
+    talla_codigo: str
+    color_id: int
+    color_nombre: str
+    stock: int
+
+
+class ProductoMostradorOut(BaseModel):
+    """Prenda con stock en la sucursal, para armar una venta de mostrador."""
+
+    producto_id: int
+    nombre: str
+    precio: Decimal
+    imagen_url: str | None
+    variantes: list[VarianteMostradorOut]
 
 
 class VentaEditIn(BaseModel):

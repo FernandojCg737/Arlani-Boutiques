@@ -30,10 +30,21 @@
         }
       </select>
 
-      <button type="button" class="ventas-nueva-btn" (click)="abrirFormulario()">+ Venta presencial</button>
+      @if (!conOrigen() || origen() === 'online') {
+        <button type="button" class="ventas-nueva-btn" (click)="abrirFormulario()">+ Venta presencial</button>
+      }
     </div>
   </div>
 
+  @if (conOrigen()) {
+    <app-selector-origen que="ventas" [origen]="origen()" (cambio)="cambiarOrigen($event)" />
+  } @else if (esPlataforma && planSinOffline()) {
+    <p class="sin-offline">
+      El plan {{ planSinOffline() }} de esta tienda no incluye la operación sin conexión: todas sus ventas son en línea.
+    </p>
+  }
+
+  @if (!conOrigen() || origen() === 'online') {
   <nav class="ventas-tabs">
     <button type="button" [class.is-active]="vista() === 'ventas'" (click)="cambiarVista('ventas')">Ventas</button>
     <button type="button" [class.is-active]="vista() === 'reservas'" (click)="cambiarVista('reservas')">
@@ -46,6 +57,7 @@
       Cambios de prenda
     </button>
   </nav>
+  }
 
   @if (vista() === 'cambios') {
     <app-admin-cambios />
@@ -134,7 +146,13 @@
           </tr>
         } @else if (items().length === 0) {
           <tr>
-            <td colspan="9" class="admin-table__empty">No hay ventas para estos filtros.</td>
+            <td colspan="9" class="admin-table__empty">
+              {{
+                conOrigen() && origen() === 'offline'
+                  ? 'Todavía no hay ventas hechas sin conexión: aparecen aquí cuando se sincronizan (CU12).'
+                  : 'No hay ventas para estos filtros.'
+              }}
+            </td>
           </tr>
         } @else {
           @for (v of items(); track v.id) {
@@ -357,13 +375,13 @@
 
   @if (formularioAbierto()) {
     <div class="ventas-overlay" (click)="cerrarFormulario()">
-      <div class="ventas-modal" (click)="$event.stopPropagation()">
+      <div class="ventas-modal ventas-modal--mostrador" (click)="$event.stopPropagation()">
         @if (editando(); as e) {
           <h2>Editar venta #{{ e.id }}</h2>
           <p class="ventas-modal__subtitulo">{{ e.cliente_nombre }}</p>
         } @else {
           <h2>Nueva venta presencial</h2>
-          <p class="ventas-modal__subtitulo">Se cobra en efectivo al instante.</p>
+          <p class="ventas-modal__subtitulo">Se cobra al instante, en efectivo o con QR, y se descuenta del stock.</p>
         }
 
         @if (errorNuevaVenta()) {
@@ -371,11 +389,36 @@
         }
 
         @if (!editando()) {
+          <span class="mostrador-etiqueta">Cliente</span>
+          <div class="mostrador-opciones">
+            <button type="button" class="mostrador-opcion" [class.is-activa]="tipoCliente() === 'sin_cuenta'"
+                    (click)="tipoCliente.set('sin_cuenta')">
+              Sin cuenta
+              <small>Solo su nombre y NIT</small>
+            </button>
+            <button type="button" class="mostrador-opcion" [class.is-activa]="tipoCliente() === 'cuenta'"
+                    (click)="tipoCliente.set('cuenta')">
+              Con cuenta en Arlani
+              <small>Buscar por nombre o correo</small>
+            </button>
+          </div>
+        }
+
+        @if (!editando() && tipoCliente() === 'sin_cuenta') {
+          <label class="ventas-campo">
+            <span>Nombre del cliente (sale en la factura)</span>
+            <input type="text" maxlength="150" placeholder="Ej. María Gutiérrez" [value]="facturaNombre()"
+                   (input)="facturaNombre.set($any($event.target).value)" />
+          </label>
+        }
+
+        @if (!editando() && tipoCliente() === 'cuenta') {
           <label class="ventas-campo">
             <span>Cliente</span>
             <input
               type="text"
               placeholder="Buscar por nombre o correo..."
+              [class.ventas-campo--pendiente]="clienteBusqueda().trim() && !clienteSeleccionado()"
               [value]="clienteBusqueda()"
               (input)="clienteBusqueda.set($any($event.target).value); buscarClientes()"
             />
@@ -388,8 +431,16 @@
             }
           </label>
           @if (clienteSeleccionado(); as c) {
-            <p class="ventas-seleccion">Cliente: {{ c.nombre }}</p>
+            <p class="ventas-seleccion">✓ Cliente: {{ c.nombre }} · {{ c.email }}</p>
           }
+        }
+
+        @if (!editando()) {
+          <label class="ventas-campo">
+            <span>NIT o CI para la factura (opcional)</span>
+            <input type="text" maxlength="20" inputmode="numeric" placeholder="Ej. 1234567 (vacío = sin NIT)"
+                   [value]="facturaNit()" (input)="facturaNit.set($any($event.target).value)" />
+          </label>
         }
 
         @if (editando()) {
@@ -416,52 +467,84 @@
 
         <label class="ventas-campo">
           <span>Sucursal</span>
-          <select [value]="sucursalNuevaId()" (change)="sucursalNuevaId.set(+$any($event.target).value)">
+          <select [value]="sucursalNuevaId()" (change)="cambiarSucursal(+$any($event.target).value)">
             @for (s of sucursales(); track s.id) {
               <option [value]="s.id">{{ s.nombre }}</option>
             }
           </select>
         </label>
 
-        <label class="ventas-campo">
-          <span>Agregar producto</span>
+        <!-- Catalogo de la sucursal: producto -> talla -> color -> cantidad -->
+        <div class="ventas-campo">
+          <span>Agregar producto (stock de esta sucursal)</span>
           <input
             type="text"
-            placeholder="Buscar producto..."
+            placeholder="Buscar en el catálogo..."
             [value]="productoBusqueda()"
             (input)="productoBusqueda.set($any($event.target).value)"
           />
-          @if (productosSugeridos().length > 0 && !productoParaVariantes()) {
-            <ul class="ventas-sugerencias">
-              @for (p of productosSugeridos(); track p.id) {
-                <li (click)="seleccionarProducto(p)">{{ p.name }} · {{ p.price }} Bs</li>
-              }
-            </ul>
-          }
-        </label>
-
-        @if (productoParaVariantes(); as p) {
-          @if (variantesDisponibles().length === 0) {
-            <p class="ventas-mensaje">Este producto no tiene stock en la sucursal elegida.</p>
-          } @else {
-            <label class="ventas-campo">
-              <span>Talla y color</span>
-              <select [value]="varianteSeleccionada()" (change)="varianteSeleccionada.set($any($event.target).value)">
-                @for (v of variantesDisponibles(); track v.talla_id + '-' + v.color_id) {
-                  <option [value]="v.talla_id + '-' + v.color_id">
-                    {{ v.talla_codigo }} · {{ v.color_nombre }} ({{ v.cantidad }} disponibles)
-                  </option>
+        </div>
+        @if (cargandoCatalogo()) {
+          <p class="ventas-mensaje">Cargando el catálogo de la sucursal…</p>
+        } @else if (catalogoMostrador().length === 0) {
+          <p class="ventas-mensaje">Esta sucursal no tiene prendas con stock.</p>
+        } @else {
+          <div class="mostrador-catalogo">
+            @for (p of productosFiltrados(); track p.producto_id) {
+              <button type="button" class="mostrador-prenda" [class.is-activa]="productoElegidoId() === p.producto_id"
+                      (click)="elegirProducto(p)">
+                @if (p.imagen_url) {
+                  <img [src]="p.imagen_url" [alt]="p.nombre" />
+                } @else {
+                  <span class="mostrador-prenda__sin-foto">{{ p.nombre.charAt(0) }}</span>
                 }
-              </select>
-            </label>
+                <strong>{{ p.nombre }}</strong>
+                <small>Bs {{ p.precio | number: '1.2-2' }}</small>
+              </button>
+            } @empty {
+              <p class="ventas-mensaje">Ninguna prenda coincide con la búsqueda.</p>
+            }
+          </div>
+        }
 
-            <label class="ventas-campo">
-              <span>Cantidad</span>
-              <input type="number" min="1" [value]="cantidadNueva()" (input)="cantidadNueva.set(+$any($event.target).value)" />
-            </label>
-
-            <button type="button" class="ventas-agregar-btn" (click)="agregarItem()">Agregar a la venta</button>
-          }
+        @if (productoElegido(); as p) {
+          <div class="mostrador-elegir">
+            <p class="mostrador-elegir__titulo">{{ p.nombre }} · Bs {{ p.precio | number: '1.2-2' }}</p>
+            <span class="mostrador-etiqueta">Talla</span>
+            <div class="mostrador-opciones">
+              @for (t of tallasProducto(); track t.id) {
+                <button type="button" class="mostrador-opcion" [class.is-activa]="tallaElegida() === t.id"
+                        [disabled]="!tallaConStock(p, t.id)" (click)="elegirTalla(t.id)">
+                  {{ t.codigo }}
+                </button>
+              }
+            </div>
+            @if (tallaElegida() !== null) {
+              <span class="mostrador-etiqueta">Color</span>
+              <div class="mostrador-opciones">
+                @for (v of coloresTalla(); track v.color_id) {
+                  <button type="button" class="mostrador-opcion" [class.is-activa]="colorElegido() === v.color_id"
+                          [disabled]="disponibles(p, v) < 1" (click)="colorElegido.set(v.color_id); cantidadNueva.set(1)">
+                    {{ v.color_nombre }}
+                    <small>{{ disponibles(p, v) < 1 ? 'sin stock' : 'quedan ' + disponibles(p, v) }}</small>
+                  </button>
+                }
+              </div>
+            }
+            @if (varianteElegida(); as v) {
+              <div class="mostrador-agregar">
+                <label>
+                  <span class="mostrador-etiqueta">Cantidad</span>
+                  <input type="number" min="1" [max]="disponibles(p, v)" [value]="cantidadNueva()"
+                         (input)="cantidadNueva.set(+$any($event.target).value)" />
+                </label>
+                <button type="button" class="ventas-agregar-btn"
+                        [disabled]="cantidadNueva() < 1 || cantidadNueva() > disponibles(p, v)" (click)="agregarItem()">
+                  Agregar · Bs {{ +p.precio * cantidadNueva() | number: '1.2-2' }}
+                </button>
+              </div>
+            }
+          </div>
         }
 
         @if (itemsNuevaVenta().length > 0) {
@@ -483,16 +566,88 @@
           <p class="ventas-seleccion">Total: {{ totalNuevaVenta() | number: '1.2-2' }} Bs</p>
         }
 
+        @if (!editando() && itemsNuevaVenta().length > 0) {
+          <span class="mostrador-etiqueta">¿Cómo paga?</span>
+          <div class="mostrador-opciones mostrador-cobro">
+            <button type="button" class="mostrador-opcion" [class.is-activa]="metodoCobro() === 'efectivo'"
+                    (click)="metodoCobro.set('efectivo')">
+              Efectivo
+              <small>Se registra al instante</small>
+            </button>
+            <button type="button" class="mostrador-opcion" [class.is-activa]="metodoCobro() === 'qr'"
+                    (click)="metodoCobro.set('qr')">
+              QR
+              <small>Con foto del comprobante (opcional)</small>
+            </button>
+          </div>
+          @if (metodoCobro() === 'qr') {
+            <!-- QR de cobro de la tienda para que el cliente lo escanee -->
+            @if (qrElegido(); as q) {
+              <div class="mostrador-qr-cobro">
+                @if (qrsTienda().length > 1) {
+                  <div class="mostrador-opciones">
+                    @for (o of qrsTienda(); track o.id) {
+                      <button type="button" class="mostrador-opcion" [class.is-activa]="q.id === o.id" (click)="qrElegidoId.set(o.id)">
+                        {{ o.nombre }}
+                      </button>
+                    }
+                  </div>
+                }
+                <img [src]="q.qr_url" [alt]="'QR de cobro ' + q.nombre" />
+                <div class="mostrador-qr-cobro__datos">
+                  <span class="mostrador-etiqueta">Que el cliente escanee y pague</span>
+                  <strong>Bs {{ totalNuevaVenta() | number: '1.2-2' }}</strong>
+                  <span>{{ q.nombre }}{{ q.banco ? ' · ' + q.banco : '' }}{{ q.titular ? ' · ' + q.titular : '' }}</span>
+                  @if (q.instrucciones) {
+                    <small>{{ q.instrucciones }}</small>
+                  }
+                </div>
+              </div>
+            } @else {
+              <p class="ventas-mensaje">
+                Tu tienda no tiene un QR de cobro registrado. Agrégalo en Métodos de pago para mostrárselo al cliente.
+              </p>
+            }
+            <div class="mostrador-qr">
+              <label class="mostrador-foto">
+                {{ fotoComprobante() ? 'Tomar otra foto' : '📷 Tomar foto del comprobante' }}
+                <input type="file" accept="image/*" capture="environment" (change)="alTomarFoto($any($event.target))" />
+              </label>
+              @if (fotoComprobante(); as foto) {
+                <img class="mostrador-qr__vista" [src]="foto" alt="Comprobante del pago con QR" />
+                <button type="button" class="mostrador-qr__quitar" (click)="fotoComprobante.set(null)">Quitar foto</button>
+              } @else {
+                <small>Puedes cobrar sin foto; si la tomas, queda guardada con la venta.</small>
+              }
+            </div>
+          }
+        }
+
         <div class="ventas-modal__acciones">
           <button type="button" class="is-secondary" (click)="cerrarFormulario()">Cancelar</button>
           <button
             type="button"
-            [disabled]="(!editando() && !clienteSeleccionado()) || itemsNuevaVenta().length === 0 || guardandoVenta()"
+            [disabled]="faltaParaCobrar().length > 0 || guardandoVenta()"
             (click)="confirmarVenta()"
           >
-            {{ guardandoVenta() ? 'Guardando...' : editando() ? 'Guardar cambios' : 'Cobrar en efectivo' }}
+            {{
+              guardandoVenta()
+                ? 'Guardando...'
+                : editando()
+                  ? 'Guardar cambios'
+                  : metodoCobro() === 'qr'
+                    ? 'Cobrar con QR · Bs ' + (totalNuevaVenta() | number: '1.2-2')
+                    : 'Cobrar en efectivo · Bs ' + (totalNuevaVenta() | number: '1.2-2')
+            }}
           </button>
         </div>
+        @if (faltaParaCobrar().length > 0) {
+          <ul class="ventas-falta">
+            @for (f of faltaParaCobrar(); track f) {
+              <li>{{ f }}</li>
+            }
+          </ul>
+        }
       </div>
     </div>
   }

@@ -28,6 +28,8 @@ interface VentaAdmin {
   estado_pago: string;
   cliente_nombre: string;
   cliente_email: string;
+  factura_nombre: string | null;
+  factura_nit: string | null;
   atendido_por_nombre: string | null;
   tienda: TiendaFactura | null;
   detalles: DetalleVenta[];

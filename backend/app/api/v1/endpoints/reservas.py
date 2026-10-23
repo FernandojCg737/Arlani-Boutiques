@@ -269,12 +269,16 @@ def listar_reservas(
     page_size: int = Query(20, ge=1, le=100),
     estado: str | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
+    # 'online' (con conexion) u 'offline' (sincronizadas, CU12).
+    origen: str | None = Query(default=None, pattern=r"^(online|offline)$"),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso("CU10", "CU11")),
 ) -> ReservaPage:
     _vencer_reservas_expiradas(db)
 
     query = _query_con_detalles(db)
+    if origen:
+        query = query.filter(Reserva.origen == origen)
     restringida = sucursal_restringida(usuario)
     if restringida is not None:
         query = query.filter(Reserva.sucursal_id == restringida)

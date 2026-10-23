@@ -162,8 +162,8 @@ export const PARCIALES: ParcialMenu[] = [
               { etiqueta: 'Inventario por sucursal', ruta: 'inventario' },
             ],
           },
-          { codigo: 'CU05', permisos: ['CU10'], nombre: 'Gestionar reservas (online y offline)', ruta: 'reservas', antes: 'CU10', plataformas: ['WEB', 'MÓVIL'] },
-          { codigo: 'CU06', permisos: ['CU11'], nombre: 'Gestionar ventas (online y offline)', ruta: 'ventas', antes: 'CU11', plataformas: ['WEB', 'MÓVIL'] },
+          { codigo: 'CU05', permisos: ['CU10'], nombre: 'Gestionar reservas (online y offline)', ruta: 'reservas', antes: 'CU10', plataformas: ['WEB', 'MÓVIL'], porEmpresa: true },
+          { codigo: 'CU06', permisos: ['CU11'], nombre: 'Gestionar ventas (online y offline)', ruta: 'ventas', antes: 'CU11', plataformas: ['WEB', 'MÓVIL'], porEmpresa: true },
           {
             codigo: 'CU19', permisos: ['CU21'],
             nombre: 'Gestionar métodos de pago',

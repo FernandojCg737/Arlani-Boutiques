@@ -326,3 +326,13 @@
     }
   }
 }
+
+// Tienda cuyo plan no incluye la operacion sin conexion (ONLINE / OFFLINE).
+.sin-offline {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  background: #f4f4f2;
+  font-size: 13px;
+  color: #666;
+}
+

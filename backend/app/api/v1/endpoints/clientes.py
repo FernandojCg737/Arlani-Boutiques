@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso, require_superadmin
+from app.api.v1.endpoints.ventas import CONSUMIDOR_FINAL_EMAIL
 from app.core.audit import log_bitacora, set_client_ip_for_trigger
 from app.core.email import nombre_marca, send_email
 from app.core.security import generate_temp_password, hash_password
@@ -70,7 +71,8 @@ def list_clientes(
     empresa = usuario.empresa_id if usuario.empresa_id is not None else empresa_id
     relacion = _relacion(db, empresa) if empresa is not None else None
 
-    query = db.query(Cliente)
+    # El cliente generico de las ventas de mostrador sin cuenta no es un cliente real.
+    query = db.query(Cliente).filter(Cliente.email != CONSUMIDOR_FINAL_EMAIL)
     if relacion is not None:
         query = query.filter(Cliente.id.in_(list(relacion) or [-1]))
     if buscar:

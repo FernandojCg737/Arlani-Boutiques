@@ -1,3 +1,5 @@
+import base64
+import binascii
 from datetime import datetime
 import json
 import logging
@@ -55,7 +57,9 @@ from app.schemas.ventas import (
     EnvioEstadoIn,
     EnvioOut,
     ItemCheckoutOut,
+    ProductoMostradorOut,
     RechazoPagoIn,
+    VarianteMostradorOut,
     TiendaCheckoutOut,
     TiendaFacturaOut,
     DetalleVentaOut,
@@ -70,6 +74,10 @@ from app.schemas.ventas import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Cliente generico de las ventas de mostrador a personas sin cuenta
+# (migracion f2b4d6e8a091): la venta guarda el nombre y el NIT reales.
+CONSUMIDOR_FINAL_EMAIL = "consumidor.final@arlaniboutiques.com"
 
 # Mensajes de las RAISE EXCEPTION de las funciones sp_* que tienen sentido
 # para el usuario (el resto se responde como error generico).
@@ -173,6 +181,16 @@ def _items_json(items) -> str:
             for i in items
         ]
     )
+
+
+def _imagen_de_data_url(data_url: str) -> tuple[bytes, str]:
+    # Foto tomada en el mostrador (data:image/jpeg;base64,...).
+    cabecera, _, datos = data_url.partition(",")
+    tipo = cabecera.removeprefix("data:").split(";")[0] or "image/jpeg"
+    try:
+        return base64.b64decode(datos or data_url), tipo
+    except (binascii.Error, ValueError) as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "La foto del comprobante no es válida.") from err
 
 
 def _monto_coincide(amount: dict | None, total: Decimal) -> bool:
@@ -313,6 +331,8 @@ def _to_out(venta: Venta) -> VentaOut:
         metodo_pago_nombre=(venta.pago.metodo_pago.nombre if venta.pago and venta.pago.metodo_pago else None),
         motivo_rechazo=venta.pago.motivo_rechazo if venta.pago else None,
         envio=EnvioOut.model_validate(venta.envio) if venta.envio else None,
+        factura_nombre=venta.factura_nombre,
+        factura_nit=venta.factura_nit,
     )
 
 
@@ -336,10 +356,12 @@ def _tienda_factura(venta: Venta) -> TiendaFacturaOut | None:
 
 
 def _to_admin_out(venta: Venta) -> VentaAdminOut:
+    # Venta de mostrador a alguien sin cuenta: se muestra el nombre que dio.
+    sin_cuenta = venta.cliente.email == CONSUMIDOR_FINAL_EMAIL
     return VentaAdminOut(
         **_to_out(venta).model_dump(),
-        cliente_nombre=venta.cliente.nombre,
-        cliente_email=venta.cliente.email,
+        cliente_nombre=(venta.factura_nombre or venta.cliente.nombre) if sin_cuenta else venta.cliente.nombre,
+        cliente_email="Cliente sin cuenta" if sin_cuenta else venta.cliente.email,
         comprobante_url=venta.pago.comprobante_url if venta.pago else None,
     )
 
@@ -1061,12 +1083,16 @@ def listar_ventas(
     metodo: str | None = Query(default=None),
     estado_pago: str | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
+    # 'online' (con conexion) u 'offline' (sincronizadas, CU12).
+    origen: str | None = Query(default=None, pattern=r"^(online|offline)$"),
     db: Session = Depends(get_db),
     empleado: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaPage:
     query = _query_venta_con_detalles(db)
     if tipo:
         query = query.filter(Venta.tipo == tipo)
+    if origen:
+        query = query.filter(Venta.origen == origen)
     restringida = sucursal_restringida(empleado)
     if restringida is not None:
         query = query.filter(Venta.sucursal_id == restringida)
@@ -1082,6 +1108,28 @@ def listar_ventas(
     total = query.count()
     rows = query.order_by(Venta.fecha.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return VentaPage(items=[_to_admin_out(v) for v in rows], total=total, page=page, page_size=page_size)
+
+
+@router.get("/origenes")
+def origenes_habilitados(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso("CU10", "CU11")),
+) -> dict:
+    """Si la tienda separa sus ventas y reservas en ONLINE / OFFLINE: solo
+    con un plan que incluya la operacion sin conexion (Basico y Profesional;
+    el de Prueba no). Vale para el personal de la tienda y para el
+    SuperAdministrador mirando una tienda (X-Empresa)."""
+    empresa_id = usuario.empresa_id if usuario.empresa_id is not None else db.info.get("empresa_scope")
+    if empresa_id is None:
+        return {"offline": False, "plan": None}
+    fila = db.execute(
+        text(
+            "SELECT p.nombre, p.operacion_offline FROM suscripcion s JOIN plan_suscripcion p ON p.id = s.plan_id "
+            "WHERE s.empresa_id = :e AND s.estado = 'activa'"
+        ),
+        {"e": empresa_id},
+    ).first()
+    return {"offline": bool(fila and fila.operacion_offline), "plan": fila.nombre if fila else None}
 
 
 @router.get("/{venta_id}", response_model=VentaAdminOut)
@@ -1205,11 +1253,73 @@ def buscar_clientes_para_venta(
     clientes = (
         db.query(Cliente)
         .filter(Cliente.nombre.ilike(like) | Cliente.email.ilike(like))
+        .filter(Cliente.email != CONSUMIDOR_FINAL_EMAIL)
         .order_by(Cliente.nombre)
         .limit(10)
         .all()
     )
     return [ClienteBusquedaOut(id=c.id, nombre=c.nombre, email=c.email) for c in clientes]
+
+
+@router.get("/presencial/catalogo", response_model=list[ProductoMostradorOut])
+def catalogo_mostrador(
+    sucursal_id: int = Query(...),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso("CU11")),
+) -> list[ProductoMostradorOut]:
+    """Prendas con stock en la sucursal (producto, precio, talla, color y
+    cuantas quedan) para armar una venta de mostrador. RLS: solo las de la
+    tienda del empleado."""
+    verificar_acceso_sucursal(usuario, sucursal_id)
+    filas = db.execute(
+        text(
+            """
+            SELECT p.id, p.nombre, p.precio,
+                   (SELECT url FROM producto_imagen pi WHERE pi.producto_id = p.id ORDER BY pi.orden LIMIT 1) AS imagen_url,
+                   i.talla_id, t.codigo AS talla_codigo, i.color_id, c.nombre AS color_nombre, i.cantidad AS stock
+            FROM inventario i
+            JOIN producto p ON p.id = i.producto_id
+            JOIN talla t ON t.id = i.talla_id
+            JOIN color c ON c.id = i.color_id
+            WHERE i.sucursal_id = :s AND i.cantidad > 0 AND p.estado = 'activo'
+            ORDER BY p.nombre, t.id, c.nombre
+            """
+        ),
+        {"s": sucursal_id},
+    ).mappings().all()
+    productos: dict[int, ProductoMostradorOut] = {}
+    for f in filas:
+        producto = productos.setdefault(
+            f["id"],
+            ProductoMostradorOut(producto_id=f["id"], nombre=f["nombre"], precio=f["precio"], imagen_url=f["imagen_url"], variantes=[]),
+        )
+        producto.variantes.append(
+            VarianteMostradorOut(
+                talla_id=f["talla_id"], talla_codigo=f["talla_codigo"], color_id=f["color_id"],
+                color_nombre=f["color_nombre"], stock=f["stock"],
+            )
+        )
+    return list(productos.values())
+
+
+@router.get("/presencial/qr")
+def qr_de_la_tienda(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso("CU11")),
+) -> list[dict]:
+    """QR de cobro activos de la tienda (Metodos de pago), para mostrarselo
+    al cliente en el mostrador. RLS: solo los de la tienda del empleado."""
+    empresa_id = usuario.empresa_id if usuario.empresa_id is not None else db.info.get("empresa_scope")
+    if empresa_id is None:
+        return []
+    filas = db.execute(
+        text(
+            "SELECT id, nombre, qr_url, instrucciones, banco, titular FROM metodo_pago_empresa "
+            "WHERE empresa_id = :e AND tipo = 'qr' AND activo AND qr_url IS NOT NULL ORDER BY orden, id"
+        ),
+        {"e": empresa_id},
+    ).mappings().all()
+    return [dict(f) for f in filas]
 
 
 @router.post("/presencial", response_model=VentaAdminOut, status_code=status.HTTP_201_CREATED)
@@ -1219,14 +1329,20 @@ def registrar_venta_presencial(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> VentaAdminOut:
-    """Venta de mostrador cobrada en efectivo -- el staff arma la venta ahi
-    mismo (sin pasar por un carrito) y se cobra al instante."""
+    """Venta de mostrador -- el staff arma la venta ahi mismo (sin pasar por
+    un carrito) y se cobra al instante, en efectivo o con el QR de la tienda
+    (con la foto del comprobante si la tomo). Descuenta el stock."""
     empleado = _get_empleado_o_403(db, usuario)
     verificar_acceso_sucursal(usuario, payload.sucursal_id)
 
-    cliente = db.query(Cliente).filter(Cliente.id == payload.cliente_id).first()
+    # Sin cuenta: la venta va al cliente generico "Consumidor final" y guarda
+    # el nombre y el NIT/CI que dio la persona (para su factura).
+    cliente_id = payload.cliente_id or db.execute(text("SELECT fn_consumidor_final()")).scalar()
+    cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first() if cliente_id else None
     if cliente is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cliente no encontrado.")
+    factura_nombre = (payload.factura_nombre or "").strip() or None
+    factura_nit = (payload.factura_nit or "").strip() or None
     sucursal = db.query(Sucursal).filter(Sucursal.id == payload.sucursal_id).first()
     if sucursal is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sucursal no encontrada.")
@@ -1264,12 +1380,36 @@ def registrar_venta_presencial(
             },
         )
         venta_id = result.scalar_one()
+        if factura_nombre or factura_nit:
+            db.execute(
+                text("UPDATE venta SET factura_nombre = :n, factura_nit = :nit WHERE id = :v"),
+                {"n": factura_nombre, "nit": factura_nit, "v": venta_id},
+            )
+        if payload.metodo_pago == "qr":
+            # Cobrada con el QR de la tienda: queda pagada (el empleado lo vio
+            # en el momento) con la foto del comprobante si la tomo.
+            comprobante_url = None
+            if payload.comprobante:
+                contenido, tipo = _imagen_de_data_url(payload.comprobante)
+                comprobante_url = upload_comprobante_pago(cliente.id, contenido, tipo)
+            # El QR que se mostro al cliente (si no vino, el primero de la tienda).
+            db.execute(
+                text(
+                    "UPDATE pago SET metodo = 'qr', comprobante_url = :url, revisado_por_id = :emp, "
+                    "metodo_pago_id = (SELECT id FROM metodo_pago_empresa WHERE empresa_id = :e AND tipo = 'qr' "
+                    "AND activo ORDER BY (id = :mid) DESC, orden, id LIMIT 1) WHERE venta_id = :v"
+                ),
+                {"url": comprobante_url, "emp": empleado.id, "e": sucursal.empresa_id, "v": venta_id,
+                 "mid": payload.metodo_pago_id or 0},
+            )
         db.commit()
     except DBAPIError as exc:
         db.rollback()
         raise _error_sp(exc)
 
-    log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta presencial en efectivo a {cliente.nombre}", request)
+    forma = "con QR" + (" (con comprobante)" if payload.comprobante else "") if payload.metodo_pago == "qr" else "en efectivo"
+    a_quien = factura_nombre if payload.cliente_id is None else cliente.nombre
+    log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta presencial {forma} a {a_quien}", request)
 
     venta = _query_venta_con_detalles(db).filter(Venta.id == venta_id).first()
     return _to_admin_out(venta)
