@@ -14,6 +14,7 @@ import { WhatsappFloat } from './components/whatsapp-float/whatsapp-float';
 import { ActualizacionApp } from './services/actualizacion-app';
 import { Auth } from './services/auth';
 import { InactivitySession } from './services/inactivity-session';
+import { DescargaAutomatica } from './services/offline/descarga-automatica';
 import { Sincronizacion } from './services/offline/sincronizacion';
 import { TiendaActiva } from './services/tienda-activa';
 
@@ -45,6 +46,8 @@ export class App implements OnInit {
   private readonly inactivitySession = inject(InactivitySession);
   // P4 offline: manda sola las operaciones guardadas sin conexion (CU12).
   private readonly sincronizacion = inject(Sincronizacion);
+  // P4 offline: el personal tiene siempre su catálogo descargado (cada 3 min).
+  private readonly descargaAutomatica = inject(DescargaAutomatica);
   // PWA: aplica la versión nueva después de cada despliegue.
   private readonly actualizacion = inject(ActualizacionApp);
 

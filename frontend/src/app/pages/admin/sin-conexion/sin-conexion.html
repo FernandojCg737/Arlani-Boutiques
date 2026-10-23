@@ -4,8 +4,9 @@
       <span class="admin-content__eyebrow">P4 · CU23 · Offline</span>
       <h1>Trabajar sin conexión</h1>
       <p>
-        Descarga los datos de tu sucursal mientras tienes internet. Si se corta, puedes seguir vendiendo al contado y
-        reservando: todo queda guardado en este dispositivo y se envía solo cuando vuelve la conexión.
+        Mientras tienes internet, los datos de tu sucursal se descargan solos cada 3 minutos, estés en la pantalla que
+        estés. Si se corta, entra aquí y sigue vendiendo al contado y reservando: todo queda guardado en este dispositivo
+        y, al volver la conexión, primero se envía y después se vuelve a descargar el catálogo.
       </p>
     </div>
   </div>
@@ -60,6 +61,9 @@
         <span>
           Datos descargados {{ hace(p.descargado_en) }} ({{ p.descargado_en | date: 'dd/MM/yyyy HH:mm' }}) ·
           {{ p.productos.length }} prendas · {{ p.clientes.length }} clientes
+        </span>
+        <span class="offline-sub">
+          {{ automatica.descargando() ? 'Actualizando ahora…' : 'Se actualiza solo cada 3 minutos con conexión.' }}
         </span>
         @if (desactualizado() || !sync.enLinea()) {
           <span class="offline-viejo">
