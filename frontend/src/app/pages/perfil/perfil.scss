@@ -306,6 +306,21 @@
   }
 }
 
+// Pantalla aparte: catálogo y reservas sin internet (P4 offline).
+.dash__tabs-enlace {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #999;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--brand-dark);
+  }
+}
+
 .dash__tabs-badge {
   display: inline-flex;
   align-items: center;

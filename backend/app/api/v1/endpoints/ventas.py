@@ -1261,6 +1261,22 @@ def buscar_clientes_para_venta(
     return [ClienteBusquedaOut(id=c.id, nombre=c.nombre, email=c.email) for c in clientes]
 
 
+@router.get("/presencial/sucursales", response_model=list[dict[str, int | str]])
+def sucursales_mostrador(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso("CU11")),
+) -> list[dict[str, int | str]]:
+    """Sucursales de la tienda donde el personal puede vender (Encargado y
+    Cajero, solo la suya). No pide el permiso del catalogo (CU05)."""
+    sql = "SELECT id, nombre FROM sucursal WHERE estado = 'activa' AND empresa_id = fn_empresa_actual()"
+    params: dict = {}
+    restringida = sucursal_restringida(usuario)
+    if restringida is not None:
+        sql += " AND id = :s"
+        params["s"] = restringida
+    return [dict(f) for f in db.execute(text(sql + " ORDER BY nombre"), params).mappings()]
+
+
 @router.get("/presencial/catalogo", response_model=list[ProductoMostradorOut])
 def catalogo_mostrador(
     sucursal_id: int = Query(...),

@@ -11,7 +11,12 @@ import { AdminMetodosPago } from './pages/admin/metodos-pago/metodos-pago';
 import { AdminPerfil } from './pages/admin/perfil/perfil';
 import { AdminProductos } from './pages/admin/productos/productos';
 import { AdminCarritos } from './pages/admin/carritos/carritos';
+import { AdminCaja } from './pages/admin/caja/caja';
 import { AdminCambios } from './pages/admin/cambios/cambios';
+import { AdminConflictos } from './pages/admin/conflictos/conflictos';
+import { AdminSinConexion } from './pages/admin/sin-conexion/sin-conexion';
+import { SinConexionCliente } from './pages/sin-conexion/sin-conexion-cliente';
+import { SeguimientoOffline } from './pages/superadmin/seguimiento-offline/seguimiento-offline';
 import { ComprobanteCambio } from './pages/comprobante-cambio/comprobante-cambio';
 import { AdminNotificaciones } from './pages/admin/notificaciones/notificaciones';
 import { AdminReportesDashboard } from './pages/admin/reportes/dashboard/dashboard';
@@ -102,6 +107,13 @@ export const routes: Routes = [
   { path: 'login', component: Login, data: { hideChrome: true } },
   { path: 'registro', component: Registro, data: { hideChrome: true } },
   { path: 'recuperar', component: RecuperarPassword, data: { hideChrome: true } },
+  // P4 offline: el cliente con sesión guarda el catálogo y reserva sin internet.
+  {
+    path: 'sin-conexion',
+    component: SinConexionCliente,
+    canActivate: [authGuard],
+    data: { header: 'plataforma', encabezadoSolido: true },
+  },
   // Mi cuenta es de la plataforma (una cuenta sirve para todas las boutiques).
   {
     path: 'perfil',
@@ -157,6 +169,9 @@ export const routes: Routes = [
       { path: 'reservas', component: AdminReservas, canActivate: [permisoGuard('CU10')] },
       { path: 'ventas', component: AdminVentas, canActivate: [permisoGuard('CU11')] },
       { path: 'carritos', component: AdminCarritos, canActivate: [permisoGuard('CU13')] },
+      { path: 'caja', component: AdminCaja, canActivate: [permisoGuard('2P-CU16')] },
+      { path: 'sin-conexion', component: AdminSinConexion, canActivate: [permisoGuard('2P-CU12')] },
+      { path: 'conflictos', component: AdminConflictos, canActivate: [permisoGuard('2P-CU13')] },
       { path: 'notificaciones', component: AdminNotificaciones, canActivate: [permisoGuard('CU14')] },
       { path: 'reportes', component: AdminReportesDashboard, canActivate: [permisoGuard('CU16')] },
       { path: 'reportes/ventas', component: ReporteVentasPage, canActivate: [permisoGuard('CU16')] },
@@ -199,6 +214,13 @@ export const routes: Routes = [
       { path: 'reservas', component: AdminReservas, canActivate: [tiendaElegidaGuard], data: { origenes: true } },
       { path: 'ventas', component: AdminVentas, canActivate: [tiendaElegidaGuard], data: { origenes: true } },
       { path: 'cambios', component: AdminCambios, canActivate: [tiendaElegidaGuard], data: { pagina: true } },
+      { path: 'caja', component: AdminCaja, canActivate: [tiendaElegidaGuard] },
+      // CU11 a CU14 (offline), por tienda: descargas, sincronización,
+      // operaciones recibidas y conflictos.
+      { path: 'descargas-offline', component: SeguimientoOffline, canActivate: [tiendaElegidaGuard], data: { vista: 'descargas' } },
+      { path: 'sincronizacion-offline', component: SeguimientoOffline, canActivate: [tiendaElegidaGuard], data: { vista: 'sincronizacion' } },
+      { path: 'operaciones-offline', component: AdminConflictos, canActivate: [tiendaElegidaGuard], data: { estado: '' } },
+      { path: 'conflictos', component: AdminConflictos, canActivate: [tiendaElegidaGuard], data: { estado: 'conflicto' } },
       { path: 'reportes', component: AdminReportesDashboard },
       { path: 'reportes/ventas', component: ReporteVentasPage },
       { path: 'reportes/asistencia', component: ReporteAsistenciaPage },

@@ -11,11 +11,14 @@ from app.api.v1.endpoints.catalogo import router as catalogo_router
 from app.api.v1.endpoints.chatbot import router as chatbot_router
 from app.api.v1.endpoints.clientes import router as clientes_router
 from app.api.v1.endpoints.colecciones import router as colecciones_router
+from app.api.v1.endpoints.cajas import publico_router as cajas_publico_router
+from app.api.v1.endpoints.cajas import router as cajas_router
 from app.api.v1.endpoints.cambios import router as cambios_router
 from app.api.v1.endpoints.devoluciones import router as devoluciones_router
 from app.api.v1.endpoints.direcciones import router as direcciones_router
 from app.api.v1.endpoints.empleados import router as empleados_router
 from app.api.v1.endpoints.notificaciones import router as notificaciones_router
+from app.api.v1.endpoints.offline import router as offline_router
 from app.api.v1.endpoints.perfil import router as perfil_router
 from app.api.v1.endpoints.mi_empresa import router as mi_empresa_router
 from app.api.v1.endpoints.mi_empresa import tiendas_router
@@ -56,6 +59,9 @@ api_router.include_router(carritos_admin_router, prefix="/carritos", tags=["carr
 api_router.include_router(ventas_router, prefix="/ventas", tags=["ventas"])
 api_router.include_router(devoluciones_router, prefix="/devoluciones", tags=["devoluciones"])
 api_router.include_router(cambios_router, prefix="/cambios", tags=["cambios"])
+api_router.include_router(cajas_publico_router, prefix="/cajas", tags=["cajas"])
+api_router.include_router(cajas_router, prefix="/cajas", tags=["cajas"])
+api_router.include_router(offline_router, prefix="/offline", tags=["offline"])
 api_router.include_router(direcciones_router, prefix="/direcciones", tags=["direcciones"])
 api_router.include_router(notificaciones_router, prefix="/notificaciones", tags=["notificaciones"])
 api_router.include_router(reportes_router, prefix="/reportes", tags=["reportes"])

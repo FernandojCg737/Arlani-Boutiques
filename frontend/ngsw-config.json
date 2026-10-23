@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "resources": {
+        "files": ["/favicon.ico", "/index.html", "/manifest.webmanifest", "/*.css", "/*.js"]
+      }
+    },
+    {
+      "name": "imagenes",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": ["/img/**", "/icons/**", "/*.(svg|png|jpg|jpeg|webp|gif|woff|woff2)"]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "imagenes-productos",
+      "urls": ["https://*.supabase.co/storage/**"],
+      "cacheConfig": { "strategy": "performance", "maxSize": 300, "maxAge": "30d" }
+    }
+  ]
+}

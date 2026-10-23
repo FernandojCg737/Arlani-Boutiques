@@ -1,0 +1,182 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">{{ esPlataforma ? 'P4 · CU13 · CU14' : 'P4 · CU24 · Offline' }}</span>
+      <h1>Operaciones sincronizadas y conflictos</h1>
+      <p>
+        Lo que llegó de los dispositivos que trabajaron sin conexión. Si al sincronizar ya no había stock, la operación
+        queda en conflicto: no se pierde, se ajusta con lo que hay o se anula.
+      </p>
+    </div>
+    <div class="admin-filtros">
+      <select [value]="filtro()" (change)="filtrar($any($event.target).value)" aria-label="Filtrar por estado">
+        <option value="conflicto">En conflicto</option>
+        <option value="">Todas</option>
+        <option value="confirmada">Confirmadas</option>
+        <option value="resuelta">Resueltas</option>
+        <option value="anulada">Anuladas</option>
+        <option value="rechazada">Rechazadas</option>
+      </select>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  <div class="admin-table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Operación</th>
+          <th>Hecha sin conexión</th>
+          <th>Prendas</th>
+          <th>Total</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (cargando()) {
+          <tr>
+            <td colspan="6" class="admin-table__empty">Cargando...</td>
+          </tr>
+        } @else {
+          @for (o of operaciones(); track o.id) {
+            <tr>
+              <td>
+                <strong>{{ o.tipo === 'venta' ? 'Venta de contado' : 'Reserva' }} #{{ o.id }}</strong>
+                <small class="offline-sub">{{ o.sucursal_nombre }}</small>
+                <small class="offline-sub offline-uuid" [title]="o.uuid">ID {{ o.uuid.slice(0, 8) }}</small>
+              </td>
+              <td>
+                {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }}
+                <small class="offline-sub">
+                  {{ o.usuario_nombre ?? '—' }}{{ o.usuario_tipo ? ' · ' + (tipoUsuario[o.usuario_tipo] ?? o.usuario_tipo) : '' }}
+                </small>
+                <small class="offline-sub">Llegó {{ o.recibida_en | date: 'dd/MM HH:mm' }} · {{ o.intentos }} {{ o.intentos === 1 ? 'envío' : 'envíos' }}</small>
+              </td>
+              <td>
+                @for (i of o.items; track $index) {
+                  <span class="offline-linea">{{ i.cantidad }}× {{ i.producto }} ({{ i.talla }}, {{ i.color }})</span>
+                }
+                @if (o.cliente_nombre) {
+                  <small class="offline-sub">Cliente: {{ o.cliente_nombre }}</small>
+                }
+              </td>
+              <td>Bs {{ o.total | number: '1.2-2' }}</td>
+              <td>
+                <span class="offline-chip offline-chip--{{ o.estado }}">{{ estadoLabel[o.estado] ?? o.estado }}</span>
+                @if (o.conflicto && o.estado === 'conflicto') {
+                  @for (c of o.conflicto; track $index) {
+                    <small class="offline-sub conflicto-falta">
+                      {{ c.producto }} ({{ c.talla }}, {{ c.color }}): pidió {{ c.pedido }}, hay {{ c.disponible }}
+                    </small>
+                  }
+                } @else if (o.resolucion) {
+                  <small class="offline-sub offline-mensaje">{{ o.resolucion }}</small>
+                  <small class="offline-sub">{{ o.resuelta_por_nombre }} · {{ o.resuelta_en | date: 'dd/MM HH:mm' }}</small>
+                } @else if (o.mensaje) {
+                  <small class="offline-sub offline-mensaje">{{ o.mensaje }}</small>
+                }
+              </td>
+              <td>
+                <div class="ventas-acciones">
+                  @if (o.estado === 'conflicto' && puedeResolver) {
+                    <button type="button" (click)="abrir(o)">Resolver</button>
+                  }
+                  @if (o.venta_id) {
+                    <span class="offline-sub">Venta #{{ o.venta_id }}</span>
+                  }
+                  @if (o.reserva_id) {
+                    <span class="offline-sub">Reserva #{{ o.reserva_id }}</span>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="admin-table__empty">
+                {{ filtro() === 'conflicto' ? 'No hay conflictos de sincronización.' : 'No hay operaciones con este estado.' }}
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+@if (resolviendo(); as o) {
+  <div class="ventas-overlay" (click)="cerrar()">
+    <div class="ventas-modal conflicto-modal" (click)="$event.stopPropagation()">
+      <h2>Resolver conflicto #{{ o.id }}</h2>
+      <p class="ventas-modal__subtitulo">
+        {{ o.tipo === 'venta' ? 'Venta de contado' : 'Reserva' }} hecha sin conexión el {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }}
+        por {{ o.usuario_nombre }} en {{ o.sucursal_nombre }} · cobrado Bs {{ o.total | number: '1.2-2' }}.
+      </p>
+
+      <div class="mostrador-opciones conflicto-acciones">
+        <button type="button" class="mostrador-opcion" [class.is-activa]="accion() === 'ajustar'" (click)="accion.set('ajustar')">
+          Ajustar con lo que hay
+        </button>
+        <button type="button" class="mostrador-opcion" [class.is-activa]="accion() === 'anular'" (click)="accion.set('anular')">
+          Anular
+        </button>
+      </div>
+
+      @if (accion() === 'ajustar') {
+        <ul class="conflicto-lineas">
+          @for (l of lineas(); track $index; let i = $index) {
+            <li>
+              <span class="conflicto-lineas__pedido">
+                Pidió {{ l.item.cantidad }}× {{ l.item.producto }} ({{ l.item.talla }}, {{ l.item.color }})
+              </span>
+              <select [value]="l.variante" (change)="cambiarLinea(i, { variante: $any($event.target).value, cantidad: 1 })">
+                <option value="">Quitar esta prenda</option>
+                @for (d of variantesDe(l.item.producto_id); track clave(d)) {
+                  <option [value]="clave(d)">{{ d.talla }} · {{ d.color }} (hay {{ d.stock }})</option>
+                }
+              </select>
+              @if (l.variante) {
+                <input type="number" min="1" [max]="stockDe(l)" [value]="l.cantidad"
+                       (input)="cambiarLinea(i, { cantidad: +$any($event.target).value })" aria-label="Cantidad" />
+              }
+            </li>
+          }
+        </ul>
+        <p class="ventas-seleccion">
+          Nuevo total: Bs {{ totalAjuste() | number: '1.2-2' }}
+          @if (o.tipo === 'venta' && +o.total - totalAjuste() > 0.005) {
+            <span class="conflicto-devolver">· devolver Bs {{ +o.total - totalAjuste() | number: '1.2-2' }} en efectivo al cliente</span>
+          }
+        </p>
+        <label class="ventas-campo">
+          <span>Nota (opcional)</span>
+          <input type="text" maxlength="300" [value]="motivo()" (input)="motivo.set($any($event.target).value)" />
+        </label>
+      } @else {
+        <p class="cambios-aviso">
+          La operación no se registra.
+          @if (o.tipo === 'venta') {
+            Hay que devolverle al cliente los Bs {{ o.total | number: '1.2-2' }} que pagó en efectivo.
+          }
+        </p>
+        <label class="ventas-campo">
+          <span>Motivo</span>
+          <textarea rows="3" maxlength="500" [value]="motivo()" (input)="motivo.set($any($event.target).value)"></textarea>
+        </label>
+      }
+
+      @if (errorModal()) {
+        <div class="admin-error">{{ errorModal() }}</div>
+      }
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" [disabled]="guardando()" (click)="cerrar()">Cancelar</button>
+        <button type="button" [disabled]="guardando()" (click)="confirmar()">
+          {{ guardando() ? 'Guardando…' : accion() === 'ajustar' ? 'Registrar ajuste' : 'Anular operación' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

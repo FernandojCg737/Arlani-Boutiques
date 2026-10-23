@@ -232,6 +232,7 @@ export class Checkout implements OnInit, OnDestroy {
       const unica = tiendas.length === 1 ? tiendas[0] : null;
       if (unica && unica.operativa && unica.metodos.length === 1) this.elegir(unica, unica.metodos[0]);
       void this.verificarStock();
+      void this.cargarEstadoSucursales(tiendas);
     } catch {
       this.estado.set('error');
     }
@@ -257,6 +258,39 @@ export class Checkout implements OnInit, OnDestroy {
     if (this.faltantes(t).length > 0) return `${t.nombre} tiene prendas sin stock`;
     if (!t.metodos.some((m) => m.tipo === 'paypal')) return `${t.nombre} no recibe pagos con PayPal`;
     return `${t.nombre} todavía no registró el correo de su cuenta PayPal`;
+  }
+
+  // CU16: sucursales sin caja abierta ahora (la tienda está cerrada). Se le
+  // avisa al cliente que su pedido se prepara cuando abra.
+  protected readonly estadoSucursales = signal<Record<number, { abierta: boolean; horario_atencion: string | null }>>({});
+
+  private async cargarEstadoSucursales(tiendas: TiendaCheckout[]): Promise<void> {
+    const ids = [...new Set(tiendas.flatMap((t) => t.items.map((i) => i.sucursal_id)))];
+    const estados = await Promise.all(
+      ids.map((id) =>
+        firstValueFrom(
+          this.http.get<{ abierta: boolean; horario_atencion: string | null }>(
+            `${environment.apiUrl}/cajas/sucursal/${id}/estado`,
+          ),
+        ).then(
+          (e) => [id, e] as const,
+          () => null,
+        ),
+      ),
+    );
+    this.estadoSucursales.set(Object.fromEntries(estados.filter((e) => e !== null)));
+  }
+
+  protected cerradasDe(t: TiendaCheckout): string[] {
+    const estados = this.estadoSucursales();
+    const nombres = t.items.filter((i) => estados[i.sucursal_id]?.abierta === false).map((i) => i.sucursal_nombre);
+    return [...new Set(nombres)];
+  }
+
+  protected horarioDe(t: TiendaCheckout): string | null {
+    const estados = this.estadoSucursales();
+    const item = t.items.find((i) => estados[i.sucursal_id]?.abierta === false);
+    return item ? estados[item.sucursal_id].horario_atencion : null;
   }
 
   protected sucursales(t: TiendaCheckout): string[] {

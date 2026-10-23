@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { Auth } from '../services/auth';
@@ -11,6 +12,12 @@ import { Auth } from '../services/auth';
 // y se perdia adonde iba el cliente (reportado por testers: entraba a
 // Checkout sin sesion, iniciaba sesion, y terminaba en el inicio en vez de
 // seguir con su compra).
+// Sin conexion (P4 offline) el backend no responde: se sigue con la sesion
+// guardada en el dispositivo; se revalida al volver la conexion.
+function sinConexion(err: unknown, auth: Auth): boolean {
+  return err instanceof HttpErrorResponse && err.status === 0 && auth.currentUser() !== null;
+}
+
 export const authGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(Auth);
   const router = inject(Router);
@@ -20,7 +27,8 @@ export const authGuard: CanActivateFn = async (_route, state) => {
   try {
     await auth.me();
     return true;
-  } catch {
+  } catch (err) {
+    if (sinConexion(err, auth)) return true;
     return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
   }
 };
@@ -36,8 +44,8 @@ export const adminGuard: CanActivateFn = async () => {
 
   try {
     await auth.me();
-  } catch {
-    return router.createUrlTree(['/login']);
+  } catch (err) {
+    if (!sinConexion(err, auth)) return router.createUrlTree(['/login']);
   }
 
   return auth.isStaff() ? true : router.createUrlTree(['/']);

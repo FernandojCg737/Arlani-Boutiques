@@ -1,0 +1,332 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P4 · CU23 · Offline</span>
+      <h1>Trabajar sin conexión</h1>
+      <p>
+        Descarga los datos de tu sucursal mientras tienes internet. Si se corta, puedes seguir vendiendo al contado y
+        reservando: todo queda guardado en este dispositivo y se envía solo cuando vuelve la conexión.
+      </p>
+    </div>
+  </div>
+
+  <div class="offline-estado" [class.is-offline]="!sync.enLinea()">
+    <span class="offline-estado__punto"></span>
+    <strong>{{ sync.enLinea() ? 'Con conexión' : 'Sin conexión' }}</strong>
+    <span>
+      @if (sync.pendientes() > 0) {
+        · {{ sync.pendientes() }} {{ sync.pendientes() === 1 ? 'operación pendiente' : 'operaciones pendientes' }} de enviar
+      } @else {
+        · Nada pendiente de enviar
+      }
+      @if (sync.conflictos() > 0) {
+        · {{ sync.conflictos() }} en conflicto
+      }
+    </span>
+    <button type="button" [disabled]="!sync.enLinea() || sync.sincronizando()" (click)="sync.sincronizar()">
+      {{ sync.sincronizando() ? 'Sincronizando…' : 'Sincronizar ahora' }}
+    </button>
+  </div>
+
+  @if (planOffline() === false) {
+    <div class="admin-error">El plan de tu tienda no incluye la operación sin conexión (solo Básico y Profesional).</div>
+  }
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+  @if (aviso()) {
+    <p class="offline-aviso">{{ aviso() }}</p>
+  }
+
+  <div class="offline-sucursal">
+    <label class="ventas-campo">
+      <span>Sucursal</span>
+      <select [value]="sucursalId() ?? ''" (change)="elegirSucursal(+$any($event.target).value)">
+        @for (s of sucursales(); track s.id) {
+          <option [value]="s.id">{{ s.nombre }}</option>
+        } @empty {
+          <option value="">Sin sucursales descargadas</option>
+        }
+      </select>
+    </label>
+    <div class="offline-sucursal__datos">
+      @if (paquete(); as p) {
+        <span>
+          Datos descargados {{ hace(p.descargado_en) }} ({{ p.descargado_en | date: 'dd/MM/yyyy HH:mm' }}) ·
+          {{ p.productos.length }} prendas · {{ p.clientes.length }} clientes
+        </span>
+        @if (desactualizado() || !sync.enLinea()) {
+          <span class="offline-viejo">
+            El stock que ves es el conocido al descargar: puede estar desactualizado. Se confirma al sincronizar.
+          </span>
+        }
+      } @else {
+        <span>Todavía no descargaste los datos de esta sucursal en este dispositivo.</span>
+      }
+    </div>
+    <button type="button" class="ventas-nueva-btn" [disabled]="!sync.enLinea() || descargando() || sucursalId() === null"
+            (click)="descargar()">
+      {{ descargando() ? 'Descargando…' : paquete() ? 'Actualizar datos' : 'Descargar datos' }}
+    </button>
+  </div>
+
+  <nav class="ventas-tabs">
+    <button type="button" [class.is-active]="vista() === 'catalogo'" (click)="cambiarVista('catalogo')">Catálogo descargado</button>
+    <button type="button" [class.is-active]="vista() === 'venta'" (click)="cambiarVista('venta')">Venta de contado</button>
+    <button type="button" [class.is-active]="vista() === 'reserva'" (click)="cambiarVista('reserva')">Reserva</button>
+    <button type="button" [class.is-active]="vista() === 'operaciones'" (click)="cambiarVista('operaciones')">
+      Operaciones del dispositivo
+      @if (sync.pendientes() + sync.conflictos() > 0) {
+        <span class="offline-contador">{{ sync.pendientes() + sync.conflictos() }}</span>
+      }
+    </button>
+  </nav>
+
+  @switch (vista()) {
+    @case ('catalogo') {
+      @if (paquete()) {
+        <input class="offline-buscar" type="search" placeholder="Buscar prenda o categoría…" [value]="buscar()"
+               (input)="buscar.set($any($event.target).value)" />
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Prenda</th>
+                <th>Precio</th>
+                <th>Tallas y colores (stock conocido)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of productos(); track p.producto_id) {
+                <tr>
+                  <td>
+                    <strong>{{ p.nombre }}</strong>
+                    <small class="offline-sub">{{ p.categoria ?? 'Sin categoría' }} · {{ stockTotal(p) }} en total</small>
+                  </td>
+                  <td>Bs {{ p.precio | number: '1.2-2' }}</td>
+                  <td>
+                    <div class="offline-variantes">
+                      @for (v of p.variantes; track v.talla_id + '-' + v.color_id) {
+                        <span [class.is-agotada]="v.stock < 1">{{ v.talla_codigo }} · {{ v.color_nombre }}: {{ v.stock }}</span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3" class="admin-table__empty">Ninguna prenda coincide.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="offline-vacio">Descarga los datos de la sucursal para consultarlos sin conexión.</p>
+      }
+    }
+
+    @case ('operaciones') {
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Operación</th>
+              <th>Registrada</th>
+              <th>Detalle</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (o of operacionesSucursal(); track o.uuid) {
+              <tr>
+                <td>
+                  <strong>{{ o.tipo === 'venta' ? 'Venta de contado' : 'Reserva' }}</strong>
+                  <small class="offline-sub">{{ o.sucursal_nombre }}</small>
+                  <small class="offline-sub offline-uuid" [title]="o.uuid">ID {{ o.uuid.slice(0, 8) }}</small>
+                </td>
+                <td>
+                  {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }}
+                  @if (o.intentos > 0) {
+                    <small class="offline-sub">{{ o.intentos }} {{ o.intentos === 1 ? 'envío' : 'envíos' }}</small>
+                  }
+                </td>
+                <td>
+                  @for (i of o.items; track $index) {
+                    <span class="offline-linea">{{ i.cantidad }}× {{ i.producto_nombre }} ({{ i.talla }}, {{ i.color }})</span>
+                  }
+                  @if (o.cliente_nombre) {
+                    <small class="offline-sub">Cliente: {{ o.cliente_nombre }}</small>
+                  }
+                </td>
+                <td>Bs {{ o.total | number: '1.2-2' }}</td>
+                <td>
+                  <span class="offline-chip offline-chip--{{ o.estado }}">{{ estadoLabel[o.estado] }}</span>
+                  @if (o.mensaje) {
+                    <small class="offline-sub offline-mensaje">{{ o.mensaje }}</small>
+                  }
+                  @if (o.venta_id) {
+                    <small class="offline-sub">Venta #{{ o.venta_id }}</small>
+                  }
+                  @if (o.reserva_id) {
+                    <small class="offline-sub">Reserva #{{ o.reserva_id }}</small>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="admin-table__empty">Este dispositivo no tiene operaciones sin conexión.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (sync.ultimoError()) {
+        <div class="admin-error">{{ sync.ultimoError() }}</div>
+      }
+      @if (sync.registro().length) {
+        <h2 class="offline-titulo">Historial de sincronización</h2>
+        <ul class="offline-registro">
+          @for (r of sync.registro(); track r.id) {
+            <li>
+              <span>{{ r.fecha | date: 'dd/MM HH:mm:ss' }}</span>
+              <span>
+                {{ r.enviadas }} enviadas · {{ r.confirmadas }} confirmadas · {{ r.conflictos }} en conflicto ·
+                {{ r.rechazadas }} rechazadas · {{ r.errores }} por reintentar
+              </span>
+              <small>{{ r.detalle }}</small>
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    @default {
+      <!-- Venta de contado o reserva -->
+      @if (paquete(); as pq) {
+        <div class="offline-form">
+          <div class="offline-form__catalogo">
+            <input class="offline-buscar" type="search" placeholder="Buscar prenda…" [value]="buscar()"
+                   (input)="buscar.set($any($event.target).value)" />
+            <div class="mostrador-catalogo">
+              @for (p of productos(); track p.producto_id) {
+                <button type="button" class="mostrador-prenda" [class.is-activa]="productoSel()?.producto_id === p.producto_id"
+                        [disabled]="stockTotal(p) < 1" (click)="elegirProducto(p)">
+                  @if (p.imagen_url && sync.enLinea()) {
+                    <img [src]="p.imagen_url" [alt]="p.nombre" />
+                  } @else {
+                    <span class="mostrador-prenda__sin-foto">{{ p.nombre.charAt(0) }}</span>
+                  }
+                  <strong>{{ p.nombre }}</strong>
+                  <small>Bs {{ p.precio | number: '1.2-2' }}</small>
+                </button>
+              }
+            </div>
+            @if (productoSel(); as p) {
+              <div class="mostrador-elegir">
+                <p class="mostrador-elegir__titulo">{{ p.nombre }} · Bs {{ p.precio | number: '1.2-2' }}</p>
+                <span class="mostrador-etiqueta">Talla y color</span>
+                <div class="mostrador-opciones">
+                  @for (v of p.variantes; track v.talla_id + '-' + v.color_id) {
+                    <button type="button" class="mostrador-opcion" [class.is-activa]="varianteSel() === v"
+                            [disabled]="disponible(p, v) < 1" (click)="varianteSel.set(v); cantidad.set(1)">
+                      {{ v.talla_codigo }} · {{ v.color_nombre }}
+                      <small>{{ disponible(p, v) < 1 ? 'sin stock' : 'quedan ' + disponible(p, v) }}</small>
+                    </button>
+                  }
+                </div>
+                @if (varianteSel(); as v) {
+                  <div class="mostrador-agregar">
+                    <label>
+                      <span class="mostrador-etiqueta">Cantidad</span>
+                      <input type="number" min="1" [max]="disponible(p, v)" [value]="cantidad()"
+                             (input)="cantidad.set(+$any($event.target).value)" />
+                    </label>
+                    <button type="button" class="ventas-agregar-btn"
+                            [disabled]="cantidad() < 1 || cantidad() > disponible(p, v)" (click)="agregar()">
+                      Agregar · Bs {{ +p.precio * cantidad() | number: '1.2-2' }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <aside class="offline-form__resumen">
+            <h2>{{ vista() === 'venta' ? 'Venta de contado (efectivo)' : 'Reserva' }}</h2>
+            <p class="offline-sub">{{ pq.sucursal.nombre }} · {{ pq.empresa_nombre }}</p>
+
+            @if (items().length) {
+              <ul class="ventas-detalles ventas-detalles--form">
+                @for (i of items(); track $index) {
+                  <li>
+                    <span>
+                      {{ i.cantidad }}× {{ i.producto_nombre }} ({{ i.talla }}, {{ i.color }})
+                      <br />
+                      <small>Bs {{ +i.precio * i.cantidad | number: '1.2-2' }}</small>
+                    </span>
+                    <button type="button" (click)="quitar($index)" aria-label="Quitar">&times;</button>
+                  </li>
+                }
+              </ul>
+              <p class="ventas-seleccion">Total: Bs {{ total() | number: '1.2-2' }}</p>
+            } @else {
+              <p class="offline-sub">Elige las prendas en el catálogo.</p>
+            }
+
+            <label class="ventas-campo">
+              <span>{{ vista() === 'reserva' ? 'Cliente registrado' : 'Cliente con cuenta (opcional)' }}</span>
+              <input type="search" placeholder="Nombre o correo" [value]="buscarCliente()"
+                     (input)="buscarCliente.set($any($event.target).value); clienteId.set(null)" />
+            </label>
+            @if (clienteId() === null && buscarCliente().trim().length > 0) {
+              <ul class="offline-sugerencias">
+                @for (c of clientesFiltrados(); track c.id) {
+                  <li><button type="button" (click)="elegirCliente(c)">{{ c.nombre }} <small>{{ c.email }}</small></button></li>
+                } @empty {
+                  <li class="offline-sub">Ningún cliente descargado coincide.</li>
+                }
+              </ul>
+            }
+            @if (clienteId() !== null) {
+              <p class="offline-sub">Cliente elegido · <button type="button" class="offline-link" (click)="quitarCliente()">cambiar</button></p>
+            }
+
+            @if (vista() === 'venta') {
+              @if (clienteId() === null) {
+                <label class="ventas-campo">
+                  <span>Nombre para la factura (sin cuenta)</span>
+                  <input type="text" maxlength="150" [value]="facturaNombre()" (input)="facturaNombre.set($any($event.target).value)" />
+                </label>
+              }
+              <label class="ventas-campo">
+                <span>NIT o CI (opcional)</span>
+                <input type="text" maxlength="20" [value]="facturaNit()" (input)="facturaNit.set($any($event.target).value)" />
+              </label>
+              <p class="offline-sub">Sin conexión solo se cobra al contado, en efectivo.</p>
+            } @else {
+              <label class="ventas-campo">
+                <span>La recoge hasta</span>
+                <input type="datetime-local" [value]="horario()" (input)="horario.set($any($event.target).value)" />
+              </label>
+            }
+
+            @if (faltaParaRegistrar().length) {
+              <ul class="ventas-falta">
+                @for (f of faltaParaRegistrar(); track f) {
+                  <li>{{ f }}</li>
+                }
+              </ul>
+            }
+            <button type="button" class="ventas-nueva-btn offline-registrar"
+                    [disabled]="guardando() || faltaParaRegistrar().length > 0" (click)="registrar()">
+              {{ guardando() ? 'Guardando…' : vista() === 'venta' ? 'Registrar venta · Bs ' + (total() | number: '1.2-2') : 'Registrar reserva' }}
+            </button>
+          </aside>
+        </div>
+      } @else {
+        <p class="offline-vacio">Primero descarga los datos de la sucursal (necesitas conexión una vez).</p>
+      }
+    }
+  }
+</div>

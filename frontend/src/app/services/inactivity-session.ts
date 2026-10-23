@@ -54,6 +54,12 @@ export class InactivitySession {
   }
 
   private async onInactivityTimeout(): Promise<void> {
+    // Sin conexion no se cierra la sesion: el personal no podria volver a
+    // entrar hasta tener internet y perderia el modo sin conexion.
+    if (!navigator.onLine) {
+      this.resetInactivityTimer();
+      return;
+    }
     await this.auth.logout();
     this.auth.sessionMessage.set('Tu sesion se cerro por inactividad.');
     this.router.navigateByUrl('/login');

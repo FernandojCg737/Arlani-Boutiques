@@ -29,6 +29,7 @@
       <button type="button" [class.is-active]="tab() === 'resumen'" (click)="setTab('resumen')">Resumen</button>
       @if (auth.hasPermiso('CU10')) {
         <button type="button" [class.is-active]="tab() === 'reservas'" (click)="setTab('reservas')">Mis Reservas</button>
+        <a routerLink="/sin-conexion" class="dash__tabs-enlace">Sin conexión</a>
       }
       @if (auth.hasPermiso('CU11')) {
         <button type="button" [class.is-active]="tab() === 'compras'" (click)="setTab('compras')">Mis Compras</button>

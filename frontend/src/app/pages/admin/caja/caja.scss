@@ -1,0 +1,283 @@
+// Arqueo y cierre de caja: usa la base de Gestión de Ventas (tabla, modal, botones).
+:host {
+  display: block;
+}
+
+.caja-recargar {
+  align-self: flex-start;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: var(--brand-dark);
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.caja-seccion {
+  margin: 8px 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+}
+
+.caja-vacio {
+  font-size: 13px;
+  color: #777;
+}
+
+.caja-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.caja-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-top: 3px solid #ccc;
+
+  &.is-abierta {
+    border-top-color: #2e7d32;
+  }
+
+  &--online {
+    border-top-color: var(--brand-dark);
+    background: #fafaf8;
+  }
+
+  &__cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+
+    strong {
+      display: block;
+      font-size: 15px;
+      color: var(--brand-dark);
+    }
+
+    small {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      color: #888;
+    }
+  }
+
+  &__quien {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #555;
+  }
+
+  &__cerrada {
+    margin: 0;
+    font-size: 13px;
+    color: #777;
+  }
+
+  &__acciones {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: auto;
+  }
+}
+
+.caja-estado {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #f1f1f1;
+  color: #666;
+
+  &.is-abierta {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &--mini {
+    display: inline-block;
+    margin-top: 4px;
+  }
+}
+
+.caja-cifras {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  dt {
+    color: #666;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  &__total {
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+
+    dt,
+    dd {
+      font-weight: 800;
+      color: var(--brand-dark);
+    }
+  }
+
+  &--modal {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f7f7f5;
+  }
+
+  &--detalle {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px 20px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #f7f7f5;
+  }
+}
+
+.caja-historial-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 4px;
+}
+
+.caja-nowrap {
+  white-space: nowrap;
+}
+
+.caja-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #888;
+}
+
+.caja-dif {
+  font-weight: 700;
+  white-space: nowrap;
+
+  &.is-falta,
+  &.is-falta dd {
+    color: #b3261e;
+  }
+
+  &.is-sobra,
+  &.is-sobra dd {
+    color: #b26a00;
+  }
+
+  &--aviso {
+    margin: -6px 0 14px;
+    font-size: 13px;
+    color: #2e7d32;
+  }
+}
+
+.caja-opciones {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+
+  button {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid #ddd;
+    background: #fff;
+    color: var(--brand-dark);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &.is-active {
+      border-color: var(--brand-dark);
+      background: var(--brand-dark);
+      color: #fff;
+    }
+  }
+}
+
+.ventas-modal.caja-detalle {
+  max-width: 860px;
+}
+
+.caja-subtitulo {
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+}
+
+.caja-obs {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: #555;
+}
+
+.caja-movimientos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+
+  strong {
+    color: #2e7d32;
+    white-space: nowrap;
+
+    &.is-falta {
+      color: #b3261e;
+    }
+  }
+}
+
+.caja-ventas td {
+  font-size: 13px;
+}
+
+.caja-tardia {
+  background: #fffaf0;
+}

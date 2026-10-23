@@ -52,7 +52,7 @@ export class AdminLayout {
   protected estadoUseCase(uc: AdminUseCase): 'ok' | 'sin-acceso' | 'proximamente' {
     if (!uc.route) return 'proximamente';
     if (SIEMPRE_PERMITIDO.has(uc.code)) return 'ok';
-    return this.auth.isAdmin() || this.auth.hasPermiso(uc.code) ? 'ok' : 'sin-acceso';
+    return this.auth.isAdmin() || this.auth.hasPermiso(uc.permiso ?? uc.code) ? 'ok' : 'sin-acceso';
   }
 
   protected togglePackage(code: string): void {
