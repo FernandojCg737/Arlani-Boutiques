@@ -42,11 +42,13 @@ export interface TiendaLocal {
   logo_url: string | null;
   sucursales: { id: number; nombre: string }[];
   productos: ProductoLocal[];
+  acepta_contra_entrega?: boolean;
 }
 
 export interface CatalogoCliente {
   descargado_en: string;
   tiendas: TiendaLocal[];
+  direcciones?: { id: number; alias: string; direccion: string }[];
 }
 
 export interface PaqueteGuardado {
@@ -64,7 +66,12 @@ export type EstadoOperacion =
   | 'rechazada'
   | 'resuelta'
   | 'anulada'
-  | 'error';
+  | 'error'
+  // Compras del cliente sin conexión.
+  | 'por_pagar'
+  | 'sin_stock'
+  | 'pagada'
+  | 'cancelada';
 
 export interface ItemLocal {
   producto_id: number;
@@ -80,7 +87,7 @@ export interface ItemLocal {
 export interface OperacionLocal {
   uuid: string;
   usuario_id: number;
-  tipo: 'venta' | 'reserva';
+  tipo: 'venta' | 'reserva' | 'pedido';
   empresa_nombre: string;
   sucursal_id: number;
   sucursal_nombre: string;
@@ -90,6 +97,10 @@ export interface OperacionLocal {
   factura_nombre: string | null;
   factura_nit: string | null;
   horario_atencion: string | null;
+  // Compra del cliente: retiro o envío, y si paga en línea o contra entrega.
+  entrega?: 'retiro' | 'envio';
+  direccion_id?: number | null;
+  forma_pago?: 'en_linea' | 'contra_entrega' | null;
   items: ItemLocal[];
   total: number;
   estado: EstadoOperacion;

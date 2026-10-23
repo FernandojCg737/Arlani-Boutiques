@@ -16,6 +16,9 @@
         <option value="resuelta">Resueltas</option>
         <option value="anulada">Anuladas</option>
         <option value="rechazada">Rechazadas</option>
+        <option value="pagada">Compras pagadas</option>
+        <option value="por_pagar">Compras por pagar</option>
+        <option value="sin_stock">Compras sin stock</option>
       </select>
     </div>
   </div>
@@ -45,7 +48,7 @@
           @for (o of operaciones(); track o.id) {
             <tr>
               <td>
-                <strong>{{ o.tipo === 'venta' ? 'Venta de contado' : 'Reserva' }} #{{ o.id }}</strong>
+                <strong>{{ o.tipo === 'venta' ? 'Venta de contado' : o.tipo === 'pedido' ? 'Compra del cliente' : 'Reserva' }} #{{ o.id }}</strong>
                 <small class="offline-sub">{{ o.sucursal_nombre }}</small>
                 <small class="offline-sub offline-uuid" [title]="o.uuid">ID {{ o.uuid.slice(0, 8) }}</small>
               </td>

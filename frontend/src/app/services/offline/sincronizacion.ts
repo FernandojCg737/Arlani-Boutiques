@@ -16,7 +16,8 @@ interface ResultadoServidor {
 // Estados que todavía hay que mandar al servidor.
 const POR_ENVIAR: EstadoOperacion[] = ['pendiente', 'enviando', 'error'];
 // Estados que el servidor todavía puede cambiar (el encargado resuelve el conflicto).
-const POR_CONSULTAR: EstadoOperacion[] = ['conflicto'];
+// (el encargado resuelve el conflicto; la compra se paga o se queda sin stock).
+const POR_CONSULTAR: EstadoOperacion[] = ['conflicto', 'por_pagar', 'sin_stock'];
 const LOTE = 50;
 const REINTENTO_MS = 60_000;
 // Si un envío falla teniendo conexión (p. ej. el servidor estaba dormido),
@@ -43,6 +44,9 @@ export class Sincronizacion {
   readonly operaciones = signal<OperacionLocal[]>([]);
   readonly registro = signal<RegistroSync[]>([]);
   readonly sincronizando = signal(false);
+  // Sube cada vez que termina una sincronización (p. ej. para revisar si
+  // quedaron compras por pagar).
+  readonly sincronizaciones = signal(0);
   readonly ultimoError = signal('');
 
   readonly pendientes = computed(() => this.operaciones().filter((o) => POR_ENVIAR.includes(o.estado)).length);
@@ -183,6 +187,7 @@ export class Sincronizacion {
       }
       this.sincronizando.set(false);
       await this.cargar();
+      this.sincronizaciones.update((n) => n + 1);
     }
   }
 
@@ -230,6 +235,9 @@ export class Sincronizacion {
       factura_nombre: o.factura_nombre,
       factura_nit: o.factura_nit,
       horario_atencion: o.horario_atencion,
+      entrega: o.entrega ?? 'retiro',
+      direccion_id: o.direccion_id ?? null,
+      forma_pago: o.forma_pago ?? null,
       items: o.items.map((i) => ({
         producto_id: i.producto_id,
         talla_id: i.talla_id,

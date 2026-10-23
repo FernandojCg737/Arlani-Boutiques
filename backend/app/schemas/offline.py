@@ -69,6 +69,14 @@ class TiendaOfflineOut(BaseModel):
     logo_url: str | None
     sucursales: list[SucursalOfflineOut]
     productos: list[ProductoOfflineOut]
+    # La tienda habilito "contra entrega" (compras sin conexion).
+    acepta_contra_entrega: bool = False
+
+
+class DireccionOfflineOut(BaseModel):
+    id: int
+    alias: str
+    direccion: str
 
 
 class CatalogoClienteOfflineOut(BaseModel):
@@ -76,6 +84,8 @@ class CatalogoClienteOfflineOut(BaseModel):
 
     descargado_en: datetime
     tiendas: list[TiendaOfflineOut]
+    # Sus direcciones, para elegir envio a domicilio sin conexion.
+    direcciones: list[DireccionOfflineOut] = []
 
     @field_serializer("descargado_en")
     def _fecha(self, value: datetime) -> str | None:
@@ -96,13 +106,18 @@ class ItemOfflineIn(BaseModel):
 
 class OperacionOfflineIn(BaseModel):
     uuid: UUID
-    tipo: str = Field(pattern="^(venta|reserva)$")
+    # venta (personal, de contado), reserva o pedido (compra del cliente que
+    # se paga al volver la conexion o contra entrega).
+    tipo: str = Field(pattern="^(venta|reserva|pedido)$")
     sucursal_id: int
     registrada_en: datetime
     cliente_id: int | None = None
     factura_nombre: str | None = Field(default=None, max_length=150)
     factura_nit: str | None = Field(default=None, max_length=20, pattern=r"^[0-9A-Za-z\-]*$")
     horario_atencion: datetime | None = None
+    entrega: str = Field(default="retiro", pattern="^(retiro|envio)$")
+    direccion_id: int | None = None
+    forma_pago: str | None = Field(default=None, pattern="^(en_linea|contra_entrega)$")
     items: list[ItemOfflineIn] = Field(min_length=1, max_length=30)
 
     @field_validator("items")
@@ -252,3 +267,51 @@ class SeguimientoOfflineOut(BaseModel):
     resumen: ResumenSeguimientoOut
     descargas: list[DescargaOfflineOut]
     usuarios: list[UsuarioOfflineOut]
+
+
+# ================================================= compras sin conexion
+
+
+class ItemPedidoOut(BaseModel):
+    producto_id: int
+    talla_id: int
+    color_id: int
+    producto: str
+    talla: str
+    color: str
+    cantidad: int
+    precio_guardado: Decimal
+    precio_actual: Decimal
+    stock: int
+
+
+class PedidoOfflineOut(BaseModel):
+    """Compra hecha sin conexion, revisada AHORA: precio y stock actuales."""
+
+    id: int
+    uuid: UUID
+    estado: str
+    mensaje: str | None
+    empresa_id: int
+    tienda: str
+    logo_url: str | None
+    color_marca: str | None
+    sucursal_id: int
+    sucursal: str
+    registrada_en: datetime
+    entrega: str
+    direccion: str | None
+    forma_pago: str
+    items: list[ItemPedidoOut]
+    total_guardado: Decimal
+    total_actual: Decimal
+    total_usd: Decimal
+    precio_cambio: bool
+    sin_stock: bool
+    puede_pagar: bool
+    metodos: list[dict]
+    venta_id: int | None = None
+
+    @field_serializer("registrada_en")
+    def _fecha(self, value: datetime) -> str | None:
+        return _iso_utc(value)

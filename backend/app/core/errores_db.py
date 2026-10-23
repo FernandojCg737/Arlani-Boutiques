@@ -73,6 +73,7 @@ MENSAJES: dict[str, tuple[int, str]] = {
     "cambio_no_pendiente": (status.HTTP_409_CONFLICT, "Este cambio ya fue atendido."),
     "cambio_sin_pago_pendiente": (status.HTTP_409_CONFLICT, "Este cambio no tiene una diferencia por pagar."),
     "destino_invalido": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Elige qué hacer con la prenda devuelta."),
+    "contra_entrega_no_pendiente": (status.HTTP_409_CONFLICT, "Esta compra ya no tiene un cobro contra entrega pendiente."),
     # Caja (CU16)
     "caja_cerrada": (
         status.HTTP_409_CONFLICT,

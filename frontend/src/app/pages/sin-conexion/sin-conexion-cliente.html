@@ -4,8 +4,9 @@
     <div>
       <h1>Sin conexión</h1>
       <p>
-        Guarda el catálogo en tu dispositivo para verlo sin internet y reservar prendas. Tus reservas se envían solas a
-        la tienda cuando vuelvas a tener conexión.
+        Guarda el catálogo en tu dispositivo para verlo sin internet, reservar o comprar. Todo se envía solo a la tienda
+        cuando vuelvas a tener conexión; las compras se pagan en ese momento (o al recibirlas, si la tienda acepta
+        contra entrega).
       </p>
     </div>
     <button type="button" class="ventas-nueva-btn" [disabled]="!sync.enLinea() || descargando()" (click)="descargar()">
@@ -17,7 +18,7 @@
     <span class="offline-estado__punto"></span>
     <strong>{{ sync.enLinea() ? 'Con conexión' : 'Sin conexión' }}</strong>
     <span>
-      · {{ sync.pendientes() }} {{ sync.pendientes() === 1 ? 'reserva pendiente' : 'reservas pendientes' }} de enviar
+      · {{ sync.pendientes() }} {{ sync.pendientes() === 1 ? 'operación pendiente' : 'operaciones pendientes' }} de enviar
     </span>
     <button type="button" [disabled]="!sync.enLinea() || sync.sincronizando()" (click)="sync.sincronizar()">
       {{ sync.sincronizando() ? 'Enviando…' : 'Enviar ahora' }}
@@ -104,7 +105,7 @@
                     </label>
                     <button type="button" class="ventas-agregar-btn" [disabled]="cantidad() < 1 || cantidad() > disponible(p, v)"
                             (click)="agregar()">
-                      Agregar a la reserva
+                      Agregar
                     </button>
                   </div>
                 }
@@ -113,7 +114,17 @@
           </div>
 
           <aside class="offline-form__resumen">
-            <h2>Mi reserva</h2>
+            <div class="mostrador-opciones cliente-offline__modo">
+              <button type="button" class="mostrador-opcion" [class.is-activa]="modo() === 'reservar'" (click)="modo.set('reservar')">
+                Reservar
+                <small>pagas al recoger</small>
+              </button>
+              <button type="button" class="mostrador-opcion" [class.is-activa]="modo() === 'comprar'" (click)="modo.set('comprar')">
+                Comprar
+                <small>retiro o envío</small>
+              </button>
+            </div>
+            <h2>{{ modo() === 'reservar' ? 'Mi reserva' : 'Mi compra' }}</h2>
             @if (items().length) {
               <ul class="ventas-detalles ventas-detalles--form">
                 @for (i of items(); track $index) {
@@ -123,17 +134,63 @@
                   </li>
                 }
               </ul>
-              <p class="ventas-seleccion">Total a pagar al recoger: Bs {{ total() | number: '1.2-2' }}</p>
+              <p class="ventas-seleccion">Total: Bs {{ total() | number: '1.2-2' }}</p>
+              @if (modo() === 'comprar') {
+                <p class="offline-sub">Precio conocido al descargar: se confirma al pagar.</p>
+              }
             } @else {
               <p class="offline-sub">Elige prendas del catálogo.</p>
             }
-            <label class="ventas-campo">
-              <span>La recojo hasta</span>
-              <input type="datetime-local" [value]="horario()" (input)="horario.set($any($event.target).value)" />
-            </label>
-            <button type="button" class="ventas-nueva-btn offline-registrar" [disabled]="guardando() || !items().length"
-                    (click)="reservar()">
-              {{ guardando() ? 'Guardando…' : 'Reservar' }}
+            @if (modo() === 'reservar') {
+              <label class="ventas-campo">
+                <span>La recojo hasta</span>
+                <input type="datetime-local" [value]="horario()" (input)="horario.set($any($event.target).value)" />
+              </label>
+            } @else {
+              <span class="mostrador-etiqueta">Entrega</span>
+              <div class="mostrador-opciones">
+                <button type="button" class="mostrador-opcion" [class.is-activa]="entrega() === 'retiro'" (click)="entrega.set('retiro')">
+                  Retiro en sucursal
+                </button>
+                <button type="button" class="mostrador-opcion" [class.is-activa]="entrega() === 'envio'" (click)="entrega.set('envio')">
+                  Envío a domicilio
+                </button>
+              </div>
+              @if (entrega() === 'envio' && direcciones().length) {
+                <label class="ventas-campo">
+                  <span>Dirección</span>
+                  <select [value]="direccionId() ?? ''" (change)="direccionId.set(+$any($event.target).value)">
+                    @for (d of direcciones(); track d.id) {
+                      <option [value]="d.id">{{ d.alias }}: {{ d.direccion }}</option>
+                    }
+                  </select>
+                </label>
+              }
+              <span class="mostrador-etiqueta">¿Cómo pagas?</span>
+              <div class="mostrador-opciones">
+                <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'en_linea'" (click)="formaPago.set('en_linea')">
+                  En línea
+                  <small>al volver internet</small>
+                </button>
+                @if (tienda()?.acepta_contra_entrega) {
+                  <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'contra_entrega'"
+                          (click)="formaPago.set('contra_entrega')">
+                    Contra entrega
+                    <small>{{ entrega() === 'envio' ? 'al recibirla' : 'al recogerla' }}</small>
+                  </button>
+                }
+              </div>
+            }
+            @if (faltaParaComprar().length && items().length) {
+              <ul class="ventas-falta">
+                @for (f of faltaParaComprar(); track f) {
+                  <li>{{ f }}</li>
+                }
+              </ul>
+            }
+            <button type="button" class="ventas-nueva-btn offline-registrar" [disabled]="guardando() || faltaParaComprar().length > 0"
+                    (click)="registrar()">
+              {{ guardando() ? 'Guardando…' : modo() === 'reservar' ? 'Reservar' : 'Comprar · Bs ' + (total() | number: '1.2-2') }}
             </button>
           </aside>
         </div>
@@ -143,12 +200,12 @@
     <p class="offline-vacio">Descarga el catálogo mientras tienes internet para poder usarlo sin conexión.</p>
   }
 
-  <h2 class="offline-titulo">Mis reservas sin conexión</h2>
+  <h2 class="offline-titulo">Mis reservas y compras sin conexión</h2>
   <div class="admin-table-wrap">
     <table class="admin-table">
       <thead>
         <tr>
-          <th>Reserva</th>
+          <th>Operación</th>
           <th>Prendas</th>
           <th>Estado</th>
         </tr>
@@ -157,7 +214,7 @@
         @for (o of misOperaciones(); track o.uuid) {
           <tr>
             <td>
-              <strong>{{ o.empresa_nombre }}</strong>
+              <strong>{{ o.tipo === 'pedido' ? 'Compra' : 'Reserva' }} · {{ o.empresa_nombre }}</strong>
               <small class="offline-sub">{{ o.sucursal_nombre }} · {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }}</small>
             </td>
             <td>
@@ -170,11 +227,14 @@
               @if (o.mensaje) {
                 <small class="offline-sub offline-mensaje">{{ o.mensaje }}</small>
               }
+              @if (o.tipo === 'pedido' && (o.estado === 'por_pagar' || o.estado === 'sin_stock')) {
+                <a class="offline-link" routerLink="/pagar-compras">{{ o.estado === 'por_pagar' ? 'Pagar ahora' : 'Ver' }}</a>
+              }
             </td>
           </tr>
         } @empty {
           <tr>
-            <td colspan="3" class="admin-table__empty">Todavía no hiciste reservas sin conexión.</td>
+            <td colspan="3" class="admin-table__empty">Todavía no hiciste reservas ni compras sin conexión.</td>
           </tr>
         }
       </tbody>

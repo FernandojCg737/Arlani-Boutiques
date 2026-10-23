@@ -159,24 +159,28 @@
 
   &--pendiente,
   &--enviando,
-  &--error {
+  &--error,
+  &--por_pagar {
     background: #fff4e0;
     color: #b26a00;
   }
 
   &--confirmada,
-  &--resuelta {
+  &--resuelta,
+  &--pagada {
     background: #e8f5e9;
     color: #2e7d32;
   }
 
-  &--conflicto {
+  &--conflicto,
+  &--sin_stock {
     background: #fdecea;
     color: #b3261e;
   }
 
   &--rechazada,
-  &--anulada {
+  &--anulada,
+  &--cancelada {
     background: #eee;
     color: #666;
   }

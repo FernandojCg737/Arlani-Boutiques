@@ -74,6 +74,12 @@
                 }
                 <p class="mp-nota">Con comprobante: lo apruebas en Gestión de Ventas.</p>
               }
+              @case ('contra_entrega') {
+                <p class="mp-nota">
+                  Solo en compras hechas sin conexión: el cliente paga al recibir o recoger y lo marcas cobrado en
+                  Gestión de Ventas.
+                </p>
+              }
               @default {
                 <dl>
                   @if (m.banco) {
@@ -214,6 +220,12 @@
                 <input type="text" [value]="f().titular" (input)="setF('titular', $any($event.target).value)" />
               </label>
             </div>
+          }
+          @case ('contra_entrega') {
+            <p class="mp-nota">
+              Los clientes lo podrán elegir al comprar sin conexión. Pagan en efectivo al recibir el envío o al recoger
+              en la sucursal; cuando cobres, márcalo en Gestión de Ventas.
+            </p>
           }
           @default {
             <div class="modal-field-row">

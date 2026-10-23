@@ -16,6 +16,7 @@ import { AdminCambios } from './pages/admin/cambios/cambios';
 import { AdminConflictos } from './pages/admin/conflictos/conflictos';
 import { AdminSinConexion } from './pages/admin/sin-conexion/sin-conexion';
 import { SinConexionCliente } from './pages/sin-conexion/sin-conexion-cliente';
+import { PagarCompras } from './pages/pagar-compras/pagar-compras';
 import { SeguimientoOffline } from './pages/superadmin/seguimiento-offline/seguimiento-offline';
 import { ComprobanteCambio } from './pages/comprobante-cambio/comprobante-cambio';
 import { AdminNotificaciones } from './pages/admin/notificaciones/notificaciones';
@@ -111,6 +112,13 @@ export const routes: Routes = [
   {
     path: 'sin-conexion',
     component: SinConexionCliente,
+    canActivate: [authGuard],
+    data: { header: 'plataforma', encabezadoSolido: true },
+  },
+  // Compras hechas sin conexión: se revisan precio y stock y se pagan.
+  {
+    path: 'pagar-compras',
+    component: PagarCompras,
     canActivate: [authGuard],
     data: { header: 'plataforma', encabezadoSolido: true },
   },

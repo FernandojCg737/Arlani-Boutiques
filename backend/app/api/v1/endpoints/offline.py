@@ -19,7 +19,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
@@ -32,15 +32,29 @@ from app.api.deps import (
     sucursal_restringida,
     verificar_acceso_sucursal,
 )
+from app.api.v1.endpoints.metodos_pago import _publico
 from app.api.v1.endpoints.reservas import _mover_stock_reserva
+from app.api.v1.endpoints.ventas import (
+    _a_usd,
+    _error_sp,
+    _guardar_captura,
+    _guardar_envio,
+    _monto_coincide,
+    _paypal_de_tienda,
+)
 from app.core.audit import client_ip, client_platform, log_bitacora
 from app.core.errores_db import http_desde_pg
+from app.core.paypal import captura_de, capturar_orden, crear_orden, obtener_orden, reembolsar_captura
+from app.core.storage import upload_comprobante_pago
 from app.db.session import get_db
-from app.models import Bitacora, DetalleReserva, Notificacion, Reserva, Usuario
+from app.models import Bitacora, DetalleReserva, MetodoPagoEmpresa, Notificacion, Reserva, Usuario
 from app.services.usuarios import codigos_permiso
 from app.schemas.offline import (
     CatalogoClienteOfflineOut,
     ClienteOfflineOut,
+    DireccionOfflineOut,
+    ItemPedidoOut,
+    PedidoOfflineOut,
     DescargaOfflineOut,
     EstadoOperacionesIn,
     ItemConflictoOut,
@@ -220,10 +234,17 @@ def catalogo_cliente(
             TiendaOfflineOut(
                 empresa_id=t["id"], nombre=t["nombre"], logo_url=t["logo_url"],
                 sucursales=[SucursalOfflineOut(**s) for s in sucursales], productos=_productos_de(filas),
+                acepta_contra_entrega=_metodo_contra_entrega(db, t["id"]) is not None,
             )
         )
+    direcciones = db.execute(
+        text("SELECT id, alias, direccion FROM direccion_cliente WHERE cliente_id = :c ORDER BY predeterminada DESC, id"),
+        {"c": usuario.id},
+    ).mappings().all()
     db.commit()
-    return CatalogoClienteOfflineOut(descargado_en=_ahora(), tiendas=salida)
+    return CatalogoClienteOfflineOut(
+        descargado_en=_ahora(), tiendas=salida, direcciones=[DireccionOfflineOut(**d) for d in direcciones]
+    )
 
 
 # ================================================================== CU12
@@ -267,6 +288,33 @@ def _aviso_precios(db: Session, items: list[ItemOfflineIn]) -> str | None:
             distintos += 1
     if distintos:
         return f"{distintos} prenda(s) cambiaron de precio mientras no había conexión: se respetó el precio cobrado."
+    return None
+
+
+def _metodo_contra_entrega(db: Session, empresa_id: int) -> MetodoPagoEmpresa | None:
+    return (
+        db.query(MetodoPagoEmpresa)
+        .filter(
+            MetodoPagoEmpresa.empresa_id == empresa_id,
+            MetodoPagoEmpresa.tipo == "contra_entrega",
+            MetodoPagoEmpresa.activo.is_(True),
+        )
+        .first()
+    )
+
+
+def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empresa_id: int) -> str | None:
+    if op.forma_pago is None:
+        return "Elige cómo vas a pagar la compra."
+    if op.entrega == "envio" and (
+        op.direccion_id is None
+        or not db.execute(
+            text("SELECT 1 FROM direccion_cliente WHERE id = :d AND cliente_id = :c"), {"d": op.direccion_id, "c": cliente_id}
+        ).first()
+    ):
+        return "Elige una de tus direcciones para el envío."
+    if op.forma_pago == "contra_entrega" and _metodo_contra_entrega(db, empresa_id) is None:
+        return "Esta tienda no acepta pago contra entrega."
     return None
 
 
@@ -349,8 +397,12 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
         estado, mensaje = "rechazada", SIN_PLAN
     elif personal and sucursal_restringida(usuario) not in (None, op.sucursal_id):
         estado, mensaje = "rechazada", "Solo puedes registrar operaciones de tu propia sucursal."
-    elif not personal and op.tipo != "reserva":
-        estado, mensaje = "rechazada", "Sin conexión el cliente solo puede reservar."
+    elif not personal and op.tipo == "venta":
+        estado, mensaje = "rechazada", "Sin conexión el cliente puede reservar o comprar, no registrar ventas."
+    elif personal and op.tipo == "pedido":
+        estado, mensaje = "rechazada", "Las compras sin conexión son de los clientes; registra una venta de contado."
+    elif op.tipo == "pedido" and (motivo := _pedido_invalido(db, op, usuario.id, sucursal["empresa_id"])):
+        estado, mensaje = "rechazada", motivo
     elif op.tipo == "reserva" and (
         cliente_reserva is None
         or db.execute(text("SELECT 1 FROM cliente WHERE id = :c"), {"c": cliente_reserva}).scalar() is None
@@ -359,9 +411,18 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
     else:
         faltan = _faltantes(db, op.sucursal_id, op.items)
         if faltan:
-            estado, conflicto = "conflicto", faltan
+            estado, conflicto = ("sin_stock" if op.tipo == "pedido" else "conflicto"), faltan
             mensaje = "Al sincronizar ya no había stock suficiente: " + "; ".join(
                 f"{f['producto']} ({f['talla']}, {f['color']}) pidió {f['pedido']}, hay {f['disponible']}" for f in faltan
+            )
+            if op.tipo == "pedido":
+                mensaje += ". No se puede comprar."
+        elif op.tipo == "pedido":
+            # No se cobra nada todavia: la app le pide pagarla con prioridad.
+            estado = "por_pagar"
+            mensaje = (
+                "Cambió el precio de alguna prenda: verás el precio nuevo al pagar."
+                if _aviso_precios(db, op.items) else "Lista para pagar."
             )
         elif op.tipo == "venta":
             venta_id = _registrar_venta(db, op, usuario, fecha)
@@ -755,3 +816,287 @@ def seguimiento(
         descargas=[DescargaOfflineOut(**d) for d in descargas],
         usuarios=[UsuarioOfflineOut(**u) for u in usuarios],
     )
+
+
+# ================================================= compras sin conexion
+# El cliente armo su compra sin internet. Al volver la conexion la app se la
+# muestra con prioridad, revisada contra el precio y el stock de AHORA: si
+# falta stock no se puede comprar; si cambio el precio, se le muestra y paga
+# el actual. Al pagar se registra la venta (origen 'offline').
+
+PEDIDO_ABIERTO = ("por_pagar", "sin_stock")
+
+
+def _cliente_pedido(db: Session, usuario: Usuario, uuid: str):
+    if usuario.tipo != "cliente":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo el cliente paga sus compras sin conexión.")
+    fila = db.execute(
+        text(
+            """SELECT o.*, s.nombre AS sucursal_nombre, e.id AS e_id, e.nombre AS e_nombre, e.logo_url, e.color_marca
+               FROM operacion_offline o JOIN sucursal s ON s.id = o.sucursal_id JOIN empresa e ON e.id = o.empresa_id
+               WHERE o.uuid = CAST(:u AS UUID) AND o.usuario_id = :c AND o.tipo = 'pedido'"""
+        ),
+        {"u": uuid, "c": usuario.id},
+    ).mappings().first()
+    if fila is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Compra no encontrada.")
+    return fila
+
+
+def _revisar(db: Session, fila) -> PedidoOfflineOut:
+    """Precio y stock de AHORA para cada prenda de la compra."""
+    datos = OperacionOfflineIn.model_validate(fila["datos"])
+    items, total_guardado, total_actual = [], Decimal(0), Decimal(0)
+    for it in datos.items:
+        f = db.execute(
+            text(
+                """SELECT p.nombre, p.precio, t.codigo, c.nombre AS color,
+                          coalesce((SELECT i.cantidad FROM inventario i WHERE i.producto_id = p.id AND i.talla_id = t.id
+                                      AND i.color_id = c.id AND i.sucursal_id = :s), 0) AS stock
+                   FROM producto p, talla t, color c WHERE p.id = :p AND t.id = :t AND c.id = :c"""
+            ),
+            {"s": datos.sucursal_id, "p": it.producto_id, "t": it.talla_id, "c": it.color_id},
+        ).mappings().first()
+        actual = Decimal(f["precio"]) if f else Decimal(0)
+        guardado = it.precio if it.precio is not None else actual
+        total_guardado += guardado * it.cantidad
+        total_actual += actual * it.cantidad
+        items.append(
+            ItemPedidoOut(
+                producto_id=it.producto_id, talla_id=it.talla_id, color_id=it.color_id,
+                producto=f["nombre"] if f else "Prenda que ya no existe", talla=f["codigo"] if f else "-",
+                color=f["color"] if f else "-", cantidad=it.cantidad, precio_guardado=guardado,
+                precio_actual=actual, stock=f["stock"] if f else 0,
+            )
+        )
+    sin_stock = any(i.stock < i.cantidad for i in items)
+    estado = fila["estado"]
+    if estado in PEDIDO_ABIERTO:
+        nuevo = "sin_stock" if sin_stock else "por_pagar"
+        if nuevo != estado:
+            mensaje = (
+                "Ya no hay stock suficiente: no se puede comprar." if sin_stock else "Volvió a haber stock: lista para pagar."
+            )
+            db.execute(
+                text("UPDATE operacion_offline SET estado = :e, mensaje = :m, actualizada_en = now() WHERE id = :i"),
+                {"e": nuevo, "m": mensaje, "i": fila["id"]},
+            )
+            db.commit()
+            estado = nuevo
+    if datos.forma_pago == "contra_entrega":
+        metodo = _metodo_contra_entrega(db, fila["empresa_id"])
+        metodos = [_publico(metodo)] if metodo else []
+    else:
+        metodos = [
+            _publico(m)
+            for m in db.query(MetodoPagoEmpresa)
+            .filter(
+                MetodoPagoEmpresa.empresa_id == fila["empresa_id"],
+                MetodoPagoEmpresa.activo.is_(True),
+                MetodoPagoEmpresa.tipo != "contra_entrega",
+            )
+            .order_by(MetodoPagoEmpresa.orden, MetodoPagoEmpresa.id)
+        ]
+    direccion = None
+    if datos.entrega == "envio" and datos.direccion_id:
+        direccion = db.execute(
+            text("SELECT alias || ': ' || direccion FROM direccion_cliente WHERE id = :d"), {"d": datos.direccion_id}
+        ).scalar()
+    total_usd, _ = _a_usd(db, total_actual.quantize(Decimal("0.01")))
+    return PedidoOfflineOut(
+        id=fila["id"], uuid=fila["uuid"], estado=estado, mensaje=fila["mensaje"], empresa_id=fila["e_id"],
+        tienda=fila["e_nombre"], logo_url=fila["logo_url"], color_marca=fila["color_marca"],
+        sucursal_id=datos.sucursal_id, sucursal=fila["sucursal_nombre"], registrada_en=fila["registrada_en"],
+        entrega=datos.entrega, direccion=direccion, forma_pago=datos.forma_pago or "en_linea", items=items,
+        total_guardado=total_guardado.quantize(Decimal("0.01")), total_actual=total_actual.quantize(Decimal("0.01")),
+        total_usd=total_usd, precio_cambio=any(i.precio_guardado != i.precio_actual for i in items),
+        sin_stock=sin_stock, puede_pagar=estado == "por_pagar" and not sin_stock and bool(metodos), metodos=metodos,
+        venta_id=fila["venta_id"],
+    )
+
+
+@router.get("/pedidos", response_model=list[PedidoOfflineOut])
+def pedidos_por_pagar(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> list[PedidoOfflineOut]:
+    """Compras sin conexion del cliente que esperan su pago (las que hizo en
+    la web o en la app movil), revisadas contra el precio y stock de ahora."""
+    if usuario.tipo != "cliente":
+        return []
+    filas = db.execute(
+        text(
+            """SELECT o.*, s.nombre AS sucursal_nombre, e.id AS e_id, e.nombre AS e_nombre, e.logo_url, e.color_marca
+               FROM operacion_offline o JOIN sucursal s ON s.id = o.sucursal_id JOIN empresa e ON e.id = o.empresa_id
+               WHERE o.usuario_id = :c AND o.tipo = 'pedido' AND o.estado IN ('por_pagar', 'sin_stock')
+               ORDER BY o.registrada_en"""
+        ),
+        {"c": usuario.id},
+    ).mappings().all()
+    return [_revisar(db, f) for f in filas]
+
+
+def _pagable(db: Session, usuario: Usuario, uuid: str) -> tuple[dict, PedidoOfflineOut, OperacionOfflineIn]:
+    fila = _cliente_pedido(db, usuario, uuid)
+    revisado = _revisar(db, fila)
+    if revisado.estado not in PEDIDO_ABIERTO:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta compra ya fue pagada o cancelada.")
+    if revisado.sin_stock:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ya no hay stock suficiente de alguna prenda: no se puede comprar.")
+    return fila, revisado, OperacionOfflineIn.model_validate(fila["datos"])
+
+
+def _items_actuales(datos: OperacionOfflineIn) -> str:
+    # El precio lo pone el procedimiento con el de ahora (el que ve el cliente).
+    return json.dumps(
+        [{"producto_id": i.producto_id, "talla_id": i.talla_id, "color_id": i.color_id, "cantidad": i.cantidad} for i in datos.items]
+    )
+
+
+def _marcar_pagada(db: Session, fila, venta_id: int, datos: OperacionOfflineIn, mensaje: str) -> None:
+    db.execute(
+        text("UPDATE venta SET origen = 'offline', sincronizado_en = now() WHERE id = :v"), {"v": venta_id}
+    )
+    if datos.entrega == "envio" and datos.direccion_id:
+        _guardar_envio(db, [venta_id], fila["usuario_id"], datos.direccion_id)
+    db.execute(
+        text(
+            """UPDATE operacion_offline SET estado = 'pagada', venta_id = :v, mensaje = :m, actualizada_en = now()
+               WHERE id = :i"""
+        ),
+        {"v": venta_id, "m": mensaje, "i": fila["id"]},
+    )
+
+
+@router.post("/pedidos/{uuid}/paypal/orden")
+def pedido_paypal_orden(
+    uuid: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> dict:
+    fila, revisado, _ = _pagable(db, usuario, uuid)
+    _, cuenta = _paypal_de_tienda(db, fila["empresa_id"])
+    base = str(request.base_url).rstrip("/")
+    orden = crear_orden(
+        revisado.total_usd, referencia=f"pedido-offline-{fila['id']}",
+        return_url=f"{base}/paypal-embed/retorno", cancel_url=f"{base}/paypal-embed/cancelado", cuenta=cuenta,
+    )
+    return {"order_id": orden["id"], "total": revisado.total_usd}
+
+
+@router.post("/pedidos/{uuid}/paypal/capturar/{order_id}", response_model=PedidoOfflineOut)
+def pedido_paypal_capturar(
+    uuid: str,
+    order_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> PedidoOfflineOut:
+    fila, revisado, datos = _pagable(db, usuario, uuid)
+    metodo, cuenta = _paypal_de_tienda(db, fila["empresa_id"])
+    unidad = (obtener_orden(order_id, cuenta).get("purchase_units") or [{}])[0]
+    if unidad.get("reference_id") != f"pedido-offline-{fila['id']}" or not _monto_coincide(unidad.get("amount"), revisado.total_usd):
+        raise HTTPException(status.HTTP_409_CONFLICT, "El precio cambió desde que iniciaste el pago. Vuelve a intentarlo.")
+    try:
+        venta_id = db.execute(
+            text("SELECT sp_crear_venta_tienda(:c, :s, NULL, CAST(:items AS JSONB), CAST(:d AS INTEGER[]), :m, :r, NULL)"),
+            {"c": usuario.id, "s": datos.sucursal_id, "items": _items_actuales(datos), "d": [], "m": metodo.id, "r": order_id},
+        ).scalar_one()
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
+    resultado = capturar_orden(order_id, cuenta)
+    captura = captura_de(resultado)
+    if resultado.get("status") != "COMPLETED" or captura is None:
+        db.rollback()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayPal no confirmó el pago.")
+    try:
+        _guardar_captura(db, [venta_id], captura["id"])
+        _marcar_pagada(db, fila, venta_id, datos, f"Pagada con PayPal · Venta #{venta_id}")
+        log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Compra sin conexión pagada con PayPal (orden {order_id})", request)
+    except Exception:
+        db.rollback()
+        reembolsar_captura(captura["id"], cuenta)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo registrar tu compra. El cobro fue revertido.")
+    return _revisar(db, _cliente_pedido(db, usuario, uuid))
+
+
+@router.post("/pedidos/{uuid}/comprobante", response_model=PedidoOfflineOut)
+async def pedido_comprobante(
+    uuid: str,
+    request: Request,
+    metodo_pago_id: int = Form(...),
+    file: UploadFile = None,  # type: ignore[assignment]
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> PedidoOfflineOut:
+    """QR, transferencia u otro: sube el comprobante; la tienda lo aprueba."""
+    fila, _, datos = _pagable(db, usuario, uuid)
+    metodo = db.query(MetodoPagoEmpresa).filter(
+        MetodoPagoEmpresa.id == metodo_pago_id, MetodoPagoEmpresa.empresa_id == fila["empresa_id"],
+        MetodoPagoEmpresa.activo.is_(True),
+    ).first()
+    if metodo is None or metodo.tipo in ("paypal", "contra_entrega") or datos.forma_pago == "contra_entrega":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ese método de pago no está disponible para esta compra.")
+    if file is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Sube la foto de tu comprobante de pago.")
+    comprobante_url = upload_comprobante_pago(usuario.id, await file.read(), file.content_type or "")
+    try:
+        venta_id = db.execute(
+            text("SELECT sp_crear_venta_tienda(:c, :s, NULL, CAST(:items AS JSONB), CAST(:d AS INTEGER[]), :m, NULL, :u)"),
+            {"c": usuario.id, "s": datos.sucursal_id, "items": _items_actuales(datos), "d": [], "m": metodo.id, "u": comprobante_url},
+        ).scalar_one()
+        _marcar_pagada(db, fila, venta_id, datos, f"Comprobante enviado ({metodo.nombre}): la tienda lo revisa · Venta #{venta_id}")
+        log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Compra sin conexión con comprobante ({metodo.nombre})", request)
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
+    return _revisar(db, _cliente_pedido(db, usuario, uuid))
+
+
+@router.post("/pedidos/{uuid}/contra-entrega", response_model=PedidoOfflineOut)
+def pedido_contra_entrega(
+    uuid: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> PedidoOfflineOut:
+    """Confirma la compra: se registra la venta, se aparta el stock y paga al
+    recibirla o recogerla."""
+    fila, _, datos = _pagable(db, usuario, uuid)
+    if datos.forma_pago != "contra_entrega":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta compra se paga en línea: elige un método de pago.")
+    metodo = _metodo_contra_entrega(db, fila["empresa_id"])
+    if metodo is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta tienda ya no acepta pago contra entrega: cancélala y vuelve a comprar.")
+    try:
+        venta_id = db.execute(
+            text("SELECT sp_crear_venta_contra_entrega(:c, :s, CAST(:items AS JSONB), :m)"),
+            {"c": usuario.id, "s": datos.sucursal_id, "items": _items_actuales(datos), "m": metodo.id},
+        ).scalar_one()
+        momento = "al recibirla" if datos.entrega == "envio" else "al recogerla"
+        _marcar_pagada(db, fila, venta_id, datos, f"Confirmada: pagas {momento} · Venta #{venta_id}")
+        log_bitacora(db, usuario, "CREAR", "venta", venta_id, "Compra sin conexión confirmada contra entrega", request)
+    except DBAPIError as exc:
+        db.rollback()
+        raise _error_sp(exc)
+    return _revisar(db, _cliente_pedido(db, usuario, uuid))
+
+
+@router.post("/pedidos/{uuid}/cancelar", response_model=PedidoOfflineOut)
+def pedido_cancelar(
+    uuid: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> PedidoOfflineOut:
+    fila = _cliente_pedido(db, usuario, uuid)
+    if fila["estado"] not in PEDIDO_ABIERTO:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esta compra ya fue pagada o cancelada.")
+    db.execute(
+        text("UPDATE operacion_offline SET estado = 'cancelada', mensaje = :m, actualizada_en = now() WHERE id = :i"),
+        {"m": "La cancelaste.", "i": fila["id"]},
+    )
+    log_bitacora(db, usuario, "ACTUALIZAR", "operacion_offline", fila["id"], "Compra sin conexión cancelada por el cliente", request)
+    return _revisar(db, _cliente_pedido(db, usuario, uuid))

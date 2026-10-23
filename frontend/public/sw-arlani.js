@@ -49,6 +49,9 @@ function contrato(o) {
     factura_nombre: o.factura_nombre,
     factura_nit: o.factura_nit,
     horario_atencion: o.horario_atencion,
+    entrega: o.entrega || 'retiro',
+    direccion_id: o.direccion_id ?? null,
+    forma_pago: o.forma_pago ?? null,
     items: o.items.map((i) => ({
       producto_id: i.producto_id,
       talla_id: i.talla_id,

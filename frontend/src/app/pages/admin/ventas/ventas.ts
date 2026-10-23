@@ -485,6 +485,30 @@ export class AdminVentas implements OnInit {
     }
   }
 
+  // Compra sin conexión pagada contra entrega: cobrada al entregar, o anulada
+  // (no se entregó) y el stock vuelve.
+  protected async contraEntrega(venta: VentaItem, accion: 'cobrar' | 'anular'): Promise<void> {
+    let motivo: string | null = null;
+    if (accion === 'cobrar') {
+      if (!confirm(`¿Confirmas que cobraste Bs ${venta.total} de la venta #${venta.id} al entregarla?`)) return;
+    } else {
+      motivo = prompt('¿Por qué se anula? (el stock vuelve a la sucursal)', 'No se pudo entregar.');
+      if (motivo === null) return;
+    }
+    this.procesando.set(venta.id);
+    this.error.set('');
+    try {
+      await firstValueFrom(
+        this.http.post(`${environment.apiUrl}/ventas/${venta.id}/contra-entrega/${accion}`, motivo ? { motivo } : {}),
+      );
+      await this.load();
+    } catch (err) {
+      this.error.set(this.extraerError(err));
+    } finally {
+      this.procesando.set(null);
+    }
+  }
+
   protected readonly rechazando = signal<VentaItem | null>(null);
   protected readonly motivoRechazo = signal('');
   protected readonly errorRechazo = signal('');

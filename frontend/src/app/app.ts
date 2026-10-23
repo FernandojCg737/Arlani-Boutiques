@@ -3,6 +3,7 @@ import { ViewportScroller } from '@angular/common';
 import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { AvisoCompras } from './components/aviso-compras/aviso-compras';
 import { ChatbotWidget } from './components/chatbot-widget/chatbot-widget';
 import { Footer } from './components/footer/footer';
 import { FooterPlataforma } from './components/footer-plataforma/footer-plataforma';
@@ -16,7 +17,17 @@ import { Sincronizacion } from './services/offline/sincronizacion';
 import { TiendaActiva } from './services/tienda-activa';
 
 @Component({
-  imports: [RouterOutlet, Header, HeaderPlataforma, Footer, FooterPlataforma, WhatsappFloat, ChatbotWidget, LoginRequeridoModal],
+  imports: [
+    RouterOutlet,
+    Header,
+    HeaderPlataforma,
+    Footer,
+    FooterPlataforma,
+    WhatsappFloat,
+    ChatbotWidget,
+    LoginRequeridoModal,
+    AvisoCompras,
+  ],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',
