@@ -212,8 +212,8 @@
               @for (p of productos(); track p.producto_id) {
                 <button type="button" class="mostrador-prenda" [class.is-activa]="productoSel()?.producto_id === p.producto_id"
                         [disabled]="stockTotal(p) < 1" (click)="elegirProducto(p)">
-                  @if (p.imagen_url && sync.enLinea()) {
-                    <img [src]="p.imagen_url" [alt]="p.nombre" />
+                  @if (imagenes.src(p.imagen_url, sync.enLinea()); as foto) {
+                    <img [src]="foto" [alt]="p.nombre" />
                   } @else {
                     <span class="mostrador-prenda__sin-foto">{{ p.nombre.charAt(0) }}</span>
                   }

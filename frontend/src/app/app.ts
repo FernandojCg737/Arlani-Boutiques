@@ -11,6 +11,7 @@ import { Header } from './components/header/header';
 import { HeaderPlataforma } from './components/header-plataforma/header-plataforma';
 import { LoginRequeridoModal } from './components/login-requerido/login-requerido';
 import { WhatsappFloat } from './components/whatsapp-float/whatsapp-float';
+import { ActualizacionApp } from './services/actualizacion-app';
 import { Auth } from './services/auth';
 import { InactivitySession } from './services/inactivity-session';
 import { Sincronizacion } from './services/offline/sincronizacion';
@@ -44,6 +45,8 @@ export class App implements OnInit {
   private readonly inactivitySession = inject(InactivitySession);
   // P4 offline: manda sola las operaciones guardadas sin conexion (CU12).
   private readonly sincronizacion = inject(Sincronizacion);
+  // PWA: aplica la versión nueva después de cada despliegue.
+  private readonly actualizacion = inject(ActualizacionApp);
 
   // Paginas de auth (login/registro) usan su propia pantalla completa, sin
   // el header/footer del sitio: se marcan con data: { hideChrome: true }.

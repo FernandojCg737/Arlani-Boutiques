@@ -11,6 +11,7 @@ import {
   ProductoLocal,
   VarianteLocal,
 } from '../../../services/offline/offline-db';
+import { ImagenesOffline } from '../../../services/offline/imagenes-offline';
 import { Sincronizacion } from '../../../services/offline/sincronizacion';
 import { mensajeError } from '../../../services/plataforma';
 
@@ -48,6 +49,7 @@ export class AdminSinConexion implements OnInit {
   private readonly auth = inject(Auth);
   private readonly db = inject(OfflineDb);
   protected readonly sync = inject(Sincronizacion);
+  protected readonly imagenes = inject(ImagenesOffline);
 
   protected readonly estadoLabel = ESTADO_OPERACION;
   protected readonly vista = signal<Vista>('catalogo');
@@ -155,7 +157,9 @@ export class AdminSinConexion implements OnInit {
     this.productoSel.set(null);
     this.varianteSel.set(null);
     const guardado = await this.db.paquete(this.clave(id));
-    this.paquete.set((guardado?.datos as PaquetePersonal) ?? null);
+    const paquete = (guardado?.datos as PaquetePersonal) ?? null;
+    this.paquete.set(paquete);
+    if (paquete) void this.imagenes.cargar(paquete.productos.map((p) => p.imagen_url));
   }
 
   // CU11: descarga (o actualiza) los datos de la sucursal en el dispositivo.
@@ -170,7 +174,13 @@ export class AdminSinConexion implements OnInit {
       );
       await this.db.guardarPaquete({ clave: this.clave(id), usuario_id: this.usuarioId, descargado_en: datos.descargado_en, datos });
       this.paquete.set(datos);
-      this.aviso.set(`Listo: ${datos.productos.length} prendas y ${datos.clientes.length} clientes guardados en este dispositivo.`);
+      // Las fotos también quedan en el dispositivo, para verlas sin conexión.
+      const urls = datos.productos.map((p) => p.imagen_url);
+      const fotos = await this.imagenes.descargar(urls);
+      await this.imagenes.cargar(urls);
+      this.aviso.set(
+        `Listo: ${datos.productos.length} prendas (${fotos} fotos) y ${datos.clientes.length} clientes guardados en este dispositivo.`,
+      );
     } catch (err) {
       this.error.set(mensajeError(err, 'No se pudo descargar: necesitas conexión.'));
     } finally {

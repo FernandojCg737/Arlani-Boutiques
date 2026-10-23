@@ -250,7 +250,7 @@ export class Sincronizacion {
 
   private motivo(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      if (err.status === 0) return 'Sin conexión con el servidor: se reintentará.';
+      if (err.status === 0 || err.status === 504) return 'Sin conexión con el servidor: se reintentará.';
       if (err.status === 401) return 'Tu sesión venció: inicia sesión para terminar de sincronizar (tus operaciones siguen guardadas).';
       const detalle = (err.error as { detail?: unknown } | null)?.detail;
       if (typeof detalle === 'string') return detalle;
