@@ -43,6 +43,8 @@ interface Venta {
   estado_pago: string;
   atendido_por_nombre: string | null;
   tienda: TiendaFactura | null;
+  factura_nombre: string | null;
+  factura_nit: string | null;
   detalles: DetalleVenta[];
 }
 

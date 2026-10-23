@@ -51,6 +51,9 @@
       </header>
 
       <div class="comprobante__info">
+        @if (v.factura_nit || v.factura_nombre) {
+          <span>Factura a: {{ v.factura_nombre || 'tu nombre' }} · NIT / CI {{ v.factura_nit || 'S/N' }}</span>
+        }
         <span>Sucursal: {{ v.sucursal_nombre }}</span>
         <span>Tipo: {{ v.tipo === 'venta_digital' ? 'Compra en linea' : 'Compra en tienda' }}</span>
         @if (v.atendido_por_nombre) {

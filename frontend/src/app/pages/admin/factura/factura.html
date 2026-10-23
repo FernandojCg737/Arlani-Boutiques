@@ -50,8 +50,11 @@
       <div class="factura__info">
         <div>
           <span class="factura__info-label">Cliente</span>
-          <strong>{{ v.cliente_nombre }}</strong>
-          <span>{{ v.cliente_email }}</span>
+          <strong>{{ v.factura_nombre || v.cliente_nombre }}</strong>
+          <span>NIT / CI: {{ v.factura_nit || 'S/N' }}</span>
+          @if (v.cliente_email !== 'Cliente sin cuenta') {
+            <span>{{ v.cliente_email }}</span>
+          }
         </div>
         <div>
           <span class="factura__info-label">Detalle de la venta</span>

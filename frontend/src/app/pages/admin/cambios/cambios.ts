@@ -68,6 +68,9 @@ export const DESTINO_PRENDA: Record<string, string> = {
   imports: [DatePipe, DecimalPipe, RouterLink],
   templateUrl: './cambios.html',
   styleUrls: ['../ventas/ventas.scss', './cambios.scss'],
+  // Como pantalla propia (CU15 del SuperAdministrador) va centrada, igual
+  // que las demas del panel; dentro de Gestion de Ventas ocupa la pestana.
+  host: { '[class.cambios-pagina]': 'pagina' },
 })
 export class AdminCambios implements OnInit {
   private readonly http = inject(HttpClient);

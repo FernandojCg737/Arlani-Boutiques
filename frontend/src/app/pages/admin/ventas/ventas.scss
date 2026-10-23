@@ -312,6 +312,266 @@
   }
 }
 
+// ---- Venta presencial: catalogo de la sucursal y cobro ----
+.ventas-falta {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: right;
+
+  li {
+    font-size: 12px;
+    color: #b26a00;
+  }
+}
+
+.ventas-campo input.ventas-campo--pendiente {
+  border-color: #e0a64a;
+  background: #fffaf0;
+}
+
+.ventas-modal.ventas-modal--mostrador {
+  max-width: 680px;
+}
+
+.mostrador-catalogo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+  max-height: 290px;
+  margin: -4px 0 14px;
+  padding: 2px;
+  overflow-y: auto;
+}
+
+.mostrador-prenda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #e5e2df;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  img,
+  .mostrador-prenda__sin-foto {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: #f5f3f1;
+  }
+
+  .mostrador-prenda__sin-foto {
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    font-weight: 800;
+    color: #bbb;
+  }
+
+  strong {
+    font-size: 12px;
+    line-height: 1.25;
+    color: var(--brand-dark);
+  }
+
+  small {
+    font-size: 12px;
+    color: #777;
+  }
+
+  &.is-activa {
+    border-color: var(--brand-dark);
+    box-shadow: inset 0 0 0 1px var(--brand-dark);
+  }
+}
+
+.mostrador-elegir {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: #f7f7f5;
+}
+
+.mostrador-elegir__titulo {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--brand-dark);
+}
+
+.mostrador-etiqueta {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #999;
+}
+
+.mostrador-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mostrador-opcion {
+  display: flex;
+  flex-direction: column;
+  min-width: 52px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-dark);
+  cursor: pointer;
+
+  small {
+    font-size: 11px;
+    font-weight: 500;
+    color: #999;
+  }
+
+  &.is-activa {
+    border-color: var(--brand-dark);
+    background: var(--brand-dark);
+    color: #fff;
+
+    small {
+      color: rgb(255 255 255 / 75%);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.mostrador-cobro .mostrador-opcion {
+  flex: 1;
+  min-width: 160px;
+  text-align: left;
+}
+
+.mostrador-agregar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+
+  input {
+    width: 90px;
+    border: 1px solid #ddd;
+    padding: 8px;
+    font: inherit;
+  }
+
+  .ventas-agregar-btn {
+    margin: 0;
+  }
+}
+
+.mostrador-qr-cobro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 18px;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #e5e2df;
+  background: #fff;
+
+  > .mostrador-opciones {
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  img {
+    width: 190px;
+    height: 190px;
+    object-fit: contain;
+    border: 1px solid #eee;
+    background: #fff;
+  }
+}
+
+.mostrador-qr-cobro__datos {
+  display: flex;
+  flex: 1;
+  min-width: 180px;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+
+  strong {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--brand-dark);
+  }
+
+  small {
+    font-size: 12px;
+    color: #888;
+    font-style: italic;
+  }
+}
+
+.mostrador-qr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 6px;
+
+  small {
+    font-size: 12px;
+    color: #888;
+  }
+}
+
+.mostrador-foto {
+  position: relative;
+  padding: 9px 14px;
+  border: 1px solid var(--brand-dark);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-dark);
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.mostrador-qr__vista {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #ddd;
+}
+
+.mostrador-qr__quitar {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: #b3261e;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .ventas-overlay {
   position: fixed;
   inset: 0;
@@ -772,5 +1032,15 @@
     color: #664d03;
     white-space: pre-wrap;
   }
+}
+
+
+// Tienda cuyo plan no incluye la operacion sin conexion (ONLINE / OFFLINE).
+.sin-offline {
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  background: #f4f4f2;
+  font-size: 13px;
+  color: #666;
 }
 

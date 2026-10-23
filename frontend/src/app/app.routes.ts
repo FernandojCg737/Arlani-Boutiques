@@ -195,8 +195,9 @@ export const routes: Routes = [
       { path: 'catalogo', component: AdminCatalogo, canActivate: [tiendaElegidaGuard] },
       { path: 'inventario', component: AdminInventario, canActivate: [tiendaElegidaGuard] },
       { path: 'metodos-pago', component: AdminMetodosPago, canActivate: [tiendaElegidaGuard] },
-      { path: 'reservas', component: AdminReservas },
-      { path: 'ventas', component: AdminVentas },
+      // CU05 y CU06: primero la tienda; luego ONLINE / OFFLINE (sincronizadas, CU12).
+      { path: 'reservas', component: AdminReservas, canActivate: [tiendaElegidaGuard], data: { origenes: true } },
+      { path: 'ventas', component: AdminVentas, canActivate: [tiendaElegidaGuard], data: { origenes: true } },
       { path: 'cambios', component: AdminCambios, canActivate: [tiendaElegidaGuard], data: { pagina: true } },
       { path: 'reportes', component: AdminReportesDashboard },
       { path: 'reportes/ventas', component: ReporteVentasPage },
