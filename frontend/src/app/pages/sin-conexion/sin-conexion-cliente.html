@@ -25,6 +25,11 @@
     </button>
   </div>
 
+  @if (db.bloqueada()) {
+    <div class="admin-error">
+      Hay otra pestaña de Arlani abierta con una versión anterior: ciérrala para ver tu catálogo guardado.
+    </div>
+  }
   @if (error()) {
     <div class="admin-error">{{ error() }}</div>
   }

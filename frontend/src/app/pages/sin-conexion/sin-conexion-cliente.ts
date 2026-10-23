@@ -25,7 +25,7 @@ import { ESTADO_OPERACION } from '../admin/sin-conexion/sin-conexion';
 export class SinConexionCliente implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(Auth);
-  private readonly db = inject(OfflineDb);
+  protected readonly db = inject(OfflineDb);
   protected readonly sync = inject(Sincronizacion);
   protected readonly imagenes = inject(ImagenesOffline);
 
