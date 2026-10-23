@@ -419,7 +419,12 @@ export class AdminVentas implements OnInit {
     this.load();
   }
 
+  // Si se cambia de ONLINE a OFFLINE (o de filtro) antes de que llegue la
+  // respuesta anterior, solo cuenta la de la última consulta.
+  private consulta = 0;
+
   private async load(): Promise<void> {
+    const esta = ++this.consulta;
     this.loading.set(true);
     this.error.set('');
     try {
@@ -433,12 +438,13 @@ export class AdminVentas implements OnInit {
       if (this.conOrigen()) params['origen'] = this.origen();
 
       const res = await firstValueFrom(this.http.get<VentaPage>(`${environment.apiUrl}/ventas`, { params }));
+      if (esta !== this.consulta) return;
       this.items.set(res.items);
       this.total.set(res.total);
     } catch {
-      this.error.set('No se pudo cargar las ventas.');
+      if (esta === this.consulta) this.error.set('No se pudo cargar las ventas.');
     } finally {
-      this.loading.set(false);
+      if (esta === this.consulta) this.loading.set(false);
     }
   }
 

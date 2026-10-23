@@ -142,7 +142,12 @@ export class AdminReservas implements OnInit {
     }
   }
 
+  // Si se cambia de ONLINE a OFFLINE (o de filtro) antes de que llegue la
+  // respuesta anterior, solo cuenta la de la última consulta.
+  private consulta = 0;
+
   private async load(): Promise<void> {
+    const esta = ++this.consulta;
     this.loading.set(true);
     this.error.set('');
     try {
@@ -155,12 +160,13 @@ export class AdminReservas implements OnInit {
       if (this.conOrigen()) params['origen'] = this.origen();
 
       const res = await firstValueFrom(this.http.get<ReservaPage>(`${environment.apiUrl}/reservas`, { params }));
+      if (esta !== this.consulta) return;
       this.items.set(res.items);
       this.total.set(res.total);
     } catch {
-      this.error.set('No se pudo cargar las reservas.');
+      if (esta === this.consulta) this.error.set('No se pudo cargar las reservas.');
     } finally {
-      this.loading.set(false);
+      if (esta === this.consulta) this.loading.set(false);
     }
   }
 
