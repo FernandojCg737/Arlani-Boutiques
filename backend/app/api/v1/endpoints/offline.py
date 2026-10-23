@@ -156,6 +156,8 @@ def _registrar_descarga(
 @router.get("/paquete", response_model=PaqueteOfflineOut)
 def paquete_sucursal(
     sucursal_id: int = Query(...),
+    # La app lo descarga sola cada pocos minutos: esas no llenan el seguimiento.
+    automatica: bool = Query(default=False),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso("2P-CU11")),
 ) -> PaqueteOfflineOut:
@@ -187,10 +189,18 @@ def paquete_sucursal(
                ORDER BY u.nombre LIMIT 1000"""
         )
     ).mappings().all()
-    _registrar_descarga(
-        db, sucursal["empresa_id"], sucursal_id, usuario.id, "personal", len({f["id"] for f in filas}), len(clientes)
-    )
-    db.commit()
+    reciente = automatica and db.execute(
+        text(
+            "SELECT 1 FROM descarga_offline WHERE usuario_id = :u AND sucursal_id = :s "
+            "AND fecha > now() - interval '30 minutes'"
+        ),
+        {"u": usuario.id, "s": sucursal_id},
+    ).first()
+    if not reciente:
+        _registrar_descarga(
+            db, sucursal["empresa_id"], sucursal_id, usuario.id, "personal", len({f["id"] for f in filas}), len(clientes)
+        )
+        db.commit()
     return PaqueteOfflineOut(
         empresa_id=sucursal["empresa_id"],
         empresa_nombre=sucursal["empresa_nombre"],

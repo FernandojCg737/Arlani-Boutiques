@@ -1,6 +1,6 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { Auth } from '../../../services/auth';
@@ -11,6 +11,7 @@ import {
   ProductoLocal,
   VarianteLocal,
 } from '../../../services/offline/offline-db';
+import { DescargaAutomatica, clavePaquete } from '../../../services/offline/descarga-automatica';
 import { ImagenesOffline } from '../../../services/offline/imagenes-offline';
 import { Sincronizacion } from '../../../services/offline/sincronizacion';
 import { mensajeError } from '../../../services/plataforma';
@@ -50,6 +51,7 @@ export class AdminSinConexion implements OnInit {
   protected readonly db = inject(OfflineDb);
   protected readonly sync = inject(Sincronizacion);
   protected readonly imagenes = inject(ImagenesOffline);
+  protected readonly automatica = inject(DescargaAutomatica);
 
   protected readonly estadoLabel = ESTADO_OPERACION;
   protected readonly vista = signal<Vista>('catalogo');
@@ -107,6 +109,25 @@ export class AdminSinConexion implements OnInit {
     return falta;
   });
 
+  constructor() {
+    // Llegó una descarga automática: se muestra el catálogo nuevo (el carrito
+    // de la venta en curso no se toca).
+    effect(() => {
+      if (this.automatica.ultima() && this.sucursalId() !== null) void this.recargarPaquete();
+    });
+  }
+
+  private async recargarPaquete(): Promise<void> {
+    const id = this.sucursalId();
+    if (id === null) return;
+    const guardado = await this.db.paquete(this.clave(id));
+    if (!guardado) return;
+    const paquete = guardado.datos as PaquetePersonal;
+    this.paquete.set(paquete);
+    if (!this.sucursales().some((s) => s.id === id)) this.sucursales.update((ss) => [...ss, paquete.sucursal]);
+    void this.imagenes.cargar(paquete.productos.map((p) => p.imagen_url));
+  }
+
   async ngOnInit(): Promise<void> {
     await this.cargarSucursales();
     void this.cargarPlan();
@@ -117,7 +138,7 @@ export class AdminSinConexion implements OnInit {
   }
 
   private clave(sucursalId: number): string {
-    return `personal:${this.usuarioId}:${sucursalId}`;
+    return clavePaquete(this.usuarioId, sucursalId);
   }
 
   private async cargarSucursales(): Promise<void> {
