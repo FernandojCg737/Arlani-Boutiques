@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../../services/auth';
 import { CatalogoCliente, ItemLocal, OfflineDb, ProductoLocal, TiendaLocal, VarianteLocal } from '../../services/offline/offline-db';
+import { ImagenesOffline } from '../../services/offline/imagenes-offline';
 import { Sincronizacion } from '../../services/offline/sincronizacion';
 import { mensajeError } from '../../services/plataforma';
 import { ESTADO_OPERACION } from '../admin/sin-conexion/sin-conexion';
@@ -26,6 +27,7 @@ export class SinConexionCliente implements OnInit {
   private readonly auth = inject(Auth);
   private readonly db = inject(OfflineDb);
   protected readonly sync = inject(Sincronizacion);
+  protected readonly imagenes = inject(ImagenesOffline);
 
   protected readonly estadoLabel = ESTADO_OPERACION;
   protected readonly catalogo = signal<CatalogoCliente | null>(null);
@@ -95,8 +97,13 @@ export class SinConexionCliente implements OnInit {
     return `cliente:${this.auth.currentUser()!.id}`;
   }
 
+  private urls(c: CatalogoCliente): (string | null)[] {
+    return c.tiendas.flatMap((t) => t.productos.map((p) => p.imagen_url));
+  }
+
   private usar(c: CatalogoCliente): void {
     this.catalogo.set(c);
+    void this.imagenes.cargar(this.urls(c));
     const t = c.tiendas.find((x) => x.empresa_id === this.tiendaId()) ?? c.tiendas[0] ?? null;
     if (t) this.elegirTienda(t.empresa_id);
   }
@@ -107,8 +114,9 @@ export class SinConexionCliente implements OnInit {
     try {
       const c = await firstValueFrom(this.http.get<CatalogoCliente>(`${environment.apiUrl}/offline/catalogo-cliente`));
       await this.db.guardarPaquete({ clave: this.clave, usuario_id: this.auth.currentUser()!.id, descargado_en: c.descargado_en, datos: c });
+      const fotos = await this.imagenes.descargar(this.urls(c));
       this.usar(c);
-      this.aviso.set('Catálogo guardado en este dispositivo: puedes verlo y reservar sin internet.');
+      this.aviso.set(`Catálogo guardado en este dispositivo (con ${fotos} fotos): puedes verlo, reservar y comprar sin internet.`);
     } catch (err) {
       this.error.set(mensajeError(err, 'No se pudo descargar: necesitas conexión.'));
     } finally {

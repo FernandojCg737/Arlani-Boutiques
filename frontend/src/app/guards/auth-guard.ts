@@ -13,9 +13,11 @@ import { Auth } from '../services/auth';
 // Checkout sin sesion, iniciaba sesion, y terminaba en el inicio en vez de
 // seguir con su compra).
 // Sin conexion (P4 offline) el backend no responde: se sigue con la sesion
-// guardada en el dispositivo; se revalida al volver la conexion.
+// guardada en el dispositivo; se revalida al volver la conexion. Con la PWA
+// el service worker contesta 504 en vez de dejar fallar la red.
 function sinConexion(err: unknown, auth: Auth): boolean {
-  return err instanceof HttpErrorResponse && err.status === 0 && auth.currentUser() !== null;
+  if (!(err instanceof HttpErrorResponse) || auth.currentUser() === null) return false;
+  return err.status === 0 || err.status === 504 || !navigator.onLine;
 }
 
 export const authGuard: CanActivateFn = async (_route, state) => {

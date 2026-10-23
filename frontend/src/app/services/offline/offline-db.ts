@@ -8,6 +8,7 @@ import { DBSchema, IDBPDatabase, openDB } from 'idb';
 // - registro: cada intento de sincronización y su resultado (observabilidad).
 // - sesion: token y dirección del backend del usuario, para que el service
 //   worker (public/sw-arlani.js) sincronice aunque la app esté cerrada.
+// - imagenes: las fotos de las prendas descargadas, para verlas sin conexión.
 
 export interface VarianteLocal {
   talla_id: number;
@@ -134,6 +135,7 @@ interface ArlaniOfflineDB extends DBSchema {
   operaciones: { key: string; value: OperacionLocal; indexes: { usuario: number } };
   registro: { key: number; value: RegistroSync; indexes: { usuario: number } };
   sesion: { key: number; value: SesionSync };
+  imagenes: { key: string; value: { url: string; blob: Blob } };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -141,7 +143,7 @@ export class OfflineDb {
   private db: Promise<IDBPDatabase<ArlaniOfflineDB>> | null = null;
 
   private abrir(): Promise<IDBPDatabase<ArlaniOfflineDB>> {
-    this.db ??= openDB<ArlaniOfflineDB>('arlani-offline', 2, {
+    this.db ??= openDB<ArlaniOfflineDB>('arlani-offline', 3, {
       upgrade(db, version) {
         if (version < 1) {
           db.createObjectStore('paquetes', { keyPath: 'clave' });
@@ -149,6 +151,7 @@ export class OfflineDb {
           db.createObjectStore('registro', { keyPath: 'id', autoIncrement: true }).createIndex('usuario', 'usuario_id');
         }
         if (version < 2) db.createObjectStore('sesion', { keyPath: 'usuario_id' });
+        if (version < 3) db.createObjectStore('imagenes', { keyPath: 'url' });
       },
     });
     return this.db;
@@ -160,6 +163,14 @@ export class OfflineDb {
 
   async borrarSesiones(): Promise<void> {
     await (await this.abrir()).clear('sesion');
+  }
+
+  async imagen(url: string): Promise<Blob | undefined> {
+    return (await (await this.abrir()).get('imagenes', url))?.blob;
+  }
+
+  async guardarImagen(url: string, blob: Blob): Promise<void> {
+    await (await this.abrir()).put('imagenes', { url, blob });
   }
 
   async guardarPaquete(p: PaqueteGuardado): Promise<void> {
