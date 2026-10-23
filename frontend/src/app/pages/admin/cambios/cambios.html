@@ -1,0 +1,198 @@
+@if (pagina) {
+  <div class="admin-content__header cambios-titulo">
+    <div>
+      <span class="admin-content__eyebrow">CU15 · Cambio de prendas</span>
+      <h1>Cambios de prenda</h1>
+    </div>
+  </div>
+}
+
+<div class="cambios-cabecera">
+  <p>
+    Política de cambios: el cliente pide el cambio dentro de las <strong>24 horas</strong> de su compra, por otra prenda
+    de la tienda con stock en la misma sucursal. La diferencia se calcula sobre lo que pagó.
+    @if (pendientes() > 0) {
+      <span class="cambios-pendientes">{{ pendientes() }} por atender</span>
+    }
+  </p>
+  <select [value]="filtro()" (change)="filtrar($any($event.target).value)" aria-label="Filtrar por estado">
+    <option value="">Todos los cambios</option>
+    <option value="solicitado">Por revisar</option>
+    <option value="por_pagar">Esperan pago de diferencia</option>
+    <option value="verificando">Comprobante por revisar</option>
+    <option value="completado">Completados</option>
+    <option value="rechazado">Rechazados</option>
+    <option value="cancelado">Cancelados</option>
+  </select>
+</div>
+
+@if (error()) {
+  <div class="admin-error">{{ error() }}</div>
+}
+
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Cliente</th>
+        <th>Devuelve</th>
+        <th>Se lleva</th>
+        <th>Diferencia</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (cargando()) {
+        <tr>
+          <td colspan="7" class="admin-table__empty">Cargando...</td>
+        </tr>
+      } @else {
+        @for (c of cambios(); track c.id) {
+          <tr>
+            <td>
+              <strong>{{ c.id }}</strong>
+              <small class="cambios-sub">Compra #{{ c.venta_id }}</small>
+            </td>
+            <td>
+              <div class="admin-table__user">
+                <strong>{{ c.cliente_nombre }}</strong>
+                <span>{{ c.cliente_email }}</span>
+                <span>{{ c.fecha_solicitud + 'Z' | date: "d MMM, HH:mm" : '-0400' }} · {{ c.sucursal_nombre }}</span>
+              </div>
+            </td>
+            <td>
+              {{ c.cantidad }}× {{ c.producto_original }} ({{ c.talla_original }}, {{ c.color_original }})
+              <small class="cambios-sub">Pagó Bs {{ c.precio_pagado | number: '1.2-2' }} c/u · {{ motivoLabel[c.motivo] }}</small>
+              @if (c.observaciones) {
+                <small class="cambios-sub cambios-obs">"{{ c.observaciones }}"</small>
+              }
+            </td>
+            <td>
+              {{ c.cantidad }}× {{ c.producto_nuevo }} ({{ c.talla_nueva }}, {{ c.color_nuevo }})
+              <small class="cambios-sub">Hoy Bs {{ c.precio_nuevo | number: '1.2-2' }} c/u</small>
+            </td>
+            <td class="cambios-dif" [class.is-cobra]="numero(c.diferencia) > 0" [class.is-devuelve]="numero(c.diferencia) < 0">
+              @if (numero(c.diferencia) > 0) {
+                Cliente paga Bs {{ c.diferencia | number: '1.2-2' }}
+              } @else if (numero(c.diferencia) < 0) {
+                Se devuelve Bs {{ -numero(c.diferencia) | number: '1.2-2' }}
+                @if (c.reembolso_metodo) {
+                  <small class="cambios-sub">{{ c.reembolso_metodo === 'paypal' ? 'Por PayPal' : 'En tienda' }}</small>
+                }
+              } @else {
+                Sin diferencia
+              }
+            </td>
+            <td>
+              <span class="admin-badge admin-badge--cambio-{{ c.estado }}">{{ estadoLabel[c.estado] }}</span>
+              @if (c.destino) {
+                <small class="cambios-sub">Prenda devuelta: {{ destinoLabel[c.destino] }}</small>
+              }
+              @if (c.motivo_rechazo && (c.estado === 'rechazado' || c.estado === 'por_pagar')) {
+                <small class="cambios-sub cambios-motivo">{{ c.motivo_rechazo }}</small>
+              }
+              @if (c.comprobante_url && c.estado === 'verificando') {
+                <a class="ventas-comprobante" [href]="c.comprobante_url" target="_blank" rel="noopener">
+                  Ver comprobante ({{ c.metodo_pago_nombre }})
+                </a>
+              }
+            </td>
+            <td>
+              <div class="ventas-acciones">
+                @if (!soloLectura()) {
+                  @if (c.estado === 'solicitado') {
+                    <button type="button" [disabled]="procesando() === c.id" (click)="abrir('aprobar', c)">Aprobar</button>
+                    <button type="button" class="is-danger" [disabled]="procesando() === c.id" (click)="abrir('rechazar', c)">
+                      Rechazar
+                    </button>
+                  }
+                  @if (c.estado === 'verificando') {
+                    <button type="button" [disabled]="procesando() === c.id" (click)="aprobarPago(c)">Aprobar pago</button>
+                    <button type="button" class="is-danger" [disabled]="procesando() === c.id" (click)="abrir('rechazar-pago', c)">
+                      Rechazar pago
+                    </button>
+                  }
+                }
+                @if (c.estado === 'completado') {
+                  <a class="is-secondary" [routerLink]="['/admin/cambio', c.id]" target="_blank">Ver comprobante</a>
+                }
+              </div>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="7" class="admin-table__empty">No hay cambios de prenda {{ filtro() ? 'con este estado' : 'todavía' }}.</td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>
+
+@if (accion(); as a) {
+  <div class="ventas-overlay" (click)="cerrar()">
+    <div class="ventas-modal" (click)="$event.stopPropagation()">
+      @switch (a.tipo) {
+        @case ('aprobar') {
+          <h2>Aprobar cambio #{{ a.cambio.id }}</h2>
+          <p class="ventas-modal__subtitulo">
+            {{ a.cambio.cliente_nombre }} devuelve {{ a.cambio.producto_original }} ({{ a.cambio.talla_original }}) y se lleva
+            {{ a.cambio.producto_nuevo }} ({{ a.cambio.talla_nueva }}, {{ a.cambio.color_nuevo }}).
+          </p>
+          <p class="cambios-aviso">
+            @if (numero(a.cambio.diferencia) > 0) {
+              El cliente debe pagar Bs {{ a.cambio.diferencia | number: '1.2-2' }}. El cambio se completa cuando pague.
+            } @else if (numero(a.cambio.diferencia) < 0) {
+              Se le devuelven Bs {{ -numero(a.cambio.diferencia) | number: '1.2-2' }}: por PayPal si pagó con PayPal, si no,
+              en la tienda. El stock se mueve al aprobar.
+            } @else {
+              Sin diferencia de precio: el stock se mueve al aprobar.
+            }
+          </p>
+          <label class="ventas-campo">
+            <span>¿Qué pasa con la prenda devuelta?</span>
+            <select [value]="destino()" (change)="destino.set($any($event.target).value)">
+              <option value="reingreso">Vuelve al stock de la sucursal</option>
+              <option value="merma">Merma: está dañada, se da de baja</option>
+              <option value="proveedor">Se devuelve al proveedor</option>
+            </select>
+          </label>
+          <label class="ventas-campo">
+            <span>Observación (opcional)</span>
+            <textarea rows="2" maxlength="500" [value]="texto()" (input)="texto.set($any($event.target).value)"></textarea>
+          </label>
+        }
+        @case ('rechazar') {
+          <h2>Rechazar cambio #{{ a.cambio.id }}</h2>
+          <p class="ventas-modal__subtitulo">{{ a.cambio.cliente_nombre }} verá el motivo en Mi cuenta.</p>
+          <label class="ventas-campo">
+            <span>Motivo</span>
+            <textarea rows="3" maxlength="500" placeholder="Ej. La prenda tiene uso o le falta la etiqueta."
+                      [value]="texto()" (input)="texto.set($any($event.target).value)"></textarea>
+          </label>
+        }
+        @case ('rechazar-pago') {
+          <h2>Rechazar el pago del cambio #{{ a.cambio.id }}</h2>
+          <p class="ventas-modal__subtitulo">El cambio vuelve a esperar el pago; el cliente puede pagar de nuevo.</p>
+          <label class="ventas-campo">
+            <span>Motivo</span>
+            <textarea rows="3" maxlength="500" placeholder="Ej. El monto del comprobante no coincide."
+                      [value]="texto()" (input)="texto.set($any($event.target).value)"></textarea>
+          </label>
+        }
+      }
+      @if (errorAccion()) {
+        <div class="admin-error">{{ errorAccion() }}</div>
+      }
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" (click)="cerrar()">Cancelar</button>
+        <button type="button" [class.is-danger-solid]="a.tipo !== 'aprobar'" [disabled]="procesando() === a.cambio.id"
+                (click)="confirmar()">
+          {{ a.tipo === 'aprobar' ? 'Aprobar cambio' : 'Rechazar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

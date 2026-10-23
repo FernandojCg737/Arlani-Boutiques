@@ -66,6 +66,20 @@ class DevolucionOut(BaseModel):
         return value.isoformat()
 
 
+class DevolucionClienteOut(DevolucionOut):
+    """Devolucion vista por el cliente (Mi cuenta > Mis Devoluciones)."""
+
+    tienda_nombre: str
+    sucursal_nombre: str
+    venta_fecha: datetime
+
+    @field_serializer("venta_fecha")
+    def _serialize_venta_fecha(self, value: datetime) -> str:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
+
+
 class DevolucionAdminOut(DevolucionOut):
     """Vista extendida para el panel de admin: incluye datos del cliente."""
 

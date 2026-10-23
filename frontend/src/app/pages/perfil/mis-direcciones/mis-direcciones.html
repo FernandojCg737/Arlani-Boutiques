@@ -1,0 +1,98 @@
+@if (!soloFormulario()) {
+  <div class="md-cabecera">
+    <p>Guarda a dónde quieres que te envíen tus compras. Al pagar eliges “Envío a domicilio” y una de estas direcciones.</p>
+    <button type="button" class="perfil-btn-confirmar" (click)="abrirNueva()">+ Agregar dirección</button>
+  </div>
+  @if (aviso()) {
+    <div class="perfil-alert is-success" role="status">{{ aviso() }}</div>
+  }
+  @if (cargando()) {
+    <p class="dash-vacio">Cargando...</p>
+  } @else if (direcciones().length === 0) {
+    <p class="dash-vacio">Todavía no guardaste direcciones.</p>
+  } @else {
+    <ul class="md-lista">
+      @for (d of direcciones(); track d.id) {
+        <li class="md-tarjeta" [class.is-pred]="d.predeterminada">
+          <app-mapa-ubicacion [punto]="{ lat: +d.latitud, lng: +d.longitud }" [soloLectura]="true" [alto]="140" />
+          <div class="md-tarjeta__datos">
+            <strong>
+              {{ d.alias }}
+              @if (d.predeterminada) {
+                <span class="md-pred">Predeterminada</span>
+              }
+            </strong>
+            <span>{{ d.direccion }}{{ d.ciudad ? ', ' + d.ciudad : '' }}</span>
+            @if (d.referencia) {
+              <small>{{ d.referencia }}</small>
+            }
+            <div class="md-acciones">
+              <button type="button" (click)="editar(d)">Editar</button>
+              @if (!d.predeterminada) {
+                <button type="button" (click)="predeterminar(d)">Usar por defecto</button>
+              }
+              <a [href]="enlaceMapa(d.latitud, d.longitud)" target="_blank" rel="noopener">Ver en el mapa</a>
+              <button type="button" class="is-danger" (click)="borrar(d)">Borrar</button>
+            </div>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+}
+
+@if (abierto()) {
+  <div class="perfil-modal-overlay" (click)="cerrar()">
+    <div class="perfil-modal perfil-modal--devolucion md-modal" (click)="$event.stopPropagation()">
+      <div class="perfil-modal__header">
+        <div>
+          <h3>{{ editando() ? 'Editar dirección' : 'Nueva dirección de envío' }}</h3>
+          <p>Marca en el mapa dónde quieres recibir tu pedido.</p>
+        </div>
+        <button type="button" class="perfil-modal__close" (click)="cerrar()">✕</button>
+      </div>
+      <div class="perfil-modal__body">
+        <app-mapa-ubicacion [punto]="f().punto" (cambio)="alMoverPin($event)" />
+
+        <div class="devolucion-campos">
+          <div class="devolucion-campo">
+            <label>Nombre de la dirección</label>
+            <div class="md-alias">
+              @for (a of aliasRapidos; track a) {
+                <button type="button" [class.is-activo]="f().alias === a" (click)="setF('alias', a)">{{ a }}</button>
+              }
+            </div>
+            <input type="text" maxlength="40" [value]="f().alias" (input)="setF('alias', $any($event.target).value)" />
+          </div>
+          <div class="devolucion-campo">
+            <label>Dirección (calle, número, zona)</label>
+            <input type="text" maxlength="250" placeholder="Ej. Av. Banzer 3er anillo, calle 2 #15"
+                   [value]="f().direccion" (input)="setF('direccion', $any($event.target).value)" />
+          </div>
+          <div class="devolucion-campo">
+            <label>Referencia para el repartidor (opcional)</label>
+            <input type="text" maxlength="250" placeholder="Ej. Portón negro, frente a la farmacia"
+                   [value]="f().referencia" (input)="setF('referencia', $any($event.target).value)" />
+          </div>
+          <div class="devolucion-campo">
+            <label>Ciudad</label>
+            <input type="text" maxlength="80" [value]="f().ciudad" (input)="setF('ciudad', $any($event.target).value)" />
+          </div>
+          <label class="md-check">
+            <input type="checkbox" [checked]="f().predeterminada" (change)="setF('predeterminada', $any($event.target).checked)" />
+            Usar esta dirección por defecto
+          </label>
+        </div>
+        @if (error()) {
+          <div class="perfil-alert is-error">{{ error() }}</div>
+        }
+      </div>
+      <div class="perfil-modal__footer">
+        <button type="button" class="perfil-btn-cancelar" (click)="cerrar()">Cancelar</button>
+        <button type="button" class="perfil-btn-confirmar" [disabled]="guardando()" (click)="guardar()">
+          {{ guardando() ? 'Guardando…' : 'Guardar dirección' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

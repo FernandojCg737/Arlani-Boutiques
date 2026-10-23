@@ -1,0 +1,128 @@
+<section class="comprobante-page">
+  <a [routerLink]="esPersonal ? '/admin/ventas' : '/perfil'" class="volver-link">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+    {{ esPersonal ? 'Volver a Gestión de Ventas' : 'Volver a mi perfil' }}
+  </a>
+
+  @if (cargando()) {
+    <p class="comprobante-mensaje">Cargando...</p>
+  }
+
+  @if (error()) {
+    <div class="comprobante-mensaje">
+      <p>{{ error() }}</p>
+    </div>
+  }
+
+  @if (cambio(); as c) {
+    <article class="comprobante" [style.--brand-dark]="color()">
+      <header class="comprobante__header">
+        <div class="comprobante__marca">
+          @if (c.tienda.logo_url) {
+            <img [src]="c.tienda.logo_url" [alt]="c.tienda.nombre" />
+          }
+          <div class="comprobante__marca-datos">
+            <strong>{{ c.tienda.nombre }}</strong>
+            @if (c.tienda.razon_social) {
+              <span>{{ c.tienda.razon_social }}</span>
+            }
+            @if (c.tienda.nit) {
+              <span>NIT {{ c.tienda.nit }}</span>
+            }
+            <span>
+              {{ c.tienda.direccion_fiscal || c.sucursal_nombre }}{{ c.tienda.ciudad ? ', ' + c.tienda.ciudad : '' }}, Bolivia
+            </span>
+            @if (c.tienda.telefono || c.tienda.email_contacto) {
+              <span>
+                {{ c.tienda.telefono }}{{ c.tienda.telefono && c.tienda.email_contacto ? ' · ' : '' }}{{ c.tienda.email_contacto }}
+              </span>
+            }
+          </div>
+        </div>
+        <div class="comprobante__folio">
+          <span>Comprobante de cambio</span>
+          <strong>N&deg; {{ folio(c.id) }}</strong>
+          <span>{{ (c.fecha_completado ?? c.fecha_solicitud) + 'Z' | date: "d 'de' MMMM 'de' yyyy, h:mm a" : '-0400' }}</span>
+        </div>
+      </header>
+
+      <div class="comprobante__info">
+        <span>Cliente: {{ c.cliente_nombre }} · {{ c.cliente_email }}</span>
+        <span>Compra original: N&deg; {{ c.venta_id }} del {{ c.venta_fecha + 'Z' | date: 'd/M/yyyy' : '-0400' }}</span>
+        <span>Sucursal: {{ c.sucursal_nombre }}</span>
+        <span>Motivo: {{ motivoLabel[c.motivo] ?? c.motivo }}</span>
+        @if (c.empleado_nombre) {
+          <span>Atendido por: {{ c.empleado_nombre }}</span>
+        }
+        <span class="comprobante__estado comprobante__estado--{{ c.estado === 'completado' ? 'completado' : 'pendiente' }}">
+          Estado: {{ estadoLabel[c.estado] }}
+        </span>
+      </div>
+
+      <table class="comprobante__tabla">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Producto</th>
+            <th>Talla</th>
+            <th>Color</th>
+            <th>Cant.</th>
+            <th>Precio</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="cambio-sentido cambio-sentido--devuelve">Devuelves</td>
+            <td>{{ c.producto_original }}</td>
+            <td>{{ c.talla_original }}</td>
+            <td>{{ c.color_original }}</td>
+            <td>{{ c.cantidad }}</td>
+            <td>{{ c.precio_pagado | number: '1.2-2' }} Bs <small>(pagado)</small></td>
+            <td>{{ numero(c.precio_pagado) * c.cantidad | number: '1.2-2' }} Bs</td>
+          </tr>
+          <tr>
+            <td class="cambio-sentido cambio-sentido--recibe">Recibes</td>
+            <td>{{ c.producto_nuevo }}</td>
+            <td>{{ c.talla_nueva }}</td>
+            <td>{{ c.color_nuevo }}</td>
+            <td>{{ c.cantidad }}</td>
+            <td>{{ c.precio_nuevo | number: '1.2-2' }} Bs</td>
+            <td>{{ numero(c.precio_nuevo) * c.cantidad | number: '1.2-2' }} Bs</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="comprobante__total">
+        @if (numero(c.diferencia) > 0) {
+          <span>Pagaste la diferencia{{ c.metodo_pago_nombre ? ' (' + c.metodo_pago_nombre + ')' : '' }}</span>
+          <strong>{{ c.diferencia | number: '1.2-2' }} Bs</strong>
+        } @else if (numero(c.diferencia) < 0) {
+          <span>Te devolvimos{{ c.reembolso_metodo ? (c.reembolso_metodo === 'paypal' ? ' (a tu PayPal)' : ' (en tienda)') : '' }}</span>
+          <strong>{{ -numero(c.diferencia) | number: '1.2-2' }} Bs</strong>
+        } @else {
+          <span>Diferencia</span>
+          <strong>0,00 Bs</strong>
+        }
+      </div>
+
+      <footer class="comprobante__footer">
+        <p>Gracias por comprar en {{ c.tienda.nombre }}.</p>
+        @if (esPersonal && c.destino) {
+          <p class="comprobante__legal">Prenda devuelta: {{ destinoLabel[c.destino] }}.</p>
+        }
+        <p class="comprobante__legal">
+          Cambio según la política de la tienda (hasta 24 horas después de la compra). Este documento es un comprobante
+          interno y no reemplaza una factura fiscal con validez tributaria (NIT).
+        </p>
+      </footer>
+
+      <div class="comprobante__acciones">
+        <button type="button" (click)="imprimir()">Descargar / Imprimir</button>
+      </div>
+    </article>
+  }
+</section>

@@ -1,9 +1,11 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { EstadoTienda } from '../../../services/estado-tienda';
 import { MarcaEmpresa, MarcaTienda } from '../../../services/marca-tienda';
+import { PaypalSdk } from '../../../services/paypal-sdk';
 import { enlaceTienda, mensajeError, rutaTienda } from '../../../services/plataforma';
 
 const LOGO_MAX_BYTES = 5 * 1024 * 1024;
@@ -16,6 +18,56 @@ interface PlanDisponible {
   dias_prueba: number | null;
   ia_generativa: boolean;
   operacion_offline: boolean;
+  comision_pct: string;
+}
+
+interface CotizacionRenovacion {
+  plan_codigo: string;
+  plan_nombre: string;
+  periodo: 'mensual' | 'anual';
+  monto_bob: string;
+  tipo_cambio: string;
+  monto_usd: string;
+  plan_bob: string;
+  plan_usd: string;
+  comisiones_bob: string;
+  comisiones_usd: string;
+  fecha_inicio: string;
+}
+
+interface MovimientoCuenta {
+  id: number;
+  fecha: string;
+  tipo: 'comision' | 'pago' | 'ajuste';
+  venta_id: number | null;
+  base_bob: string | null;
+  porcentaje: string | null;
+  monto_bob: string;
+  descripcion: string;
+}
+
+interface LiquidacionRecibida {
+  id: number;
+  fecha: string;
+  bruto_bob: string;
+  comision_bob: string;
+  neto_bob: string;
+  neto_usd: string;
+  paypal_email: string;
+  estado: 'pendiente' | 'enviada' | 'fallida';
+}
+
+interface CuentaTienda {
+  liquidaciones: LiquidacionRecibida[];
+  saldo_bob: string;
+  saldo_usd: string;
+  tipo_cambio: string;
+  comision_pct: string | null;
+  ventas_mes: number;
+  ventas_mes_bob: string;
+  comisiones_mes_bob: string;
+  pagado_total_bob: string;
+  movimientos: MovimientoCuenta[];
 }
 
 interface HistorialSuscripcion {
@@ -47,6 +99,9 @@ interface MiSuscripcion {
   max_sucursales: number | null;
   personal: number;
   clientes: number;
+  // False: la suscripcion vencio (o la tienda esta suspendida) y no opera.
+  operativa: boolean;
+  comision_pct: string | null;
   historial: HistorialSuscripcion[];
   planes: PlanDisponible[];
 }
@@ -57,6 +112,8 @@ const AVISO_DIAS = 15;
 
 // Mi suscripcion: el Administrador de la tienda ve su plan, cuando vence,
 // cuanto usa de el, el enlace de su tienda y los planes a los que puede pasar.
+// Desde aca compra o renueva su plan con PayPal; con la suscripcion vencida
+// es lo unico que la tienda puede hacer.
 @Component({
   selector: 'app-admin-suscripcion',
   imports: [DatePipe, DecimalPipe],
@@ -65,6 +122,8 @@ const AVISO_DIAS = 15;
 })
 export class AdminSuscripcion {
   private readonly http = inject(HttpClient);
+  private readonly paypalSdk = inject(PaypalSdk);
+  private readonly estadoTienda = inject(EstadoTienda);
 
   protected readonly datos = signal<MiSuscripcion | null>(null);
   protected readonly cargando = signal(true);
@@ -118,8 +177,13 @@ export class AdminSuscripcion {
       return { tono: 'alerta', texto: 'Tu tienda está suspendida. Escríbenos a soporte para reactivarla.' };
     if (!d.plan_codigo) return { tono: 'alerta', texto: 'Tu tienda no tiene una suscripción vigente.' };
     const dias = d.dias_restantes;
-    if (dias !== null && dias < 0)
-      return { tono: 'alerta', texto: 'Tu suscripción venció. Renuévala para seguir vendiendo sin cortes.' };
+    if (!d.operativa || (dias !== null && dias < 0))
+      return {
+        tono: 'alerta',
+        texto:
+          'Tu suscripción venció y tu tienda está pausada: no aparece en la plataforma ni puede vender. ' +
+          'Renueva tu plan abajo para volver a operar.',
+      };
     if (dias !== null && dias <= AVISO_DIAS)
       return {
         tono: 'info',
@@ -181,6 +245,82 @@ export class AdminSuscripcion {
 
   constructor() {
     void this.cargar();
+    void this.cargarCuenta();
+  }
+
+  // ------------------------------------------------ estado de cuenta
+  // Comision de Arlani por cada venta en linea; se paga con PayPal cuando la
+  // tienda quiera o junto con la renovacion del plan.
+  protected readonly cuenta = signal<CuentaTienda | null>(null);
+  protected readonly verTodos = signal(false);
+  protected readonly pagandoSaldo = signal(false);
+  protected readonly procesandoSaldo = signal(false);
+  protected readonly errorSaldo = signal('');
+  protected readonly exitoSaldo = signal('');
+  private readonly contenedorPaypalSaldo = viewChild<ElementRef<HTMLDivElement>>('paypalSaldo');
+
+  protected readonly movimientosVisibles = computed(() => {
+    const m = this.cuenta()?.movimientos ?? [];
+    return this.verTodos() ? m : m.slice(0, 8);
+  });
+
+  protected absoluto(valor: string): number {
+    return Math.abs(Number(valor));
+  }
+
+  private async cargarCuenta(): Promise<void> {
+    try {
+      this.cuenta.set(await firstValueFrom(this.http.get<CuentaTienda>(`${environment.apiUrl}/mi-empresa/cuenta`)));
+    } catch {
+      // Sin estado de cuenta la pantalla sigue funcionando.
+    }
+  }
+
+  protected async abrirPagoSaldo(): Promise<void> {
+    this.pagandoSaldo.set(true);
+    this.errorSaldo.set('');
+    this.exitoSaldo.set('');
+    await new Promise((r) => setTimeout(r));
+    const contenedor = this.contenedorPaypalSaldo()?.nativeElement;
+    if (!contenedor) return;
+    contenedor.innerHTML = '';
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const paypal = (await this.paypalSdk.cargar()) as any;
+      await paypal
+        .Buttons({
+          style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+          createOrder: async () =>
+            (await firstValueFrom(this.http.post<{ order_id: string }>(`${environment.apiUrl}/mi-empresa/cuenta/orden`, {})))
+              .order_id,
+          onApprove: (data: { orderID: string }) => this.confirmarPagoSaldo(data.orderID),
+          onCancel: () => this.errorSaldo.set('Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.'),
+          onError: (err: unknown) =>
+            this.errorSaldo.set(mensajeError(err, 'PayPal tuvo un problema. Inténtalo de nuevo en unos segundos.')),
+        })
+        .render(contenedor);
+    } catch {
+      this.errorSaldo.set('No se pudo cargar PayPal. Inténtalo de nuevo en unos segundos.');
+    }
+  }
+
+  private async confirmarPagoSaldo(orderId: string): Promise<void> {
+    this.procesandoSaldo.set(true);
+    this.errorSaldo.set('');
+    try {
+      const pagado = this.cuenta()?.saldo_bob;
+      this.cuenta.set(
+        await firstValueFrom(
+          this.http.post<CuentaTienda>(`${environment.apiUrl}/mi-empresa/cuenta/confirmar`, { order_id: orderId }),
+        ),
+      );
+      this.pagandoSaldo.set(false);
+      this.exitoSaldo.set(`Listo: pagaste Bs ${pagado} de comisiones. Tu cuenta quedó al día.`);
+    } catch (err) {
+      this.errorSaldo.set(mensajeError(err, 'No pudimos registrar tu pago.'));
+    } finally {
+      this.procesandoSaldo.set(false);
+    }
   }
 
   private async cargar(): Promise<void> {
@@ -202,6 +342,120 @@ export class AdminSuscripcion {
       setTimeout(() => this.copiado.set(false), 2000);
     } catch {
       // sin portapapeles (http sin permisos): el enlace igual se puede seleccionar
+    }
+  }
+
+  // ------------------------------------------------ comprar / renovar
+  protected readonly planPago = signal<PlanDisponible | null>(null);
+  protected readonly periodoPago = signal<'mensual' | 'anual'>('mensual');
+  protected readonly cotizacion = signal<CotizacionRenovacion | null>(null);
+  protected readonly cotizando = signal(false);
+  protected readonly procesando = signal(false);
+  protected readonly errorPago = signal('');
+  protected readonly exitoPago = signal('');
+  private readonly contenedorPaypal = viewChild<ElementRef<HTMLDivElement>>('paypal');
+
+  protected abrirPago(p: PlanDisponible): void {
+    this.planPago.set(p);
+    this.periodoPago.set('mensual');
+    this.exitoPago.set('');
+    void this.cotizarPago();
+    setTimeout(() => document.getElementById('pago')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
+
+  protected cerrarPago(): void {
+    this.planPago.set(null);
+    this.cotizacion.set(null);
+    this.errorPago.set('');
+  }
+
+  protected elegirPeriodo(periodo: 'mensual' | 'anual'): void {
+    if (this.periodoPago() === periodo) return;
+    this.periodoPago.set(periodo);
+    void this.cotizarPago();
+  }
+
+  private solicitudPago(): { plan: string; periodo: 'mensual' | 'anual' } {
+    return { plan: this.planPago()!.codigo, periodo: this.periodoPago() };
+  }
+
+  private async cotizarPago(): Promise<void> {
+    if (!this.planPago()) return;
+    this.cotizando.set(true);
+    this.errorPago.set('');
+    this.cotizacion.set(null);
+    try {
+      this.cotizacion.set(
+        await firstValueFrom(
+          this.http.post<CotizacionRenovacion>(`${environment.apiUrl}/mi-empresa/suscripcion/cotizar`, this.solicitudPago()),
+        ),
+      );
+    } catch (err) {
+      this.errorPago.set(mensajeError(err, 'No pudimos calcular el precio. Inténtalo de nuevo.'));
+      return;
+    } finally {
+      this.cotizando.set(false);
+    }
+    await this.mostrarPaypal();
+  }
+
+  private async mostrarPaypal(): Promise<void> {
+    // Esperar a que Angular pinte el contenedor.
+    await new Promise((r) => setTimeout(r));
+    const contenedor = this.contenedorPaypal()?.nativeElement;
+    if (!contenedor) return;
+    contenedor.innerHTML = '';
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const paypal = (await this.paypalSdk.cargar()) as any;
+      await paypal
+        .Buttons({
+          style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+          createOrder: async () =>
+            (
+              await firstValueFrom(
+                this.http.post<{ order_id: string }>(
+                  `${environment.apiUrl}/mi-empresa/suscripcion/orden`,
+                  this.solicitudPago(),
+                ),
+              )
+            ).order_id,
+          onApprove: (data: { orderID: string }) => this.confirmarPago(data.orderID),
+          onCancel: () => this.errorPago.set('Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.'),
+          onError: (err: unknown) =>
+            this.errorPago.set(mensajeError(err, 'PayPal tuvo un problema. Inténtalo de nuevo en unos segundos.')),
+        })
+        .render(contenedor);
+    } catch {
+      this.errorPago.set('No se pudo cargar PayPal. Inténtalo de nuevo en unos segundos.');
+    }
+  }
+
+  private async confirmarPago(orderId: string): Promise<void> {
+    this.procesando.set(true);
+    this.errorPago.set('');
+    try {
+      const res = await firstValueFrom(
+        this.http.post<MiSuscripcion>(`${environment.apiUrl}/mi-empresa/suscripcion/confirmar`, {
+          ...this.solicitudPago(),
+          order_id: orderId,
+        }),
+      );
+      this.datos.set(res);
+      this.planPago.set(null);
+      this.cotizacion.set(null);
+      this.exitoPago.set(
+        `Listo: tu plan ${res.plan_nombre} quedó activo` +
+          (res.fecha_fin ? ` hasta el ${new Date(res.fecha_fin + 'T00:00').toLocaleDateString('es-BO')}` : '') +
+          '. Tu tienda ya está operando.',
+      );
+      this.estadoTienda.vencida.set(false);
+      void this.cargarCuenta();
+      await this.marca.recargar();
+    } catch (err) {
+      this.errorPago.set(mensajeError(err, 'No pudimos registrar tu pago.'));
+    } finally {
+      this.procesando.set(false);
     }
   }
 

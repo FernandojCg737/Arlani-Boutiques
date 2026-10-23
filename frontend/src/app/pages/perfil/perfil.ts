@@ -1,12 +1,14 @@
 import { DatePipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../../services/auth';
 import { Notificaciones } from '../../services/notificaciones';
 import { checkPassword, isPasswordValid } from '../../utils/password';
+import { MisCambios } from './mis-cambios/mis-cambios';
+import { MisDirecciones } from './mis-direcciones/mis-direcciones';
 
 interface DetalleReservaItem {
   id: number;
@@ -31,6 +33,7 @@ interface DetalleVentaItem {
   color_nombre: string;
   cantidad: number;
   precio_unitario: string;
+  ya_solicitada: boolean;
 }
 
 interface VentaItem {
@@ -41,6 +44,10 @@ interface VentaItem {
   total: string;
   estado: string;
   metodo_pago: string;
+  metodo_pago_nombre: string | null;
+  motivo_rechazo: string | null;
+  tienda: { nombre: string } | null;
+  envio: { direccion: string; ciudad: string | null; estado: string } | null;
   estado_pago: string;
   calificacion_estrellas: number | null;
   calificacion_comentario: string | null;
@@ -49,6 +56,7 @@ interface VentaItem {
   estado_devolucion?: string | null;
   monto_devolucion?: string | null;
   puede_devolver?: boolean;
+  puede_cambiar?: boolean;
   horas_restantes_devolucion?: number | null;
 }
 
@@ -63,17 +71,64 @@ interface ItemDevolucionSeleccion {
   seleccionado: boolean;
 }
 
-type Tab = 'resumen' | 'reservas' | 'compras' | 'pagos' | 'notificaciones' | 'datos' | 'seguridad';
+type Tab =
+  | 'resumen'
+  | 'reservas'
+  | 'compras'
+  | 'cambios'
+  | 'devoluciones'
+  | 'direcciones'
+  | 'pagos'
+  | 'notificaciones'
+  | 'datos'
+  | 'seguridad';
+
+// Cambio de una prenda comprada (para tacharla en Mis Compras).
+interface CambioDeLinea {
+  id: number;
+  item_linea_id: number;
+  estado: string;
+  cantidad: number;
+  producto_nuevo: string;
+  talla_nueva: string;
+  color_nuevo: string;
+}
+
+interface DevolucionCliente {
+  id: number;
+  venta_id: number;
+  tienda_nombre: string;
+  sucursal_nombre: string;
+  venta_fecha: string;
+  motivo: string;
+  tipo: string;
+  monto_reembolso: string;
+  metodo_reembolso: string;
+  estado: string;
+  fecha_solicitud: string;
+  fecha_resolucion: string | null;
+  observaciones: string | null;
+  detalles: { id: number; producto_nombre: string; talla_codigo: string; color_nombre: string; cantidad_devuelta: number }[];
+}
 
 const METODO_LABEL: Record<string, string> = {
   paypal: 'PayPal / Tarjeta',
-  qr: 'QR (transferencia)',
+  qr: 'QR',
+  transferencia: 'Transferencia',
+  otro: 'Otro',
   efectivo: 'Efectivo en sucursal',
+};
+
+const ESTADO_PAGO_LABEL: Record<string, string> = {
+  completado: 'pagado',
+  verificando: 'en revisión',
+  rechazado: 'rechazado',
+  pendiente: 'pendiente',
 };
 
 @Component({
   selector: 'app-perfil',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, MisCambios, MisDirecciones],
   templateUrl: './perfil.html',
   styleUrl: './perfil.scss',
 })
@@ -85,6 +140,7 @@ export class Perfil implements OnInit {
 
   protected readonly isCliente = computed(() => this.auth.currentUser()?.tipo === 'cliente');
   protected readonly metodoLabel = METODO_LABEL;
+  protected readonly estadoPagoLabel = ESTADO_PAGO_LABEL;
 
   protected readonly tab = signal<Tab>('resumen');
 
@@ -138,15 +194,18 @@ export class Perfil implements OnInit {
     if (this.isCliente()) {
       void this.cargarReservas();
       void this.cargarCompras();
+      void this.cargarCambios();
       void this.notificaciones.cargar();
     }
 
     const tabParam = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
-    if (tabParam) this.tab.set(tabParam);
+    if (tabParam) this.setTab(tabParam);
   }
 
   protected setTab(t: Tab): void {
     this.tab.set(t);
+    if (t === 'devoluciones') void this.cargarDevoluciones();
+    if (t === 'compras') void this.cargarCambios();
   }
 
   private async cargarReservas(): Promise<void> {
@@ -170,6 +229,89 @@ export class Perfil implements OnInit {
       this.compras.set([]);
     } finally {
       this.cargandoCompras.set(false);
+    }
+  }
+
+  // ---------- Cambio de prendas (24 horas desde la compra) ----------
+  private readonly misCambios = viewChild(MisCambios);
+
+  // Pasaron las 24 h desde la compra (para el aviso de plazo vencido).
+  protected vencioPlazo(v: VentaItem): boolean {
+    const fecha = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(v.fecha) ? v.fecha : v.fecha + 'Z');
+    return Date.now() - fecha > 24 * 3600 * 1000;
+  }
+
+  // Alguna prenda ya tuvo su unica solicitud de cambio o devolucion.
+  protected algunaSolicitada(v: VentaItem): boolean {
+    return v.detalles.some((d) => d.ya_solicitada);
+  }
+
+  protected abrirCambio(v: VentaItem): void {
+    void this.misCambios()?.abrir(v.id);
+  }
+
+  // Tras pedir un cambio: la prenda se tacha y la compra ya no ofrece otro.
+  protected alPedirCambio(): void {
+    void this.cargarCambios();
+    void this.cargarCompras();
+  }
+
+  // Cambios pedidos por linea de compra: en Mis Compras la prenda que se
+  // cambia sale tachada, con la nueva al lado (rechazados y cancelados no).
+  private readonly cambiosDeLineas = signal<CambioDeLinea[]>([]);
+  protected readonly cambioPorLinea = computed(() => {
+    const m = new Map<number, CambioDeLinea>();
+    for (const c of this.cambiosDeLineas()) {
+      if (c.estado !== 'rechazado' && c.estado !== 'cancelado' && !m.has(c.item_linea_id)) m.set(c.item_linea_id, c);
+    }
+    return m;
+  });
+  protected readonly estadoCambioLabel: Record<string, string> = {
+    solicitado: 'cambio por revisar',
+    por_pagar: 'cambio: falta pagar la diferencia',
+    verificando: 'cambio: comprobante en revisión',
+    completado: 'cambiada',
+  };
+
+  protected async cargarCambios(): Promise<void> {
+    try {
+      this.cambiosDeLineas.set(await firstValueFrom(this.http.get<CambioDeLinea[]>(`${environment.apiUrl}/cambios/mios`)));
+    } catch {
+      this.cambiosDeLineas.set([]);
+    }
+  }
+
+  // ---------- Mis devoluciones ----------
+  protected readonly devoluciones = signal<DevolucionCliente[]>([]);
+  protected readonly cargandoDevoluciones = signal(false);
+  protected readonly estadoDevolucionLabel: Record<string, string> = {
+    solicitada: 'En revisión',
+    aprobada: 'Aprobada',
+    completada: 'Aprobada y reembolsada',
+    rechazada: 'Rechazada',
+  };
+  protected readonly metodoReembolsoLabel: Record<string, string> = {
+    mismo_medio: 'al mismo medio de pago',
+    credito_tienda: 'como crédito en la tienda',
+    efectivo: 'en efectivo en la sucursal',
+  };
+  protected readonly motivoDevolucionLabel: Record<string, string> = {
+    defecto: 'Defecto de fábrica',
+    talla_incorrecta: 'Talla incorrecta',
+    insatisfaccion: 'No cumplió expectativas',
+    otro: 'Otro motivo',
+  };
+
+  private async cargarDevoluciones(): Promise<void> {
+    this.cargandoDevoluciones.set(true);
+    try {
+      this.devoluciones.set(
+        await firstValueFrom(this.http.get<DevolucionCliente[]>(`${environment.apiUrl}/devoluciones/mias`)),
+      );
+    } catch {
+      this.devoluciones.set([]);
+    } finally {
+      this.cargandoDevoluciones.set(false);
     }
   }
 
@@ -270,8 +412,9 @@ export class Perfil implements OnInit {
     this.observacionesDevolucion.set('');
     this.motivoDevolucion.set('defecto');
     this.metodoReembolso.set('mismo_medio');
+    // Solo las prendas que no tuvieron ya su unica solicitud.
     this.itemsDevolucion.set(
-      (v.detalles || []).map((d) => ({
+      (v.detalles || []).filter((d) => !d.ya_solicitada).map((d) => ({
         item_linea_id: d.id,
         producto_nombre: d.producto_nombre,
         talla_codigo: d.talla_codigo,
@@ -320,9 +463,11 @@ export class Perfil implements OnInit {
       return;
     }
 
-    const todosCompletos = this.itemsDevolucion().every(
-      (i) => i.seleccionado && i.cantidad_devuelta === i.cantidad_comprada,
-    );
+    // Total solo si se devuelve TODA la compra (si alguna prenda quedo fuera
+    // por ya tener su solicitud, es parcial).
+    const todosCompletos =
+      this.itemsDevolucion().length === venta.detalles.length &&
+      this.itemsDevolucion().every((i) => i.seleccionado && i.cantidad_devuelta === i.cantidad_comprada);
     const tipo = todosCompletos ? 'total' : 'parcial';
 
     this.guardandoDevolucion.set(true);
@@ -340,6 +485,7 @@ export class Perfil implements OnInit {
       );
 
       this.exitoDevolucion.set('Tu solicitud de devolución fue enviada con éxito. Nuestro personal la revisará.');
+      void this.cargarCompras();
 
       // Actualizar estado reactivamente en compras()
       this.compras.update((items) =>

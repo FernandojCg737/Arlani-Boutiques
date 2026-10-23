@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_ID: str = ""
     PAYPAL_CLIENT_SECRET: str = ""
     PAYPAL_MODE: str = "sandbox"
+    # Clave Fernet para cifrar el Secret de PayPal de cada tienda (si no se
+    # define, se deriva de SECRET_KEY).
+    PAGOS_CLAVE_CIFRADO: str = ""
 
     # CU18: redacta la razon personalizada de cada recomendacion (el ranking
     # en si lo calcula el motor de reglas en SQL, no el modelo). Si esta

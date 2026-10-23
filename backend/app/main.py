@@ -27,6 +27,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # El panel lee X-Suscripcion para llevar a "Mi suscripcion" si la tienda vencio.
+    expose_headers=["X-Suscripcion"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

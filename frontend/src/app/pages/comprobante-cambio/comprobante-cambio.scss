@@ -1,0 +1,21 @@
+// Sobre la base del comprobante de compra.
+.cambio-sentido {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  &--devuelve {
+    color: #b3261e !important;
+  }
+
+  &--recibe {
+    color: #2e7d32 !important;
+  }
+}
+
+.comprobante__tabla small {
+  font-size: 10px;
+  color: #999;
+}

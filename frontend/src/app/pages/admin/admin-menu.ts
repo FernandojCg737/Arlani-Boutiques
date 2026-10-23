@@ -48,6 +48,7 @@ export const ADMIN_MENU: AdminPackage[] = [
       { code: 'CU10', label: 'Gestion de Reservas', route: '/admin/reservas' },
       { code: 'CU11', label: 'Gestion de Ventas', route: '/admin/ventas' },
       { code: 'CU13', label: 'Administrar Carrito de Compras', route: '/admin/carritos' },
+      { code: 'CU21', label: 'Gestionar Metodos de Pago', route: '/admin/metodos-pago' },
     ],
   },
   {

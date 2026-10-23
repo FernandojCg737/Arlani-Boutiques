@@ -64,6 +64,8 @@ export interface PlanPlataforma {
   diasPrueba: number | null;
   iaGenerativa: boolean;
   operacionOffline: boolean;
+  // Porcentaje que Arlani cobra por cada venta de las tiendas del plan.
+  comisionPct: number;
   empresas: number;
 }
 
@@ -120,6 +122,7 @@ function aPlan(p: any): PlanPlataforma {
     diasPrueba: p.dias_prueba,
     iaGenerativa: p.ia_generativa,
     operacionOffline: p.operacion_offline,
+    comisionPct: num(p.comision_pct),
     empresas: p.empresas,
   };
 }
@@ -262,7 +265,7 @@ export class PlataformaApi {
 
   async actualizarPlan(
     codigo: string,
-    datos: { precio_mensual: number; max_sucursales: number; ia_generativa: boolean },
+    datos: { precio_mensual: number; max_sucursales: number; ia_generativa: boolean; comision_pct: number },
   ): Promise<PlanPlataforma> {
     return aPlan(await firstValueFrom(this.http.put(`${this.base}/planes/${codigo}`, datos)));
   }

@@ -132,7 +132,16 @@ export const PARCIALES: ParcialMenu[] = [
         nombre: 'Plataforma SaaS',
         casos: [
           { codigo: 'CU09', permisos: ['2P-CU09'], nombre: 'Gestionar empresas (tenants)', ruta: 'empresas', plataformas: ['WEB'] },
-          { codigo: 'CU10', permisos: ['2P-CU10'], nombre: 'Gestionar y verificar planes, suscripciones y límites', ruta: 'planes', plataformas: ['WEB', 'MÓVIL'] },
+          {
+            codigo: 'CU10', permisos: ['2P-CU10'],
+            nombre: 'Gestionar y verificar planes, suscripciones y límites',
+            ruta: 'planes',
+            plataformas: ['WEB', 'MÓVIL'],
+            subs: [
+              { etiqueta: 'Planes y suscripciones', ruta: 'planes' },
+              { etiqueta: 'Comisiones por tienda', ruta: 'comisiones' },
+            ],
+          },
         ],
       },
       {
@@ -156,9 +165,20 @@ export const PARCIALES: ParcialMenu[] = [
           { codigo: 'CU05', permisos: ['CU10'], nombre: 'Gestionar reservas (online y offline)', ruta: 'reservas', antes: 'CU10', plataformas: ['WEB', 'MÓVIL'] },
           { codigo: 'CU06', permisos: ['CU11'], nombre: 'Gestionar ventas (online y offline)', ruta: 'ventas', antes: 'CU11', plataformas: ['WEB', 'MÓVIL'] },
           {
+            codigo: 'CU19', permisos: ['CU21'],
+            nombre: 'Gestionar métodos de pago',
+            ruta: 'metodos-pago',
+            plataformas: ['WEB'],
+            porEmpresa: true,
+            descripcion:
+              'Cada tienda registra cómo le pagan: su PayPal (con sus credenciales), QR, transferencia u otros. Los pagos con comprobante los aprueba el personal.',
+          },
+          {
             codigo: 'CU15', permisos: ['2P-CU15'],
             nombre: 'Gestionar cambio de prendas',
+            ruta: 'cambios',
             plataformas: ['WEB', 'MÓVIL'],
+            porEmpresa: true,
             descripcion:
               'Cambiar una prenda vendida por otra (talla, color o modelo), ajustando el stock de la sucursal y la diferencia de precio. Parte de la base de devoluciones del 1er parcial.',
           },

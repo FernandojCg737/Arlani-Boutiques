@@ -25,6 +25,40 @@ class IngresoMesOut(BaseModel):
     ingresos: Decimal
 
 
+class ComisionTiendaOut(BaseModel):
+    # Lo que gana Arlani por las ventas en linea de una tienda.
+    empresa_id: int
+    nombre: str
+    subdominio: str
+    estado: str
+    plan_nombre: str | None
+    comision_pct: Decimal | None
+    ventas: int
+    ventas_bob: Decimal
+    comisiones_bob: Decimal
+    pagado_bob: Decimal
+    # Lo que la tienda debe hoy (todas las fechas).
+    saldo_bob: Decimal
+
+
+class LiquidacionOut(BaseModel):
+    # Envio de Arlani a una tienda por una compra con "Pagar todo".
+    id: int
+    empresa_id: int
+    empresa_nombre: str
+    fecha: datetime
+    paypal_order_id: str
+    bruto_bob: Decimal
+    comision_bob: Decimal
+    neto_bob: Decimal
+    neto_usd: Decimal
+    paypal_email: str
+    estado: str
+    payout_batch_id: str | None
+    error: str | None
+    fecha_envio: datetime | None
+
+
 class DistribucionPlanOut(BaseModel):
     codigo: str
     nombre: str
@@ -86,6 +120,7 @@ class PlanOut(BaseModel):
     dias_prueba: int | None
     ia_generativa: bool
     operacion_offline: bool
+    comision_pct: Decimal
     empresas: int
 
 
@@ -93,6 +128,8 @@ class PlanUpdate(BaseModel):
     precio_mensual: Decimal = Field(ge=0, le=100000)
     max_sucursales: int = Field(ge=1, le=500)
     ia_generativa: bool
+    # Porcentaje que Arlani cobra por cada venta de las tiendas de este plan.
+    comision_pct: Decimal = Field(ge=0, le=30)
 
 
 class LimiteSucursalesOut(BaseModel):

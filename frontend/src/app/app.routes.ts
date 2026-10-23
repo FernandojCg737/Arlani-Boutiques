@@ -7,9 +7,12 @@ import { AdminCatalogo } from './pages/admin/catalogo/catalogo';
 import { AdminClientes } from './pages/admin/clientes/clientes';
 import { AdminHome } from './pages/admin/home/home';
 import { AdminInventario } from './pages/admin/inventario/inventario';
+import { AdminMetodosPago } from './pages/admin/metodos-pago/metodos-pago';
 import { AdminPerfil } from './pages/admin/perfil/perfil';
 import { AdminProductos } from './pages/admin/productos/productos';
 import { AdminCarritos } from './pages/admin/carritos/carritos';
+import { AdminCambios } from './pages/admin/cambios/cambios';
+import { ComprobanteCambio } from './pages/comprobante-cambio/comprobante-cambio';
 import { AdminNotificaciones } from './pages/admin/notificaciones/notificaciones';
 import { AdminReportesDashboard } from './pages/admin/reportes/dashboard/dashboard';
 import { ReporteVentasPage } from './pages/admin/reportes/ventas/ventas';
@@ -52,6 +55,7 @@ import { SuperadminEmpresas } from './pages/superadmin/empresas/empresas';
 import { SuperadminElegirEmpresa } from './pages/superadmin/elegir-empresa/elegir-empresa';
 import { SuperadminEnConstruccion } from './pages/superadmin/en-construccion/en-construccion';
 import { SuperadminPlanes } from './pages/superadmin/planes/planes';
+import { SuperadminComisiones } from './pages/superadmin/comisiones/comisiones';
 import { SuperadminLayout } from './pages/superadmin/superadmin-layout';
 import { tiendaElegidaGuard } from './pages/superadmin/por-tienda';
 
@@ -88,7 +92,12 @@ export const routes: Routes = [
     canActivate: [clientePermisoGuard('CU13')],
     data: { header: 'plataforma', encabezadoSolido: true },
   },
-  { path: 'checkout', component: Checkout, canActivate: [authGuard, clientePermisoGuard('CU13')] },
+  {
+    path: 'checkout',
+    component: Checkout,
+    canActivate: [authGuard, clientePermisoGuard('CU13')],
+    data: { header: 'plataforma', encabezadoSolido: true },
+  },
   { path: 'producto/:id', component: ProductoDetalle },
   { path: 'login', component: Login, data: { hideChrome: true } },
   { path: 'registro', component: Registro, data: { hideChrome: true } },
@@ -105,6 +114,18 @@ export const routes: Routes = [
     component: Comprobante,
     canActivate: [authGuard],
     data: { hideChrome: true },
+  },
+  {
+    path: 'mis-cambios/:id',
+    component: ComprobanteCambio,
+    canActivate: [authGuard],
+    data: { hideChrome: true },
+  },
+  {
+    path: 'admin/cambio/:id',
+    component: ComprobanteCambio,
+    canActivate: [adminGuard, permisoGuard('CU11')],
+    data: { hideChrome: true, modo: 'admin' },
   },
   {
     path: 'admin/factura/:id',
@@ -129,6 +150,7 @@ export const routes: Routes = [
       { path: 'inventario', component: AdminInventario, canActivate: [permisoGuard('CU12')] },
       { path: 'perfil', component: AdminPerfil },
       { path: 'suscripcion', component: AdminSuscripcion, canActivate: [adminTiendaGuard] },
+      { path: 'metodos-pago', component: AdminMetodosPago, canActivate: [adminTiendaGuard] },
       { path: 'sesiones', component: AdminSesiones, canActivate: [permisoGuard('CU01')] },
       { path: 'bitacora', component: AdminBitacora, canActivate: [permisoGuard('CU17')] },
       { path: 'ar-uso', component: AdminArUso, canActivate: [permisoGuard('CU09')] },
@@ -164,6 +186,7 @@ export const routes: Routes = [
       { path: 'bitacora', component: AdminBitacora },
       { path: 'empresas', component: SuperadminEmpresas },
       { path: 'planes', component: SuperadminPlanes },
+      { path: 'comisiones', component: SuperadminComisiones },
       // CU03 y CU04: primero se elige la tienda (tiendas/:codigo) y la
       // pantalla muestra solo lo de esa tienda (?empresa=<id>).
       { path: 'tiendas/:codigo', component: SuperadminElegirEmpresa, data: { parcial: 'p2' } },
@@ -171,8 +194,10 @@ export const routes: Routes = [
       { path: 'productos', component: AdminProductos, canActivate: [tiendaElegidaGuard] },
       { path: 'catalogo', component: AdminCatalogo, canActivate: [tiendaElegidaGuard] },
       { path: 'inventario', component: AdminInventario, canActivate: [tiendaElegidaGuard] },
+      { path: 'metodos-pago', component: AdminMetodosPago, canActivate: [tiendaElegidaGuard] },
       { path: 'reservas', component: AdminReservas },
       { path: 'ventas', component: AdminVentas },
+      { path: 'cambios', component: AdminCambios, canActivate: [tiendaElegidaGuard], data: { pagina: true } },
       { path: 'reportes', component: AdminReportesDashboard },
       { path: 'reportes/ventas', component: ReporteVentasPage },
       { path: 'reportes/asistencia', component: ReporteAsistenciaPage },

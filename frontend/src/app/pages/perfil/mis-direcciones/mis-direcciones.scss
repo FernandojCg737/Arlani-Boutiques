@@ -1,0 +1,144 @@
+// Sobre la base de estilos del perfil (tarjetas y modal).
+:host {
+  display: block;
+}
+
+.md-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+
+  p {
+    margin: 0;
+    max-width: 60ch;
+    font-size: 13px;
+    color: #666;
+  }
+}
+
+.md-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-tarjeta {
+  border: 1px solid #e5e2df;
+  background: #fff;
+
+  &.is-pred {
+    border-color: var(--brand-dark);
+  }
+}
+
+.md-tarjeta__datos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 14px;
+  font-size: 13px;
+  color: #555;
+
+  strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--brand-dark);
+  }
+
+  small {
+    color: #888;
+  }
+}
+
+.md-pred {
+  padding: 2px 8px;
+  background: var(--brand-dark);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.md-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+
+  button,
+  a {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--brand-dark);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .is-danger {
+    color: #b3261e;
+  }
+}
+
+.md-modal {
+  max-width: 640px;
+}
+
+.md-alias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+
+  button {
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &.is-activo {
+      border-color: var(--brand-dark);
+      background: var(--brand-dark);
+      color: #fff;
+    }
+  }
+}
+
+.md-modal .devolucion-campo input[type='text'] {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--brand-dark);
+  outline: none;
+
+  &:focus {
+    border-color: var(--brand-dark);
+  }
+}
+
+.md-modal .devolucion-campos {
+  margin-top: 16px;
+}
+
+.md-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}

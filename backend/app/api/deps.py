@@ -1,8 +1,9 @@
 from collections.abc import Callable
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -18,9 +19,29 @@ ADMIN_TIPOS = {"administrador", "superadministrador"}
 STAFF_TIPOS = {*ADMIN_TIPOS, "encargado_sucursal", "cajero"}
 # Personal de una tienda: sus peticiones solo ven los datos de su empresa.
 PERSONAL_DE_TIENDA = {"administrador", "encargado_sucursal", "cajero"}
+# Con la suscripcion vencida el personal solo puede entrar, salir y ver o
+# pagar su suscripcion ("Mi suscripcion" vive en /mi-empresa).
+RUTAS_SIN_SUSCRIPCION = ("/auth/", "/mi-empresa/")
+
+
+def _verificar_tienda_operativa(db: Session, usuario: Usuario, request: Request) -> None:
+    fila = db.execute(
+        text("SELECT estado, fn_empresa_operativa(id) AS operativa FROM empresa WHERE id = :e"),
+        {"e": usuario.empresa_id},
+    ).first()
+    if fila is None or fila.operativa or any(r in request.url.path for r in RUTAS_SIN_SUSCRIPCION):
+        return
+    if fila.estado == "suspendida":
+        mensaje = "Tu tienda está suspendida por la plataforma. Comunícate con soporte de Arlani Boutiques."
+    elif usuario.tipo == "administrador":
+        mensaje = "La suscripción de tu tienda venció. Renuévala en Mi suscripción para seguir operando."
+    else:
+        mensaje = "La suscripción de tu tienda venció. El administrador debe renovarla para seguir operando."
+    raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, mensaje, headers={"X-Suscripcion": "vencida"})
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
     x_empresa: int | None = Header(default=None, alias="X-Empresa"),
@@ -29,6 +50,7 @@ def get_current_user(
     # El SuperAdministrador y los clientes (sin empresa) ven toda la plataforma.
     if usuario.empresa_id is not None and usuario.tipo in PERSONAL_DE_TIENDA:
         limitar_a_empresa(db, usuario.empresa_id)
+        _verificar_tienda_operativa(db, usuario, request)
     # El SuperAdministrador puede entrar a una tienda (CU03 sucursales, CU04
     # catalogo): con X-Empresa ve y modifica solo los datos de esa empresa,
     # con el mismo aislamiento (RLS) que el personal de la tienda.

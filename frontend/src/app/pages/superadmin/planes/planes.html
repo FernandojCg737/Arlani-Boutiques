@@ -3,7 +3,7 @@
     <span class="encabezado__ante encabezado__ante--pagina">CU10 · Planes, suscripciones y límites</span>
     <h1>Planes y suscripciones</h1>
     <p>
-      Ajusta precio, límite de sucursales e IA de cada plan. La base de datos impide bajar un límite por debajo de lo
+      Ajusta precio, comisión por venta, límite de sucursales e IA de cada plan. La base de datos impide bajar un límite por debajo de lo
       que una empresa ya usa.
     </p>
   </div>
@@ -53,6 +53,24 @@
         } @else {
           <em>Anual: Bs {{ borrador(p.codigo).precio * 10 | number: '1.0-0' }} (2 meses de regalo)</em>
         }
+      </label>
+
+      <!-- Comision de Arlani por venta -->
+      <label class="plan__precio">
+        <span>Comisión por venta</span>
+        <div>
+          <input
+            type="number"
+            min="0"
+            max="30"
+            step="0.5"
+            inputmode="decimal"
+            [value]="borrador(p.codigo).comision"
+            (input)="editar(p.codigo, { comision: +$any($event.target).value })"
+          />
+          <b>%</b>
+        </div>
+        <em>Lo que Arlani cobra de cada venta de las tiendas de este plan.</em>
       </label>
 
       <!-- Sucursales -->

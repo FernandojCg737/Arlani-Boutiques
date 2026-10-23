@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PayPal</title>
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+</style>
+</head>
+<body>
+<div id="botones"></div>
+<script>
+  // Botones de PayPal de UNA tienda (su client-id), aislados en este iframe:
+  // PayPal no deja dos SDK con client-id distinto en la misma pagina. La
+  // pagina que lo incluye (mismo sitio) hace las llamadas al backend; ver
+  // PaypalSdk.montarBotones en services/paypal-sdk.ts.
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var registro = window.parent && window.parent.__arlaniPaypal;
+    var acciones = registro && registro[q.get('canal')];
+    if (!acciones) return;
+    function altura() {
+      acciones.altura(document.body.scrollHeight);
+    }
+    var s = document.createElement('script');
+    s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(q.get('client-id')) +
+      '&currency=USD&intent=capture&enable-funding=card&locale=es_BO';
+    s.onload = function () {
+      window.paypal.Buttons({
+        createOrder: function () { return acciones.crearOrden(); },
+        onApprove: function (data) { return acciones.aprobar(data.orderID); },
+        onCancel: function () { acciones.cancelar(); },
+        onError: function (e) { acciones.error(e); }
+      }).render('#botones').then(altura, function (e) { acciones.error(e); });
+      new ResizeObserver(altura).observe(document.body);
+    };
+    s.onerror = function () { acciones.error(new Error('No se pudo cargar el SDK de PayPal.')); };
+    document.head.appendChild(s);
+  })();
+</script>
+</body>
+</html>

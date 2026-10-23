@@ -9,162 +9,263 @@
 
   <div class="checkout-page__header">
     <h1>Finalizar compra</h1>
+    @if (estado() === 'listo' && tiendas().length > 1) {
+      <p>
+        Tu carrito tiene prendas de {{ tiendas().length }} tiendas. Cada tienda cobra por separado con sus propios
+        métodos: paga una y luego la siguiente.
+      </p>
+    }
   </div>
+
+  <!-- Lo que ya se pago en esta visita -->
+  @if (pagadas().length > 0) {
+    <div class="checkout-pagadas">
+      @for (p of pagadas(); track $index) {
+        <div class="checkout-pagada" [style.--marca]="p.color">
+          <strong>{{ p.tienda }}</strong>
+          @if (p.pendiente) {
+            <span>Recibimos tu comprobante ({{ p.metodo }}). La tienda lo revisa y te avisamos cuando confirme tu pago.</span>
+          } @else {
+            <span>Pagado con {{ p.metodo }}. Ya puedes recoger tu pedido.</span>
+          }
+          <span class="checkout-pagada__ventas">
+            @for (v of p.ventas; track v.id) {
+              <a [routerLink]="['/mis-compras', v.id]">Compra #{{ v.id }} · {{ v.sucursal_nombre }}</a>
+            }
+          </span>
+        </div>
+      }
+    </div>
+  }
 
   @if (estado() === 'cargando') {
     <p class="checkout-mensaje">Cargando...</p>
-  }
-
-  @if (estado() === 'vacio') {
-    <div class="checkout-empty">
-      <h2>Tu carrito esta vacio</h2>
-      <a routerLink="/tienda-atelier-aranier">Ir a la tienda</a>
-    </div>
   }
 
   @if (estado() === 'error') {
     <p class="checkout-mensaje">No pudimos cargar el checkout. Intenta de nuevo en unos segundos.</p>
   }
 
-  @if (estado() === 'formulario' || estado() === 'procesando') {
-    <div class="checkout-content">
-      <div class="checkout-resumen">
-        <h2>Resumen</h2>
-
-        @for (grupo of gruposPorSucursal(); track grupo.sucursal_nombre) {
-          <p class="checkout-resumen__sucursal">Retiras en {{ grupo.sucursal_nombre }}</p>
-          <ul>
-            @for (item of grupo.items; track item.id) {
-              <li>
-                <span>{{ item.cantidad }}x {{ item.producto_nombre }} ({{ item.talla_codigo }}, {{ item.color_nombre }})</span>
-                <span>{{ item.subtotal | number: '1.2-2' }} Bs</span>
-              </li>
-            }
-          </ul>
-        }
-
-        @if (gruposPorSucursal().length > 1) {
-          <p class="checkout-nota">
-            Tu pedido se retira en {{ gruposPorSucursal().length }} sucursales distintas -- se va a generar una
-            compra separada por cada una, todas pagadas de una sola vez.
-          </p>
-        }
-
-        <div class="checkout-resumen__total">
-          <span>Total</span>
-          <span>{{ cart.totalPrice() | number: '1.2-2' }} Bs</span>
-        </div>
-      </div>
-
-      <div class="checkout-form">
-        @if (errorMsg()) {
-          <div class="checkout-error">{{ errorMsg() }}</div>
-        }
-
-        @if (verificandoStock()) {
-          <p class="checkout-nota">Comprobando stock...</p>
-        }
-
-        @if (!verificandoStock() && itemsSinStock().length > 0) {
-          <div class="checkout-error">
-            <p>Ya no hay stock suficiente de:</p>
-            <ul>
-              @for (item of itemsSinStock(); track item.detalle_id) {
-                <li>
-                  {{ item.producto_nombre }} ({{ item.talla_codigo }}, {{ item.color_nombre }}) en
-                  {{ item.sucursal_nombre }} -- pediste {{ item.cantidad_pedida }}, hay {{ item.cantidad_disponible }}
-                </li>
-              }
-            </ul>
-            <p>Volve al carrito y ajusta las cantidades o saca esos productos.</p>
-          </div>
-        }
-
-        @if (stockOk()) {
-        <div class="checkout-metodos">
-          <button
-            type="button"
-            class="checkout-metodo"
-            [class.checkout-metodo--activo]="metodo() === 'paypal'"
-            (click)="onMetodoChange('paypal')"
-          >
-            PayPal / Tarjeta de credito
-          </button>
-          <button
-            type="button"
-            class="checkout-metodo"
-            [class.checkout-metodo--activo]="metodo() === 'qr'"
-            (click)="onMetodoChange('qr')"
-          >
-            QR (transferencia)
-          </button>
-        </div>
-
-        @if (metodo() === 'paypal') {
-          <p class="checkout-nota">
-            El pago se hace en dolares (USD) a traves de PayPal, aunque los precios de la tienda esten en bolivianos.
-          </p>
-          <div #paypalContainer class="checkout-paypal"></div>
-        }
-
-        @if (metodo() === 'qr') {
-          <p class="checkout-nota">
-            Escanea el QR, transfiere el total de tu compra y sube una foto del comprobante. Un encargado de la
-            sucursal lo va a revisar antes de confirmar tu compra.
-          </p>
-          <div class="checkout-qr-monto">
-            <span>MONTO EXACTO A TRANSFERIR</span>
-            <strong>{{ cart.totalPrice() | number: '1.2-2' }} Bs</strong>
-          </div>
-          <img class="checkout-qr-img" src="/img/pago/qr-transferencia.png" alt="QR para pagar por transferencia" />
-          <p class="checkout-qr-aviso">
-            Este QR es de monto libre: escribi vos el monto de arriba al escanearlo. Si transferis un monto distinto,
-            la revision de tu comprobante se va a demorar mas.
-          </p>
-          <label class="checkout-campo">
-            <span>Foto del comprobante</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onArchivoSeleccionado($event)" />
-          </label>
-          <button
-            type="button"
-            class="checkout-enviar"
-            [disabled]="!archivoComprobante() || estado() === 'procesando'"
-            (click)="enviarQr()"
-          >
-            {{ estado() === 'procesando' ? 'Enviando...' : 'Enviar comprobante' }}
-          </button>
-        }
-        }
-      </div>
+  @if (estado() === 'vacio') {
+    <div class="checkout-empty">
+      @if (pagadas().length > 0) {
+        <h2>¡Listo! No te queda nada por pagar</h2>
+        <p>Puedes ver tus compras y sus facturas en Mi cuenta.</p>
+        <a routerLink="/perfil">Ver mis compras</a>
+      } @else {
+        <h2>Tu carrito está vacío</h2>
+        <a routerLink="/catalogo">Ir al catálogo</a>
+      }
     </div>
   }
 
   @if (estado() === 'listo') {
-    <div class="checkout-exito">
-      <h2>Tu compra fue pagada con exito</h2>
-      @if (ventasCreadas().length > 1) {
-        <p>Se generaron {{ ventasCreadas().length }} compras (una por sucursal). Te esperamos en cada una para recoger tu pedido:</p>
-        <ul>
-          @for (venta of ventasCreadas(); track venta.id) {
-            <li>Compra #{{ venta.id }} -- {{ venta.sucursal_nombre }}</li>
-          }
-        </ul>
-      } @else {
-        <p>Te esperamos en la sucursal que elegiste para recoger tu pedido.</p>
-      }
-      <button type="button" (click)="irATienda()">Seguir comprando</button>
-    </div>
-  }
+    @if (errorMsg()) {
+      <div class="checkout-error" role="alert">{{ errorMsg() }}</div>
+    }
 
-  @if (estado() === 'listo-qr') {
-    <div class="checkout-exito">
-      <h2>Comprobante recibido</h2>
-      @if (ventasCreadas().length > 1) {
-        <p>Tu compra queda pendiente de verificacion en {{ ventasCreadas().length }} sucursales distintas. Te avisaremos cuando se confirme cada pago.</p>
-      } @else {
-        <p>Tu compra queda pendiente de verificacion. Te avisaremos cuando se confirme el pago.</p>
+    <section class="checkout-entrega">
+      <p class="checkout-etiqueta">¿Cómo recibes tu pedido?</p>
+      <div class="checkout-entrega__opciones">
+        <button type="button" class="checkout-metodo" [class.checkout-metodo--activo]="entrega() === 'retiro'"
+                (click)="elegirEntrega('retiro')">
+          Recojo en sucursal
+          <small>Lo recoges en la sucursal de cada prenda</small>
+        </button>
+        <button type="button" class="checkout-metodo" [class.checkout-metodo--activo]="entrega() === 'envio'"
+                (click)="elegirEntrega('envio')">
+          Envío a domicilio
+          <small>La tienda te lo envía a tu dirección</small>
+        </button>
+      </div>
+      @if (entrega() === 'envio') {
+        <div class="checkout-direcciones">
+          @for (d of direcciones(); track d.id) {
+            <label class="checkout-direccion" [class.is-activa]="direccionId() === d.id">
+              <input type="radio" name="direccion" [checked]="direccionId() === d.id" (change)="direccionId.set(d.id)" />
+              <span>
+                <strong>{{ d.alias }}</strong>
+                {{ d.direccion }}{{ d.ciudad ? ', ' + d.ciudad : '' }}
+                @if (d.referencia) {
+                  <small>{{ d.referencia }}</small>
+                }
+              </span>
+            </label>
+          }
+          <button type="button" class="checkout-direccion-nueva" (click)="agregarDireccion()">
+            + {{ direcciones().length ? 'Agregar otra dirección' : 'Agregar mi dirección con el mapa' }}
+          </button>
+          <p class="checkout-nota">Cada tienda coordina contigo el costo y la hora de entrega.</p>
+        </div>
       }
-      <button type="button" (click)="irATienda()">Seguir comprando</button>
+    </section>
+    <app-mis-direcciones [soloFormulario]="true" (guardada)="alGuardarDireccion($event)" />
+
+    <div class="checkout-tiendas">
+      @for (t of tiendas(); track t.empresa_id) {
+        <article class="checkout-tienda" [style.--marca]="t.color_marca" [class.is-activa]="tiendaActiva() === t.empresa_id">
+          <header class="checkout-tienda__cabecera">
+            @if (t.logo_url) {
+              <img [src]="t.logo_url" [alt]="t.nombre" />
+            } @else {
+              <span class="checkout-tienda__inicial">{{ t.nombre.charAt(0) }}</span>
+            }
+            <div>
+              <h2>{{ t.nombre }}</h2>
+              <span>Retiras en {{ sucursales(t).join(', ') }}</span>
+            </div>
+          </header>
+
+          <div class="checkout-tienda__cuerpo">
+            <ul class="checkout-items">
+              @for (item of t.items; track item.detalle_id) {
+                <li [class.sin-stock]="sinStock().has(item.detalle_id)">
+                  <span>{{ item.cantidad }}× {{ item.producto_nombre }} ({{ item.talla_codigo }}, {{ item.color_nombre }})</span>
+                  <span>{{ item.subtotal | number: '1.2-2' }} Bs</span>
+                </li>
+              }
+            </ul>
+            <div class="checkout-resumen__total">
+              <span>Total {{ t.nombre }}</span>
+              <span>{{ t.total | number: '1.2-2' }} Bs</span>
+            </div>
+
+            @if (!t.operativa) {
+              <p class="checkout-aviso">
+                Esta tienda no está recibiendo pedidos por ahora. Quita sus prendas del carrito para pagar lo demás.
+              </p>
+            } @else if (t.metodos.length === 0) {
+              <p class="checkout-aviso">
+                Esta tienda todavía no configuró cómo cobrar en línea. Puedes pagar en la sucursal o volver más tarde.
+              </p>
+            } @else if (faltantes(t).length > 0) {
+              <div class="checkout-error">
+                <p>Ya no hay stock suficiente de:</p>
+                <ul>
+                  @for (s of faltantes(t); track s.detalle_id) {
+                    <li>
+                      {{ s.producto_nombre }} ({{ s.talla_codigo }}, {{ s.color_nombre }}) en {{ s.sucursal_nombre }}:
+                      pediste {{ s.cantidad_pedida }}, hay {{ s.cantidad_disponible }}
+                    </li>
+                  }
+                </ul>
+                <p>Vuelve al carrito y ajusta las cantidades o quita esas prendas.</p>
+              </div>
+            } @else {
+              <p class="checkout-etiqueta">¿Cómo pagas a {{ t.nombre }}?</p>
+              <div class="checkout-metodos">
+                @for (m of t.metodos; track m.id) {
+                  <button
+                    type="button"
+                    class="checkout-metodo"
+                    [class.checkout-metodo--activo]="esActivo(t, m)"
+                    [disabled]="!puedePagar(t) || procesando()"
+                    (click)="elegir(t, m)"
+                  >
+                    {{ m.nombre }}
+                    <small>{{ m.requiere_comprobante ? 'Con comprobante' : 'Se confirma al instante' }}</small>
+                  </button>
+                }
+              </div>
+
+              @if (tiendaActiva() === t.empresa_id && entregaLista()) {
+              @if (metodoActivo(); as m) {
+                <div class="checkout-pago">
+                  @if (m.tipo === 'paypal') {
+                    <p class="checkout-nota">
+                      Pagas US$ {{ t.total_usd }} (al cambio oficial) con PayPal o tarjeta; el dinero va directo a
+                      {{ t.nombre }}.
+                    </p>
+                    @if (procesando()) {
+                      <p class="checkout-nota">Confirmando tu pago…</p>
+                    }
+                    <div #paypalContainer class="checkout-paypal"></div>
+                  } @else {
+                    <div class="checkout-qr-monto">
+                      <span>Monto exacto a pagar</span>
+                      <strong>{{ t.total | number: '1.2-2' }} Bs</strong>
+                    </div>
+                    @if (m.qr_url) {
+                      <img class="checkout-qr-img" [src]="m.qr_url" [alt]="'QR de cobro de ' + t.nombre" />
+                    }
+                    @if (m.banco || m.numero_cuenta || m.titular) {
+                      <dl class="checkout-datos">
+                        @if (m.banco) {
+                          <dt>Banco</dt>
+                          <dd>{{ m.banco }}</dd>
+                        }
+                        @if (m.numero_cuenta) {
+                          <dt>Cuenta</dt>
+                          <dd>{{ m.numero_cuenta }}{{ m.tipo_cuenta ? ' · ' + m.tipo_cuenta : '' }}</dd>
+                        }
+                        @if (m.titular) {
+                          <dt>Titular</dt>
+                          <dd>{{ m.titular }}{{ m.documento_titular ? ' · ' + m.documento_titular : '' }}</dd>
+                        }
+                      </dl>
+                    }
+                    @if (m.instrucciones) {
+                      <p class="checkout-instrucciones">{{ m.instrucciones }}</p>
+                    }
+                    <p class="checkout-nota">
+                      Paga el monto exacto y sube la foto del comprobante. El personal de {{ t.nombre }} lo revisa
+                      antes de confirmar tu compra.
+                    </p>
+                    <label class="checkout-campo">
+                      <span>Foto del comprobante</span>
+                      <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onArchivo($event)" />
+                    </label>
+                    <button
+                      type="button"
+                      class="checkout-enviar"
+                      [disabled]="!archivo() || procesando()"
+                      (click)="enviarComprobante(t)"
+                    >
+                      {{ procesando() ? 'Enviando…' : 'Enviar comprobante a ' + t.nombre }}
+                    </button>
+                  }
+                </div>
+              }
+              }
+            }
+          </div>
+        </article>
+      }
     </div>
+
+    @if (tiendas().length > 1) {
+      <section class="checkout-todo" [class.is-activa]="modoTodo()">
+        <div class="checkout-total-general">
+          <span>Total de tu carrito</span>
+          <strong>{{ totalGeneral() | number: '1.2-2' }} Bs</strong>
+        </div>
+        @if (puedePagarTodo()) {
+          <div class="checkout-todo__cuerpo">
+            <div>
+              <h2>¿Prefieres pagar todo junto?</h2>
+              <p>
+                Un solo pago con PayPal o tarjeta (US$ {{ totalUsd() }}) para las {{ tiendas().length }} tiendas. Arlani
+                Boutiques cobra y le envía a cada tienda lo suyo al instante. Recibes una factura de cada tienda.
+              </p>
+            </div>
+            @if (!modoTodo()) {
+              <button type="button" class="checkout-enviar" [disabled]="procesando() || !entregaLista()" (click)="abrirPagarTodo()">
+                Pagar todo junto
+              </button>
+            }
+          </div>
+          @if (modoTodo() && entregaLista()) {
+            @if (procesando()) {
+              <p class="checkout-nota">Confirmando tu pago…</p>
+            }
+            <div #paypalTodo class="checkout-paypal"></div>
+          }
+        } @else if (stock() !== null) {
+          <p class="checkout-nota">
+            Pagar todo junto no está disponible: {{ razonesSinPagarTodo() }}. Paga cada tienda por separado.
+          </p>
+        }
+      </section>
+    }
   }
 </section>

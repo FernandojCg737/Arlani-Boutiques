@@ -1,10 +1,11 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { MarcaTienda } from '../../../services/marca-tienda';
+import { colorParaTextoBlanco } from '../../../services/marca-tienda';
+import { ESTADO_PAGO_LABEL, METODO_LABEL, TiendaFactura } from '../../comprobante/comprobante';
 
 interface DetalleVenta {
   id: number;
@@ -23,18 +24,14 @@ interface VentaAdmin {
   total: string;
   estado: string;
   metodo_pago: string;
+  metodo_pago_nombre: string | null;
   estado_pago: string;
   cliente_nombre: string;
   cliente_email: string;
   atendido_por_nombre: string | null;
+  tienda: TiendaFactura | null;
   detalles: DetalleVenta[];
 }
-
-const METODO_LABEL: Record<string, string> = {
-  paypal: 'PayPal / Tarjeta de credito',
-  qr: 'QR (transferencia)',
-  efectivo: 'Efectivo en sucursal',
-};
 
 // CU11: factura/comprobante de una venta cualquiera (no solo las propias),
 // para que el staff pueda verla o "descargarla" (imprimir a PDF) desde el
@@ -47,8 +44,6 @@ const METODO_LABEL: Record<string, string> = {
   styleUrl: './factura.scss',
 })
 export class AdminFactura implements OnInit {
-  // Logo, nombre y contacto de la tienda que emite el comprobante.
-  protected readonly marca = inject(MarcaTienda);
   private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);
 
@@ -56,9 +51,16 @@ export class AdminFactura implements OnInit {
   protected readonly cargando = signal(true);
   protected readonly error = signal('');
   protected readonly metodoLabel = METODO_LABEL;
+  protected readonly estadoLabel = ESTADO_PAGO_LABEL;
+
+  // Logo, color y datos fiscales de la tienda que emite el comprobante
+  // (vienen con la venta: cada tienda factura solo lo suyo).
+  protected readonly color = computed(() => {
+    const t = this.venta()?.tienda;
+    return t ? colorParaTextoBlanco(t.color_marca) : null;
+  });
 
   ngOnInit(): void {
-    void this.marca.cargar();
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.error.set('Venta no encontrada.');

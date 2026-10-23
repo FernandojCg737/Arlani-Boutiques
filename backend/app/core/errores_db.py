@@ -33,7 +33,58 @@ MENSAJES: dict[str, tuple[int, str]] = {
         status.HTTP_409_CONFLICT,
         "No se puede bajar el límite: hay empresas que ya lo superan.",
     ),
-    "plan_valores_invalidos": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Precio o límite de sucursales no válidos."),
+    "plan_valores_invalidos": (
+        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        "Precio, límite de sucursales o comisión no válidos (la comisión va de 0 % a 30 %).",
+    ),
+    "prueba_no_renovable": (
+        status.HTTP_409_CONFLICT,
+        "El plan de prueba no se puede volver a contratar: elige el plan Básico o Profesional.",
+    ),
+    "pago_ya_usado": (status.HTTP_409_CONFLICT, "Ese pago de PayPal ya se usó para otra suscripción."),
+    # Metodos de pago de cada tienda
+    "metodo_pago_invalido": (
+        status.HTTP_409_CONFLICT,
+        "Ese método de pago no está disponible para esta tienda. Elige otro.",
+    ),
+    "tienda_no_operativa": (status.HTTP_409_CONFLICT, "Esta tienda no está recibiendo pedidos por ahora."),
+    "comprobante_requerido": (status.HTTP_400_BAD_REQUEST, "Sube la foto de tu comprobante de pago."),
+    "pago_no_verificable": (status.HTTP_409_CONFLICT, "Este pago ya fue revisado o no tiene comprobante que revisar."),
+    "motivo_rechazo_requerido": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Escribe el motivo del rechazo."),
+    # Cambio de prendas
+    "cambio_venta_invalida": (status.HTTP_409_CONFLICT, "Esa compra no admite cambios (debe estar pagada y ser tuya)."),
+    "cambio_fuera_de_plazo": (
+        status.HTTP_409_CONFLICT,
+        "Pasaron más de 24 horas desde tu compra: ya no se puede cambiar.",
+    ),
+    "cambio_cantidad_invalida": (
+        status.HTTP_409_CONFLICT,
+        "No puedes cambiar esa cantidad: revisa cuántas prendas te quedan por cambiar.",
+    ),
+    "prenda_ya_solicitada": (
+        status.HTTP_409_CONFLICT,
+        "Esa prenda ya tuvo una solicitud de cambio o devolución: solo se permite una.",
+    ),
+    "cambio_sucursal_invalida": (
+        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        "Elige una sucursal de la misma tienda para recoger tu prenda.",
+    ),
+    "cambio_misma_prenda": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Elige una prenda distinta a la que compraste."),
+    "cambio_no_pendiente": (status.HTTP_409_CONFLICT, "Este cambio ya fue atendido."),
+    "cambio_sin_pago_pendiente": (status.HTTP_409_CONFLICT, "Este cambio no tiene una diferencia por pagar."),
+    "destino_invalido": (status.HTTP_422_UNPROCESSABLE_ENTITY, "Elige qué hacer con la prenda devuelta."),
+    # "Pagar todo": liquidacion a cada tienda
+    "liquidacion_invalida": (status.HTTP_409_CONFLICT, "No se pudo liquidar la compra a una de las tiendas."),
+    "tienda_sin_paypal_email": (
+        status.HTTP_409_CONFLICT,
+        "Una de las tiendas de tu carrito no recibe pagos con PayPal: págala por separado.",
+    ),
+    # Estado de cuenta de la tienda (comisiones de Arlani)
+    "saldo_sin_deuda": (status.HTTP_409_CONFLICT, "No tienes comisiones pendientes de pago."),
+    "saldo_cambio": (
+        status.HTTP_409_CONFLICT,
+        "Tu saldo cambió mientras pagabas (entró una venta nueva). Vuelve a intentarlo.",
+    ),
     # Compra de la suscripcion (/empezar)
     "correo_en_uso": (
         status.HTTP_409_CONFLICT,

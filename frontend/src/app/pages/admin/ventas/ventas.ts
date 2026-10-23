@@ -5,6 +5,8 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { CatalogoPublico } from '../../../services/catalogo-publico';
+import { enlaceMapa } from '../../../services/mapa';
+import { AdminCambios } from '../cambios/cambios';
 
 interface DetalleVentaItem {
   id: number;
@@ -27,6 +29,9 @@ interface VentaItem {
   total: string;
   estado: string;
   metodo_pago: string;
+  metodo_pago_nombre: string | null;
+  motivo_rechazo: string | null;
+  envio: EnvioVenta | null;
   estado_pago: string;
   cliente_nombre: string;
   cliente_email: string;
@@ -36,6 +41,17 @@ interface VentaItem {
   tiene_devolucion: boolean;
   estado_devolucion: string | null;
   monto_devolucion: string | null;
+}
+
+interface EnvioVenta {
+  destinatario: string;
+  telefono: string | null;
+  direccion: string;
+  referencia: string | null;
+  ciudad: string | null;
+  latitud: string;
+  longitud: string;
+  estado: 'pendiente' | 'enviado' | 'entregado';
 }
 
 interface VentaPage {
@@ -139,7 +155,7 @@ interface ItemDevolucionSeleccion {
   seleccionado: boolean;
 }
 
-type Vista = 'ventas' | 'reservas' | 'devoluciones';
+type Vista = 'ventas' | 'reservas' | 'devoluciones' | 'cambios';
 
 // CU11: panel financiero de staff (Administrador, Encargado de Sucursal,
 // Cajero) -- reune ventas en linea (PayPal), por QR (con aprobacion manual)
@@ -147,7 +163,7 @@ type Vista = 'ventas' | 'reservas' | 'devoluciones';
 // en efectivo.
 @Component({
   selector: 'app-admin-ventas',
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink, AdminCambios],
   templateUrl: './ventas.html',
   styleUrl: './ventas.scss',
 })
@@ -326,12 +342,41 @@ export class AdminVentas implements OnInit {
     }
   }
 
-  protected async aprobarQr(venta: VentaItem): Promise<void> {
-    if (!confirm(`Aprobar el pago QR de la venta #${venta.id}? Esto descuenta el stock.`)) return;
+  // CU21: los pagos con comprobante (QR, transferencia u otro metodo de la
+  // tienda) los aprueba o rechaza el Administrador, Encargado o Cajero.
+  protected nombreMetodo(v: VentaItem): string {
+    return v.metodo_pago_nombre ?? this.metodosPagoLabels[v.metodo_pago] ?? v.metodo_pago;
+  }
+
+  // Envio a domicilio: la direccion del momento de la compra y su estado.
+  protected readonly enlaceMapa = enlaceMapa;
+  protected readonly estadoEnvioLabel: Record<string, string> = {
+    pendiente: 'Por enviar',
+    enviado: 'En camino',
+    entregado: 'Entregado',
+  };
+
+  protected async marcarEnvio(venta: VentaItem, estado: 'enviado' | 'entregado'): Promise<void> {
     this.procesando.set(venta.id);
     this.error.set('');
     try {
-      await firstValueFrom(this.http.post(`${environment.apiUrl}/ventas/${venta.id}/aprobar-qr`, {}));
+      const nueva = await firstValueFrom(
+        this.http.post<VentaItem>(`${environment.apiUrl}/ventas/${venta.id}/envio`, { estado }),
+      );
+      this.items.update((vs) => vs.map((x) => (x.id === nueva.id ? nueva : x)));
+    } catch (err) {
+      this.error.set(this.extraerError(err));
+    } finally {
+      this.procesando.set(null);
+    }
+  }
+
+  protected async aprobarPago(venta: VentaItem): Promise<void> {
+    if (!confirm(`¿Aprobar el pago (${this.nombreMetodo(venta)}) de la venta #${venta.id}? Esto descuenta el stock.`)) return;
+    this.procesando.set(venta.id);
+    this.error.set('');
+    try {
+      await firstValueFrom(this.http.post(`${environment.apiUrl}/ventas/${venta.id}/aprobar-pago`, {}));
       await this.load();
     } catch (err) {
       this.error.set(this.extraerError(err));
@@ -340,15 +385,41 @@ export class AdminVentas implements OnInit {
     }
   }
 
-  protected async rechazarQr(venta: VentaItem): Promise<void> {
-    if (!confirm(`Rechazar el pago QR de la venta #${venta.id}?`)) return;
+  protected readonly rechazando = signal<VentaItem | null>(null);
+  protected readonly motivoRechazo = signal('');
+  protected readonly errorRechazo = signal('');
+  protected readonly motivosRapidos = [
+    'El monto del comprobante no coincide con el total.',
+    'No encontramos el depósito en nuestra cuenta.',
+    'La foto del comprobante no se lee bien.',
+  ];
+
+  protected abrirRechazo(venta: VentaItem): void {
+    this.rechazando.set(venta);
+    this.motivoRechazo.set('');
+    this.errorRechazo.set('');
+  }
+
+  protected cerrarRechazo(): void {
+    this.rechazando.set(null);
+  }
+
+  protected async confirmarRechazo(): Promise<void> {
+    const venta = this.rechazando();
+    const motivo = this.motivoRechazo().trim();
+    if (!venta) return;
+    if (motivo.length < 3) {
+      this.errorRechazo.set('Escribe el motivo: el cliente lo verá en Mis compras.');
+      return;
+    }
     this.procesando.set(venta.id);
-    this.error.set('');
+    this.errorRechazo.set('');
     try {
-      await firstValueFrom(this.http.post(`${environment.apiUrl}/ventas/${venta.id}/rechazar-qr`, {}));
+      await firstValueFrom(this.http.post(`${environment.apiUrl}/ventas/${venta.id}/rechazar-pago`, { motivo }));
+      this.rechazando.set(null);
       await this.load();
     } catch (err) {
-      this.error.set(this.extraerError(err));
+      this.errorRechazo.set(this.extraerError(err));
     } finally {
       this.procesando.set(null);
     }
@@ -707,6 +778,14 @@ export class AdminVentas implements OnInit {
     defecto: 'Producto defectuoso',
     talla_incorrecta: 'Talla incorrecta',
     insatisfaccion: 'Insatisfaccion',
+    otro: 'Otro',
+  };
+
+  protected readonly metodosPagoLabels: Record<string, string> = {
+    efectivo: 'Efectivo',
+    paypal: 'PayPal',
+    qr: 'QR',
+    transferencia: 'Transferencia',
     otro: 'Otro',
   };
 

@@ -3,7 +3,10 @@
     <div>
       <span class="admin-content__eyebrow">P4 · CU11</span>
       <h1>Gestion de Ventas</h1>
-      <p>Ventas en linea (PayPal), por QR y de mostrador -- las finanzas de la venta en un solo lugar.</p>
+      <p>
+        Ventas en línea (PayPal o con comprobante: QR, transferencia y otros) y de mostrador. Las finanzas de la venta,
+        en un solo lugar.
+      </p>
     </div>
 
     <div class="admin-filtros">
@@ -15,7 +18,7 @@
 
       <select [value]="filtroEstadoPago()" (change)="filtroEstadoPago.set($any($event.target).value); filtrar()">
         <option value="">Todos los pagos</option>
-        <option value="verificando">QR por verificar</option>
+        <option value="verificando">Comprobantes por revisar</option>
         <option value="completado">Completado</option>
         <option value="rechazado">Rechazado</option>
       </select>
@@ -39,7 +42,14 @@
     <button type="button" [class.is-active]="vista() === 'devoluciones'" (click)="cambiarVista('devoluciones')">
       Devoluciones
     </button>
+    <button type="button" [class.is-active]="vista() === 'cambios'" (click)="cambiarVista('cambios')">
+      Cambios de prenda
+    </button>
   </nav>
+
+  @if (vista() === 'cambios') {
+    <app-admin-cambios />
+  }
 
   @if (error()) {
     <div class="admin-error">{{ error() }}</div>
@@ -136,7 +146,26 @@
                 </div>
               </td>
               <td>{{ v.tipo === 'venta_digital' ? 'En linea' : 'Mostrador' }}</td>
-              <td>{{ v.sucursal_nombre }}</td>
+              <td>
+                {{ v.sucursal_nombre }}
+                @if (v.envio; as e) {
+                  <div class="ventas-envio">
+                    <strong>Envío a domicilio · {{ estadoEnvioLabel[e.estado] }}</strong>
+                    <span>{{ e.direccion }}{{ e.ciudad ? ', ' + e.ciudad : '' }}</span>
+                    @if (e.referencia) {
+                      <span>Ref.: {{ e.referencia }}</span>
+                    }
+                    <span>{{ e.destinatario }}{{ e.telefono ? ' · ' + e.telefono : '' }}</span>
+                    <a [href]="enlaceMapa(e.latitud, e.longitud)" target="_blank" rel="noopener">Ver ubicación en el mapa</a>
+                    @if (v.estado === 'pagada' && e.estado !== 'entregado') {
+                      <button type="button" [disabled]="procesando() === v.id"
+                              (click)="marcarEnvio(v, e.estado === 'pendiente' ? 'enviado' : 'entregado')">
+                        {{ e.estado === 'pendiente' ? 'Marcar como enviado' : 'Marcar como entregado' }}
+                      </button>
+                    }
+                  </div>
+                }
+              </td>
               <td>{{ v.fecha | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }}</td>
               <td>
                 <ul class="ventas-detalles">
@@ -147,19 +176,22 @@
               </td>
               <td>{{ v.total }} Bs</td>
               <td>
-                <span class="admin-badge admin-badge--{{ v.estado_pago }}">{{ v.metodo_pago }} · {{ v.estado_pago }}</span>
+                <span class="admin-badge admin-badge--{{ v.estado_pago }}">{{ nombreMetodo(v) }} · {{ v.estado_pago }}</span>
                 @if (v.comprobante_url) {
                   <a class="ventas-comprobante" [href]="v.comprobante_url" target="_blank" rel="noopener">
                     Ver comprobante
                   </a>
+                }
+                @if (v.estado_pago === 'rechazado' && v.motivo_rechazo) {
+                  <span class="ventas-motivo">Motivo: {{ v.motivo_rechazo }}</span>
                 }
               </td>
               <td>{{ v.atendido_por_nombre ?? '-' }}</td>
               <td>
                 <div class="ventas-acciones">
                   @if (v.estado_pago === 'verificando') {
-                    <button type="button" [disabled]="procesando() === v.id" (click)="aprobarQr(v)">Aprobar</button>
-                    <button type="button" class="is-danger" [disabled]="procesando() === v.id" (click)="rechazarQr(v)">
+                    <button type="button" [disabled]="procesando() === v.id" (click)="aprobarPago(v)">Aprobar</button>
+                    <button type="button" class="is-danger" [disabled]="procesando() === v.id" (click)="abrirRechazo(v)">
                       Rechazar
                     </button>
                   }
@@ -288,6 +320,41 @@
     </div>
   }
 
+  @if (rechazando(); as r) {
+    <div class="ventas-overlay" (click)="cerrarRechazo()">
+      <div class="ventas-modal" (click)="$event.stopPropagation()">
+        <h2>Rechazar pago de la venta #{{ r.id }}</h2>
+        <p class="ventas-modal__subtitulo">
+          {{ r.cliente_nombre }} · {{ nombreMetodo(r) }} · {{ r.total }} Bs. La venta se cancela y el cliente ve el
+          motivo en Mis compras.
+        </p>
+        <div class="ventas-motivos-rapidos">
+          @for (m of motivosRapidos; track m) {
+            <button type="button" (click)="motivoRechazo.set(m)">{{ m }}</button>
+          }
+        </div>
+        <label class="ventas-campo">
+          <span>Motivo del rechazo</span>
+          <textarea
+            rows="3"
+            maxlength="500"
+            [value]="motivoRechazo()"
+            (input)="motivoRechazo.set($any($event.target).value)"
+          ></textarea>
+        </label>
+        @if (errorRechazo()) {
+          <div class="admin-error">{{ errorRechazo() }}</div>
+        }
+        <div class="ventas-modal__acciones">
+          <button type="button" class="is-secondary" (click)="cerrarRechazo()">Cancelar</button>
+          <button type="button" class="is-danger-solid" [disabled]="procesando() === r.id" (click)="confirmarRechazo()">
+            Rechazar pago
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
   @if (formularioAbierto()) {
     <div class="ventas-overlay" (click)="cerrarFormulario()">
       <div class="ventas-modal" (click)="$event.stopPropagation()">
@@ -330,7 +397,9 @@
             <span>Metodo de pago</span>
             <select [value]="metodoPagoEdit()" (change)="metodoPagoEdit.set($any($event.target).value)">
               <option value="efectivo">Efectivo</option>
-              <option value="qr">QR (transferencia)</option>
+              <option value="qr">QR</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="otro">Otro</option>
               <option value="paypal">PayPal / Tarjeta</option>
             </select>
           </label>

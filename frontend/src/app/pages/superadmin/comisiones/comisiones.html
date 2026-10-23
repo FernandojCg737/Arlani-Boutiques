@@ -1,0 +1,158 @@
+<header class="encabezado">
+  <div>
+    <span class="encabezado__ante encabezado__ante--pagina">CU10 · Comisiones por tienda</span>
+    <h1>Comisiones por tienda</h1>
+    <p>
+      Lo que gana Arlani por cada venta en línea de las tiendas, según la comisión de su plan. Cada tienda cobra en sus
+      propias cuentas y paga sus comisiones desde Mi suscripción (sola o junto con su plan).
+    </p>
+  </div>
+  <div class="periodo">
+    <label>
+      <span>Desde</span>
+      <input type="date" [value]="desde()" [max]="hasta()" (change)="cambiarFecha('desde', $any($event.target).value)" />
+    </label>
+    <label>
+      <span>Hasta</span>
+      <input type="date" [value]="hasta()" [min]="desde()" (change)="cambiarFecha('hasta', $any($event.target).value)" />
+    </label>
+  </div>
+</header>
+
+@if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+}
+
+<section class="kpis">
+  <div class="kpi">
+    <span>Ventas en línea</span>
+    <strong>{{ totales().ventas }}</strong>
+    <small>Bs {{ totales().vendido | number: '1.2-2' }} vendidos</small>
+  </div>
+  <div class="kpi kpi--destacado">
+    <span>Comisiones del periodo</span>
+    <strong>Bs {{ totales().comisiones | number: '1.2-2' }}</strong>
+    <small>Lo que ganó Arlani</small>
+  </div>
+  <div class="kpi">
+    <span>Cobrado en el periodo</span>
+    <strong>Bs {{ totales().pagado | number: '1.2-2' }}</strong>
+    <small>Pagos de las tiendas</small>
+  </div>
+  <div class="kpi">
+    <span>Por cobrar hoy</span>
+    <strong>Bs {{ totales().porCobrar | number: '1.2-2' }}</strong>
+    <small>Saldo de todas las tiendas</small>
+  </div>
+</section>
+
+<section class="tarjeta">
+  <div class="tarjeta__cabecera">
+    <h2>Por tienda</h2>
+    <label class="filtro">
+      <input type="checkbox" [checked]="soloConMovimiento()" (change)="soloConMovimiento.set($any($event.target).checked)" />
+      Solo tiendas con movimiento
+    </label>
+  </div>
+  <div class="tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>Tienda</th>
+          <th>Plan</th>
+          <th class="num">Comisión</th>
+          <th class="num">Ventas</th>
+          <th class="num">Vendido</th>
+          <th class="num">Comisiones</th>
+          <th class="num">Pagado</th>
+          <th class="num">Debe hoy</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (cargando()) {
+          <tr>
+            <td colspan="8"><div class="esqueleto fila-carga"></div></td>
+          </tr>
+        } @else {
+          @for (f of visibles(); track f.empresa_id) {
+            <tr>
+              <td>
+                <strong>{{ f.nombre }}</strong>
+                <small>{{ f.subdominio }}{{ f.estado !== 'activa' ? ' · ' + f.estado : '' }}</small>
+              </td>
+              <td>{{ f.plan_nombre ?? '-' }}</td>
+              <td class="num">{{ f.comision_pct ? (f.comision_pct | number: '1.0-1') + ' %' : '-' }}</td>
+              <td class="num">{{ f.ventas }}</td>
+              <td class="num">Bs {{ f.ventas_bob | number: '1.2-2' }}</td>
+              <td class="num"><strong>Bs {{ f.comisiones_bob | number: '1.2-2' }}</strong></td>
+              <td class="num">Bs {{ f.pagado_bob | number: '1.2-2' }}</td>
+              <td class="num" [class.debe]="+f.saldo_bob > 0">Bs {{ f.saldo_bob | number: '1.2-2' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="vacio">Ninguna tienda tuvo ventas en línea con comisión en este periodo.</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="tarjeta liquidaciones">
+  <div class="tarjeta__cabecera">
+    <div>
+      <h2>Envíos a tiendas (Pagar todo)</h2>
+      <small>Arlani cobra el carrito completo y le envía a cada tienda lo suyo menos la comisión, por PayPal.</small>
+    </div>
+  </div>
+  <div class="tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Tienda</th>
+          <th class="num">Cobrado</th>
+          <th class="num">Comisión</th>
+          <th class="num">Enviado</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (l of liquidaciones(); track l.id) {
+          <tr>
+            <td>{{ l.fecha + 'Z' | date: 'd MMM y, HH:mm' : '-0400' }}</td>
+            <td>
+              <strong>{{ l.empresa_nombre }}</strong>
+              <small>{{ l.paypal_email }}</small>
+            </td>
+            <td class="num">Bs {{ l.bruto_bob | number: '1.2-2' }}</td>
+            <td class="num">Bs {{ l.comision_bob | number: '1.2-2' }}</td>
+            <td class="num">
+              Bs {{ l.neto_bob | number: '1.2-2' }}
+              <small>US$ {{ l.neto_usd }}</small>
+            </td>
+            <td>
+              <span class="pill" [class.pill--activa]="l.estado === 'enviada'" [class.pill--prueba]="l.estado === 'pendiente'"
+                    [class.pill--suspendida]="l.estado === 'fallida'">
+                <i></i>{{ l.estado === 'enviada' ? 'Enviada' : l.estado === 'pendiente' ? 'Pendiente' : 'Falló' }}
+              </span>
+              @if (l.estado !== 'enviada') {
+                @if (l.error) {
+                  <small class="liquidaciones__error">{{ l.error }}</small>
+                }
+                <button type="button" class="btn btn--chico" [disabled]="reintentando() === l.id" (click)="reintentar(l)">
+                  {{ reintentando() === l.id ? 'Enviando…' : 'Reintentar' }}
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="vacio">Todavía no hay compras con Pagar todo.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

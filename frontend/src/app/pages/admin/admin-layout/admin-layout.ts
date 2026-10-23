@@ -1,6 +1,9 @@
 import { Component, HostListener, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map, startWith } from 'rxjs/operators';
 import { Auth } from '../../../services/auth';
+import { EstadoTienda } from '../../../services/estado-tienda';
 import { MarcaTienda } from '../../../services/marca-tienda';
 import { ADMIN_MENU, AdminUseCase } from '../admin-menu';
 
@@ -20,6 +23,21 @@ export class AdminLayout {
   // Logo, nombre y color de la tienda del usuario (no los de Atelier fijos).
   protected readonly marca = inject(MarcaTienda);
   private readonly router = inject(Router);
+  private readonly estadoTienda = inject(EstadoTienda);
+
+  // Suscripcion vencida (o tienda suspendida): solo "Mi suscripcion" queda
+  // disponible; el resto del panel muestra el aviso.
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url),
+      startWith(this.router.url),
+    ),
+    { initialValue: this.router.url },
+  );
+  protected readonly bloqueada = computed(
+    () => (this.estadoTienda.vencida() || !this.marca.operativa()) && !this.url().startsWith('/admin/suscripcion'),
+  );
 
   constructor() {
     void this.marca.cargar();

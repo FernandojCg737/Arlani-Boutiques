@@ -11,12 +11,15 @@ from app.api.v1.endpoints.catalogo import router as catalogo_router
 from app.api.v1.endpoints.chatbot import router as chatbot_router
 from app.api.v1.endpoints.clientes import router as clientes_router
 from app.api.v1.endpoints.colecciones import router as colecciones_router
+from app.api.v1.endpoints.cambios import router as cambios_router
 from app.api.v1.endpoints.devoluciones import router as devoluciones_router
+from app.api.v1.endpoints.direcciones import router as direcciones_router
 from app.api.v1.endpoints.empleados import router as empleados_router
 from app.api.v1.endpoints.notificaciones import router as notificaciones_router
 from app.api.v1.endpoints.perfil import router as perfil_router
 from app.api.v1.endpoints.mi_empresa import router as mi_empresa_router
 from app.api.v1.endpoints.mi_empresa import tiendas_router
+from app.api.v1.endpoints.metodos_pago import router as metodos_pago_router
 from app.api.v1.endpoints.registro_empresa import router as registro_empresa_router
 from app.api.v1.endpoints.plataforma import router as plataforma_router
 from app.api.v1.endpoints.productos import router as productos_router
@@ -52,6 +55,8 @@ api_router.include_router(carrito_router, prefix="/carrito", tags=["carrito"])
 api_router.include_router(carritos_admin_router, prefix="/carritos", tags=["carrito"])
 api_router.include_router(ventas_router, prefix="/ventas", tags=["ventas"])
 api_router.include_router(devoluciones_router, prefix="/devoluciones", tags=["devoluciones"])
+api_router.include_router(cambios_router, prefix="/cambios", tags=["cambios"])
+api_router.include_router(direcciones_router, prefix="/direcciones", tags=["direcciones"])
 api_router.include_router(notificaciones_router, prefix="/notificaciones", tags=["notificaciones"])
 api_router.include_router(reportes_router, prefix="/reportes", tags=["reportes"])
 api_router.include_router(recomendaciones_router, prefix="/recomendaciones", tags=["recomendaciones"])
@@ -64,6 +69,7 @@ api_router.include_router(registro_empresa_router, prefix="/empresas", tags=["pl
 # Cada tienda: su suscripcion (Administrador) y su enlace publico /tienda/<subdominio>.
 api_router.include_router(mi_empresa_router, prefix="/mi-empresa", tags=["plataforma"])
 api_router.include_router(tiendas_router, prefix="/tiendas", tags=["plataforma"])
+api_router.include_router(metodos_pago_router, prefix="/metodos-pago", tags=["metodos-pago"])
 
 
 @api_router.get("/ping", tags=["health"])

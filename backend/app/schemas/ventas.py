@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
+from app.schemas.metodos_pago import MetodoPagoPublicoOut
+
 
 class OrdenPaypalOut(BaseModel):
     order_id: str
@@ -39,6 +41,41 @@ class DetalleVentaOut(BaseModel):
     color_nombre: str
     cantidad: int
     precio_unitario: Decimal
+    # Ya tuvo una solicitud de cambio o devolucion: no admite otra.
+    ya_solicitada: bool = False
+
+
+class TiendaFacturaOut(BaseModel):
+    # Tienda que vende: su marca y sus datos fiscales para la factura.
+    id: int
+    nombre: str
+    subdominio: str
+    logo_url: str | None
+    color_marca: str
+    ciudad: str | None
+    email_contacto: str | None
+    razon_social: str | None
+    nit: str | None
+    direccion_fiscal: str | None
+    telefono: str | None
+
+
+class EnvioOut(BaseModel):
+    # Direccion y ubicacion del momento de la compra (envio a domicilio).
+    destinatario: str
+    telefono: str | None
+    direccion: str
+    referencia: str | None
+    ciudad: str | None
+    latitud: Decimal
+    longitud: Decimal
+    estado: str
+
+    model_config = {"from_attributes": True}
+
+
+class EnvioEstadoIn(BaseModel):
+    estado: str = Field(pattern=r"^(pendiente|enviado|entregado)$")
 
 
 class VentaOut(BaseModel):
@@ -60,7 +97,15 @@ class VentaOut(BaseModel):
     estado_devolucion: str | None = None
     monto_devolucion: Decimal | None = None
     puede_devolver: bool = False
+    # Quedan prendas sin solicitud y la compra esta en plazo (24 h).
+    puede_cambiar: bool = False
     horas_restantes_devolucion: float | None = None
+    tienda: TiendaFacturaOut | None = None
+    # Metodo de pago de la tienda (ej. "QR BNB") y, si se rechazo, por que.
+    metodo_pago_nombre: str | None = None
+    motivo_rechazo: str | None = None
+    # Envio a domicilio (None = recojo en sucursal).
+    envio: EnvioOut | None = None
 
     @field_serializer("fecha")
     def _serialize_fecha(self, value: datetime) -> str:
@@ -131,3 +176,40 @@ class VentaEditIn(BaseModel):
     @classmethod
     def _sin_items_repetidos(cls, value: list[ItemVentaPresencialCreate]) -> list[ItemVentaPresencialCreate]:
         return rechazar_items_repetidos(value)
+
+
+class ItemCheckoutOut(BaseModel):
+    detalle_id: int
+    producto_id: int
+    producto_nombre: str
+    imagen_url: str | None
+    talla_codigo: str
+    color_nombre: str
+    sucursal_id: int
+    sucursal_nombre: str
+    cantidad: int
+    precio_unitario: Decimal
+    subtotal: Decimal
+
+
+class TiendaCheckoutOut(BaseModel):
+    """Parte del carrito de UNA tienda: se paga aparte, con sus metodos."""
+
+    empresa_id: int
+    nombre: str
+    subdominio: str
+    logo_url: str | None
+    color_marca: str
+    operativa: bool
+    items: list[ItemCheckoutOut]
+    total: Decimal
+    # Lo que cobra PayPal: en US$ al cambio oficial.
+    total_usd: Decimal
+    metodos: list[MetodoPagoPublicoOut]
+    # Tiene PayPal con correo: Arlani le puede enviar lo suyo si el cliente
+    # usa "Pagar todo".
+    acepta_pagar_todo: bool
+
+
+class RechazoPagoIn(BaseModel):
+    motivo: str = Field(min_length=3, max_length=500)
