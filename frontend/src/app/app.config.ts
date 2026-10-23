@@ -15,9 +15,10 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' })),
     provideHttpClient(withInterceptors([authInterceptor])),
     { provide: LOCALE_ID, useValue: 'es' },
-    // PWA: guarda la app en el dispositivo para abrirla sin conexion. Solo en
+    // PWA: guarda la app en el dispositivo para abrirla sin conexion y
+    // sincroniza en segundo plano (public/sw-arlani.js envuelve al de Angular). Solo en
     // el build de produccion (ng serve no registra el service worker).
-    provideServiceWorker('ngsw-worker.js', {
+    provideServiceWorker('sw-arlani.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
     }),

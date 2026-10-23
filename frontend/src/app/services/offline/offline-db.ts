@@ -6,6 +6,8 @@ import { DBSchema, IDBPDatabase, openDB } from 'idb';
 // - paquetes: lo descargado para trabajar sin conexión (CU11).
 // - operaciones: ventas y reservas hechas sin conexión y su estado (CU12/CU13).
 // - registro: cada intento de sincronización y su resultado (observabilidad).
+// - sesion: token y dirección del backend del usuario, para que el service
+//   worker (public/sw-arlani.js) sincronice aunque la app esté cerrada.
 
 export interface VarianteLocal {
   talla_id: number;
@@ -110,10 +112,17 @@ export interface RegistroSync {
   detalle: string;
 }
 
+export interface SesionSync {
+  usuario_id: number;
+  token: string;
+  api: string;
+}
+
 interface ArlaniOfflineDB extends DBSchema {
   paquetes: { key: string; value: PaqueteGuardado };
   operaciones: { key: string; value: OperacionLocal; indexes: { usuario: number } };
   registro: { key: number; value: RegistroSync; indexes: { usuario: number } };
+  sesion: { key: number; value: SesionSync };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -121,14 +130,25 @@ export class OfflineDb {
   private db: Promise<IDBPDatabase<ArlaniOfflineDB>> | null = null;
 
   private abrir(): Promise<IDBPDatabase<ArlaniOfflineDB>> {
-    this.db ??= openDB<ArlaniOfflineDB>('arlani-offline', 1, {
-      upgrade(db) {
-        db.createObjectStore('paquetes', { keyPath: 'clave' });
-        db.createObjectStore('operaciones', { keyPath: 'uuid' }).createIndex('usuario', 'usuario_id');
-        db.createObjectStore('registro', { keyPath: 'id', autoIncrement: true }).createIndex('usuario', 'usuario_id');
+    this.db ??= openDB<ArlaniOfflineDB>('arlani-offline', 2, {
+      upgrade(db, version) {
+        if (version < 1) {
+          db.createObjectStore('paquetes', { keyPath: 'clave' });
+          db.createObjectStore('operaciones', { keyPath: 'uuid' }).createIndex('usuario', 'usuario_id');
+          db.createObjectStore('registro', { keyPath: 'id', autoIncrement: true }).createIndex('usuario', 'usuario_id');
+        }
+        if (version < 2) db.createObjectStore('sesion', { keyPath: 'usuario_id' });
       },
     });
     return this.db;
+  }
+
+  async guardarSesion(sesion: SesionSync): Promise<void> {
+    await (await this.abrir()).put('sesion', sesion);
+  }
+
+  async borrarSesiones(): Promise<void> {
+    await (await this.abrir()).clear('sesion');
   }
 
   async guardarPaquete(p: PaqueteGuardado): Promise<void> {
