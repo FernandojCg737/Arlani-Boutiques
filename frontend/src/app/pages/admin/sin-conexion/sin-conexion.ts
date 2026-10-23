@@ -47,7 +47,7 @@ const HORAS_DESACTUALIZADO = 6;
 export class AdminSinConexion implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(Auth);
-  private readonly db = inject(OfflineDb);
+  protected readonly db = inject(OfflineDb);
   protected readonly sync = inject(Sincronizacion);
   protected readonly imagenes = inject(ImagenesOffline);
 
@@ -131,14 +131,18 @@ export class AdminSinConexion implements OnInit {
         lista = [];
       }
     }
-    // Sin conexión: las sucursales que ya se descargaron en este dispositivo.
+    // Sin conexión (o si el servidor no responde): las sucursales que ya se
+    // descargaron en este dispositivo.
     if (!lista.length) {
       lista = (await this.db.paquetesDe(this.usuarioId))
         .filter((p) => p.clave.startsWith('personal:'))
         .map((p) => (p.datos as PaquetePersonal).sucursal);
     }
     this.sucursales.set(lista);
-    if (lista.length) await this.elegirSucursal(lista[0].id);
+    // Se vuelve a la sucursal con la que se estaba trabajando.
+    const recordada = Number(this.leerSucursal());
+    const elegida = lista.find((s) => s.id === recordada) ?? lista[0];
+    if (elegida) await this.elegirSucursal(elegida.id);
   }
 
   private async cargarPlan(): Promise<void> {
@@ -151,8 +155,21 @@ export class AdminSinConexion implements OnInit {
     }
   }
 
+  private leerSucursal(): string | null {
+    try {
+      return localStorage.getItem(`arlani_offline_sucursal_${this.usuarioId}`);
+    } catch {
+      return null;
+    }
+  }
+
   protected async elegirSucursal(id: number): Promise<void> {
     this.sucursalId.set(id);
+    try {
+      localStorage.setItem(`arlani_offline_sucursal_${this.usuarioId}`, String(id));
+    } catch {
+      // Sin localStorage: al recargar se elige la primera.
+    }
     this.items.set([]);
     this.productoSel.set(null);
     this.varianteSel.set(null);

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { DBSchema, IDBPDatabase, openDB } from 'idb';
 
 // P4 offline (persistencia): IndexedDB del navegador. Sobrevive a cerrar y
@@ -141,6 +141,9 @@ interface ArlaniOfflineDB extends DBSchema {
 @Injectable({ providedIn: 'root' })
 export class OfflineDb {
   private db: Promise<IDBPDatabase<ArlaniOfflineDB>> | null = null;
+  // Otra pestaña con una versión anterior de Arlani no deja actualizar la
+  // base: hasta que se cierre, los datos guardados no se pueden leer.
+  readonly bloqueada = signal(false);
 
   private abrir(): Promise<IDBPDatabase<ArlaniOfflineDB>> {
     this.db ??= openDB<ArlaniOfflineDB>('arlani-offline', 3, {
@@ -153,6 +156,16 @@ export class OfflineDb {
         if (version < 2) db.createObjectStore('sesion', { keyPath: 'usuario_id' });
         if (version < 3) db.createObjectStore('imagenes', { keyPath: 'url' });
       },
+      blocked: () => this.bloqueada.set(true),
+      // Una versión nueva (otra pestaña ya actualizada) necesita la base: se cede.
+      blocking: () => {
+        void this.db?.then((d) => d.close());
+        this.db = null;
+      },
+      terminated: () => (this.db = null),
+    }).then((d) => {
+      this.bloqueada.set(false);
+      return d;
     });
     return this.db;
   }

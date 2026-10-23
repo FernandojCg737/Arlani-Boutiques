@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Auth } from './auth';
+import { ImagenesOffline } from './offline/imagenes-offline';
 
 export interface MarcaEmpresa {
   nombre: string;
@@ -91,6 +92,7 @@ const CLAVE_MARCA = 'arlani_marca_panel';
 export class MarcaTienda {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(Auth);
+  private readonly imagenes = inject(ImagenesOffline);
   private cargadaPara: number | null = null;
   private pendiente: Promise<void> | null = null;
 
@@ -101,23 +103,29 @@ export class MarcaTienda {
 
   readonly nombre = computed(() => (this.cargando() ? '' : (this.marca()?.nombre ?? MARCA_PLATAFORMA.nombre)));
   // Sin logo propio, la tienda se muestra con su inicial (ver el panel).
-  readonly logo = computed(() => {
+  private readonly logoOriginal = computed(() => {
     if (this.cargando()) return null;
     const m = this.marca();
     return m ? m.logo_url : MARCA_PLATAFORMA.logo;
   });
+  // Lo que se pinta: el logo subido sale del dispositivo si ya se guardó
+  // (así se ve también sin conexión).
+  readonly logo = computed(() => {
+    const url = this.logoOriginal();
+    return url?.startsWith('http') ? this.imagenes.src(url, true) : url;
+  });
   // Logo subido por la tienda (los propios del sitio, /img/..., ya estan
   // hechos para el fondo oscuro del panel).
-  readonly logoSubido = computed(() => this.logo()?.startsWith('http') ?? false);
+  readonly logoSubido = computed(() => this.logoOriginal()?.startsWith('http') ?? false);
   // Logo oscuro: lleva contorno claro sobre la barra del panel (siempre oscura).
   readonly logoOscuro = signal(false);
 
   constructor() {
     effect(() => {
-      const url = this.logoSubido() ? this.logo() : null;
+      const url = this.logoSubido() ? this.logoOriginal() : null;
       this.logoOscuro.set(false);
       void esLogoOscuro(url).then((oscuro) => {
-        if (this.logo() === url) this.logoOscuro.set(oscuro);
+        if (this.logoOriginal() === url) this.logoOscuro.set(oscuro);
       });
     });
   }
@@ -149,18 +157,33 @@ export class MarcaTienda {
     if (recordada !== undefined) {
       this.marca.set(recordada);
       this.cargando.set(false);
+      if (recordada?.logo_url) void this.imagenes.cargar([recordada.logo_url]);
     } else {
       this.cargando.set(true);
     }
     this.pendiente = firstValueFrom(this.http.get<MarcaEmpresa>(`${environment.apiUrl}/mi-empresa/marca`))
-      .then((m) => m, () => null) // Sin tienda (SuperAdministrador) o sin conexión: la de la plataforma.
-      .then((m) => {
+      .then(
+        (m) => ({ m, valida: true }),
+        // Sin tienda (SuperAdministrador): la de la plataforma. Sin conexión o
+        // servidor caído: se queda la marca recordada (no se pisa).
+        (err: unknown) => ({ m: null, valida: !this.sinRed(err) }),
+      )
+      .then(({ m, valida }) => {
         if (this.cargadaPara !== usuario.id) return;
+        if (!valida) {
+          this.cargando.set(false);
+          return;
+        }
         this.marca.set(m);
         this.cargando.set(false);
         this.guardar(usuario.id, m);
+        if (m?.logo_url) void this.imagenes.descargar([m.logo_url]).then(() => this.imagenes.cargar([m.logo_url]));
       });
     return this.pendiente;
+  }
+
+  private sinRed(err: unknown): boolean {
+    return !navigator.onLine || !(err instanceof HttpErrorResponse) || err.status === 0 || err.status >= 500;
   }
 
   // undefined = no hay nada recordado para este usuario.

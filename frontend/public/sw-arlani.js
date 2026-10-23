@@ -16,7 +16,11 @@ self.addEventListener('sync', (event) => {
 function abrirDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open('arlani-offline');
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      // Si la app necesita actualizar la base, el worker la suelta.
+      req.result.onversionchange = () => req.result.close();
+      resolve(req.result);
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -64,6 +68,19 @@ function contrato(o) {
 
 async function sincronizarEnFondo() {
   const db = await abrirDb();
+  let huboCambios = false;
+  try {
+    huboCambios = await enviarPendientes(db);
+  } finally {
+    db.close();
+  }
+  if (huboCambios) {
+    const ventanas = await self.clients.matchAll({ includeUncontrolled: true });
+    for (const v of ventanas) v.postMessage({ tipo: 'arlani-sincronizado' });
+  }
+}
+
+async function enviarPendientes(db) {
   const sesiones = await todos(db, 'sesion');
   const operaciones = await todos(db, 'operaciones');
   let huboCambios = false;
@@ -113,10 +130,5 @@ async function sincronizarEnFondo() {
     });
     huboCambios = true;
   }
-  db.close();
-
-  if (huboCambios) {
-    const ventanas = await self.clients.matchAll({ includeUncontrolled: true });
-    for (const v of ventanas) v.postMessage({ tipo: 'arlani-sincronizado' });
-  }
+  return huboCambios;
 }

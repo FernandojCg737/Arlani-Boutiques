@@ -28,6 +28,12 @@
     </button>
   </div>
 
+  @if (db.bloqueada()) {
+    <div class="admin-error">
+      Hay otra pestaña de Arlani abierta con una versión anterior: ciérrala para ver los datos guardados en este
+      dispositivo.
+    </div>
+  }
   @if (planOffline() === false) {
     <div class="admin-error">El plan de tu tienda no incluye la operación sin conexión (solo Básico y Profesional).</div>
   }
