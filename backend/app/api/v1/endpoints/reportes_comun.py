@@ -17,7 +17,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_permiso, require_superadmin, sucursal_restringida
 from app.core.email import nombre_marca
 from app.core.rate_limit import verificar_limite
-from app.core.reporte_dinamico import FUENTES_PLATAFORMA, FUENTES_TIENDA, catalogo, ejecutar, periodo_por_defecto
+from app.core.reporte_dinamico import (
+    COBROS_SUSCRIPCION,
+    FUENTES_PLATAFORMA,
+    FUENTES_TIENDA,
+    catalogo,
+    ejecutar,
+    periodo_por_defecto,
+)
 from app.core.reporte_export import Columna, Reporte, descargar, enviar
 from app.db.session import get_db
 from app.models import Usuario
@@ -131,8 +138,8 @@ def resumen_saas(
     p = {"d": desde, "h": hasta}
     plataforma = dict(db.execute(text("SELECT * FROM fn_resumen_plataforma()")).mappings().one())
     sus = db.execute(
-        text(f"SELECT coalesce(sum(monto_bob), 0) AS total, count(*) AS pagos FROM pago_suscripcion "
-             f"WHERE estado = 'completado' AND {_DIA.format(col='fecha')} BETWEEN :d AND :h"), p
+        text(f"SELECT coalesce(sum(monto_bob), 0) AS total, count(*) AS pagos FROM {COBROS_SUSCRIPCION} c "
+             f"WHERE {_DIA.format(col='fecha')} BETWEEN :d AND :h"), p
     ).mappings().one()
     com = db.execute(
         text(f"SELECT coalesce(sum(monto_bob), 0) AS total, coalesce(sum(base_bob), 0) AS vendido, count(*) AS ventas "
@@ -146,8 +153,8 @@ def resumen_saas(
         text(
             f"""WITH meses AS (SELECT to_char(m, 'YYYY-MM') AS mes FROM generate_series(date_trunc('month', CAST(:d AS date)),
                                      date_trunc('month', CAST(:h AS date)), interval '1 month') m),
-                     s AS (SELECT to_char({_DIA.format(col='fecha')}, 'YYYY-MM') AS mes, sum(monto_bob) AS v FROM pago_suscripcion
-                           WHERE estado = 'completado' AND {_DIA.format(col='fecha')} BETWEEN :d AND :h GROUP BY 1),
+                     s AS (SELECT to_char({_DIA.format(col='fecha')}, 'YYYY-MM') AS mes, sum(monto_bob) AS v FROM {COBROS_SUSCRIPCION} x
+                           WHERE {_DIA.format(col='fecha')} BETWEEN :d AND :h GROUP BY 1),
                      c AS (SELECT to_char({_DIA.format(col='fecha')}, 'YYYY-MM') AS mes, sum(monto_bob) AS v FROM cuenta_tienda_movimiento
                            WHERE tipo = 'comision' AND {_DIA.format(col='fecha')} BETWEEN :d AND :h GROUP BY 1)
                 SELECT meses.mes, coalesce(s.v, 0) AS suscripciones, coalesce(c.v, 0) AS comisiones,
@@ -174,7 +181,7 @@ def resumen_saas(
 
 
 TABLAS_SAAS = {
-    "suscripciones": "Pagos de suscripción",
+    "suscripciones": "Suscripciones de las tiendas",
     "comisiones": "Comisiones por tienda",
     "tiendas": "Ranking de tiendas",
     "planes": "Ingresos por plan",
@@ -198,16 +205,25 @@ def tabla_saas(
     sub = f"Del {desde:%d/%m/%Y} al {hasta:%d/%m/%Y}"
     dia = _DIA.format(col="{c}")
     if tipo == "suscripciones":
+        # Todas las suscripciones vigentes en el periodo, pagadas o asignadas.
         filas = db.execute(text(
-            f"""SELECT to_char(ps.fecha - interval '4 hours', 'DD/MM/YYYY HH24:MI') AS fecha, e.nombre AS tienda,
-                       coalesce(pl.nombre, '-') AS plan, coalesce(su.periodo, '-') AS periodo, ps.metodo,
-                       ps.monto_bob, ps.monto_usd
-                FROM pago_suscripcion ps JOIN empresa e ON e.id = ps.empresa_id
-                LEFT JOIN suscripcion su ON su.id = ps.suscripcion_id LEFT JOIN plan_suscripcion pl ON pl.id = su.plan_id
-                WHERE ps.estado = 'completado' AND {dia.format(c='ps.fecha')} BETWEEN :d AND :h ORDER BY ps.fecha DESC"""), p).mappings().all()
-        cols = [Columna("fecha", "Fecha"), Columna("tienda", "Tienda"), Columna("plan", "Plan"), Columna("periodo", "Periodo"),
-                Columna("metodo", "Método"), Columna("monto_bob", "Monto (Bs)", "moneda"), Columna("monto_usd", "Monto (US$)", "moneda")]
-        tot = {"fecha": "Total", "monto_bob": sum(f["monto_bob"] or 0 for f in filas), "monto_usd": sum(f["monto_usd"] or 0 for f in filas)}
+            f"""SELECT e.nombre AS tienda, pl.nombre AS plan, su.periodo, su.estado,
+                       to_char(su.fecha_inicio, 'DD/MM/YYYY') AS inicio, coalesce(to_char(su.fecha_fin, 'DD/MM/YYYY'), '-') AS vence,
+                       su.monto, fn_mrr_suscripcion(su.periodo, su.monto) AS mrr,
+                       CASE WHEN su.monto = 0 THEN 'Prueba gratis'
+                            WHEN EXISTS (SELECT 1 FROM pago_suscripcion x WHERE x.suscripcion_id = su.id AND x.metodo = 'paypal') THEN 'PayPal'
+                            WHEN EXISTS (SELECT 1 FROM pago_suscripcion x WHERE x.suscripcion_id = su.id) THEN 'Pago registrado'
+                            ELSE 'Asignada por la plataforma' END AS forma,
+                       coalesce((SELECT sum(c.monto_bob) FROM {COBROS_SUSCRIPCION} c WHERE c.suscripcion_id = su.id
+                                 AND {dia.format(c='c.fecha')} BETWEEN :d AND :h), 0) AS cobrado
+                FROM suscripcion su JOIN empresa e ON e.id = su.empresa_id JOIN plan_suscripcion pl ON pl.id = su.plan_id
+                WHERE su.fecha_inicio <= :h AND (su.fecha_fin IS NULL OR su.fecha_fin >= :d)
+                ORDER BY su.fecha_inicio DESC, e.nombre"""), p).mappings().all()
+        cols = [Columna("tienda", "Tienda"), Columna("plan", "Plan"), Columna("periodo", "Periodo"), Columna("estado", "Estado"),
+                Columna("inicio", "Inicio"), Columna("vence", "Vence"), Columna("monto", "Monto (Bs)", "moneda"),
+                Columna("mrr", "Ingreso mensual (Bs)", "moneda"), Columna("forma", "Forma de pago"),
+                Columna("cobrado", "Cobrado en el periodo (Bs)", "moneda")]
+        tot = {"tienda": "Total", **{k: sum(f[k] or 0 for f in filas) for k in ("monto", "mrr", "cobrado")}}
     elif tipo == "comisiones":
         filas = db.execute(text(
             f"""SELECT e.nombre AS tienda, coalesce(pl.nombre, '-') AS plan, coalesce(pl.comision_pct, 0) AS porcentaje,
@@ -232,8 +248,8 @@ def tabla_saas(
                           AND v.estado <> 'cancelada' AND {dia.format(c='v.fecha')} BETWEEN :d AND :h) AS gmv,
                        (SELECT coalesce(sum(m.monto_bob), 0) FROM cuenta_tienda_movimiento m WHERE m.empresa_id = e.id
                           AND m.tipo = 'comision' AND {dia.format(c='m.fecha')} BETWEEN :d AND :h) AS comision,
-                       (SELECT coalesce(sum(ps.monto_bob), 0) FROM pago_suscripcion ps WHERE ps.empresa_id = e.id
-                          AND ps.estado = 'completado' AND {dia.format(c='ps.fecha')} BETWEEN :d AND :h) AS suscripcion
+                       (SELECT coalesce(sum(ps.monto_bob), 0) FROM {COBROS_SUSCRIPCION} ps WHERE ps.empresa_id = e.id
+                          AND {dia.format(c='ps.fecha')} BETWEEN :d AND :h) AS suscripcion
                 FROM empresa e LEFT JOIN suscripcion su ON su.empresa_id = e.id AND su.estado = 'activa'
                 LEFT JOIN plan_suscripcion pl ON pl.id = su.plan_id ORDER BY gmv DESC, e.nombre"""), p).mappings().all()
         filas = [{**f, "aporte": (f["comision"] or 0) + (f["suscripcion"] or 0)} for f in filas]
@@ -246,8 +262,8 @@ def tabla_saas(
             f"""SELECT pl.nombre AS plan, pl.precio_mensual, pl.comision_pct,
                        count(DISTINCT su.empresa_id) FILTER (WHERE su.estado = 'activa') AS tiendas,
                        coalesce(sum(fn_mrr_suscripcion(su.periodo, su.monto)) FILTER (WHERE su.estado = 'activa'), 0) AS mrr,
-                       (SELECT coalesce(sum(ps.monto_bob), 0) FROM pago_suscripcion ps JOIN suscripcion s2 ON s2.id = ps.suscripcion_id
-                          WHERE s2.plan_id = pl.id AND ps.estado = 'completado' AND {dia.format(c='ps.fecha')} BETWEEN :d AND :h) AS cobrado
+                       (SELECT coalesce(sum(ps.monto_bob), 0) FROM {COBROS_SUSCRIPCION} ps JOIN suscripcion s2 ON s2.id = ps.suscripcion_id
+                          WHERE s2.plan_id = pl.id AND {dia.format(c='ps.fecha')} BETWEEN :d AND :h) AS cobrado
                 FROM plan_suscripcion pl LEFT JOIN suscripcion su ON su.plan_id = pl.id
                 GROUP BY pl.id ORDER BY pl.orden"""), p).mappings().all()
         cols = [Columna("plan", "Plan"), Columna("precio_mensual", "Precio mensual (Bs)", "moneda"),

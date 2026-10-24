@@ -92,16 +92,29 @@ FUENTES_TIENDA: dict[str, Fuente] = {
     ),
 }
 
+# Lo que cobra Arlani por suscripciones: los pagos (PayPal) y las suscripciones
+# que asigno la plataforma con monto y sin pago registrado (contratacion
+# administrativa), en la fecha en que empezaron.
+COBROS_SUSCRIPCION = """(
+    SELECT ps.empresa_id, ps.suscripcion_id, ps.fecha, ps.monto_bob, ps.monto_usd,
+           CASE ps.metodo WHEN 'paypal' THEN 'PayPal' ELSE initcap(ps.metodo) END AS forma
+    FROM pago_suscripcion ps WHERE ps.estado = 'completado'
+    UNION ALL
+    SELECT su.empresa_id, su.id, su.fecha_inicio::timestamp + interval '4 hours', su.monto, NULL, 'Asignada por la plataforma'
+    FROM suscripcion su
+    WHERE su.monto > 0 AND NOT EXISTS (SELECT 1 FROM pago_suscripcion x WHERE x.suscripcion_id = su.id)
+)"""
+
 FUENTES_PLATAFORMA: dict[str, Fuente] = {
     "suscripciones": Fuente(
-        "Pagos de suscripción", "Lo que pagan las tiendas por su plan.",
-        "pago_suscripcion ps JOIN empresa e ON e.id = ps.empresa_id LEFT JOIN suscripcion su ON su.id = ps.suscripcion_id "
+        "Cobros de suscripción", "Lo que pagan las tiendas por su plan (PayPal o asignado por la plataforma).",
+        f"{COBROS_SUSCRIPCION} ps JOIN empresa e ON e.id = ps.empresa_id LEFT JOIN suscripcion su ON su.id = ps.suscripcion_id "
         "LEFT JOIN plan_suscripcion pl ON pl.id = su.plan_id", "ps.fecha",
         {**_tiempo("ps.fecha"), "tienda": ("Tienda", "e.nombre"), "plan": ("Plan", "coalesce(pl.nombre, '-')"),
-         "periodo": ("Periodo", "coalesce(su.periodo, '-')"), "metodo": ("Método", "ps.metodo")},
-        {"pagos": ("Pagos", "count(*)", "numero"), "total_bob": ("Total (Bs)", "sum(ps.monto_bob)", "moneda"),
-         "total_usd": ("Total (US$)", "sum(ps.monto_usd)", "moneda")},
-        donde="ps.estado = 'completado'", empresa="ps.empresa_id", defecto=(["mes"], ["pagos", "total_bob"]),
+         "periodo": ("Periodo", "coalesce(su.periodo, '-')"), "metodo": ("Forma de pago", "ps.forma")},
+        {"pagos": ("Cobros", "count(*)", "numero"), "total_bob": ("Total (Bs)", "sum(ps.monto_bob)", "moneda"),
+         "total_usd": ("Pagado en US$", "sum(ps.monto_usd)", "moneda")},
+        empresa="ps.empresa_id", defecto=(["mes"], ["pagos", "total_bob"]),
     ),
     "comisiones": Fuente(
         "Comisiones por ventas", "Lo que gana Arlani por las ventas en línea de cada tienda.",
