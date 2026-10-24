@@ -15,6 +15,15 @@ class GoogleAuthButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: loading ? null : onPressed,
+      // Pildora blanca con borde, como en la web.
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(50),
+        shape: const StadiumBorder(),
+        side: const BorderSide(color: Color(0xFFDDDDDD)),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF121A2C),
+        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
