@@ -12,7 +12,9 @@ class Categoria(Base):
     __tablename__ = "categoria"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(100), unique=True)
+    nombre: Mapped[str] = mapped_column(String(100))
+    # NULL: categoria base (todas las tiendas); con empresa: propia de esa tienda.
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
 
     productos: Mapped[list["Producto"]] = relationship(back_populates="categoria")
 
@@ -21,7 +23,9 @@ class Talla(Base):
     __tablename__ = "talla"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    codigo: Mapped[str] = mapped_column(String(10), unique=True)
+    codigo: Mapped[str] = mapped_column(String(10))
+    # letra (S, M...), numero (28, 30...), calzado (35...), nino (2, 4...) o bebe (0-3 m...).
+    tipo: Mapped[str] = mapped_column(String(10), default="letra")
 
     inventarios: Mapped[list["Inventario"]] = relationship(back_populates="talla")
     items_linea: Mapped[list["ItemLinea"]] = relationship(back_populates="talla")
@@ -105,6 +109,8 @@ class Producto(Base):
     precio: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     precio_original: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     estado: Mapped[str] = mapped_column(String(20), default="activo")
+    # Para quien es: mujer, hombre, unisex, nina, nino o bebe.
+    publico: Mapped[str] = mapped_column(String(10), default="unisex")
 
     categoria: Mapped["Categoria"] = relationship(back_populates="productos")
     marca: Mapped["Marca"] = relationship(back_populates="productos")

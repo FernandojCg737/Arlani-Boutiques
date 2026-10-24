@@ -31,6 +31,8 @@ export interface Product {
   gallery: string[];
   category: string;
   categoryLabel: string;
+  // Para quién es: mujer, hombre, unisex, nina, nino o bebe.
+  publico?: string;
   temporada?: string;
   isNew: boolean;
   colors: ProductColor[];

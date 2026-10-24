@@ -97,6 +97,26 @@ def rango_precio(mensaje: str) -> tuple[float | None, float | None, str] | None:
     return None
 
 
+PUBLICOS = {"mujer": "mujer", "hombre": "hombre", "unisex": "unisex", "nina": "niña", "nino": "niño", "bebe": "bebé"}
+# Del mas especifico al mas general (normalizado: sin tildes ni enies).
+_PALABRAS_PUBLICO = [
+    (r"\b(bebe|bebes|recien nacid[oa]s?)\b", ("bebe",)),
+    (r"\b(nina|ninas|hija|hijas)\b", ("nina",)),
+    (r"\b(nino|ninos|infantil|infantiles|hijo|hijos|escolar|escolares)\b", ("nino", "nina")),
+    (r"\b(mujer|mujeres|dama|damas|femenin[oa]s?|chica|chicas|senora|senoras)\b", ("mujer", "unisex")),
+    (r"\b(hombre|hombres|caballero|caballeros|varon|varones|masculin[oa]s?|chico|chicos)\b", ("hombre", "unisex")),
+]
+
+
+def publico_mencionado(mensaje: str) -> tuple[str, ...] | None:
+    """Para quien busca el cliente ("vestidos para mujer", "ropa de nino")."""
+    t = normalizar(mensaje)
+    for patron, publicos in _PALABRAS_PUBLICO:
+        if re.search(patron, t):
+            return publicos
+    return None
+
+
 def _sucursales(db: Session, tienda: Tienda, mensaje: str) -> list:
     filas = db.execute(
         text(f"""SELECT s.nombre, s.direccion, s.horario_atencion, s.telefono, c.nombre AS ciudad, e.nombre AS tienda
@@ -114,7 +134,8 @@ def _sucursales(db: Session, tienda: Tienda, mensaje: str) -> list:
 
 def _productos(db: Session, tienda: Tienda) -> list:
     return db.execute(
-        text(f"""SELECT p.id, p.nombre, p.precio, p.precio_original, c.nombre AS categoria, m.nombre AS marca, e.nombre AS tienda
+        text(f"""SELECT p.id, p.nombre, p.precio, p.precio_original, c.nombre AS categoria, m.nombre AS marca, e.nombre AS tienda,
+                        p.publico
                  FROM producto p JOIN categoria c ON c.id = p.categoria_id LEFT JOIN marca m ON m.id = p.marca_id
                  JOIN empresa e ON e.id = p.empresa_id
                  WHERE {_de(tienda, 'p')} AND p.estado = 'activo'"""),
@@ -140,13 +161,19 @@ def _palabras(mensaje: str) -> set[str]:
             if len(p) >= 4 and p not in ("num", "precio", "producto", "prenda", "tienda", "vender", "tener", "haber")}
 
 
+def _para_quien(db: Session, tienda: Tienda, mensaje: str) -> list:
+    """Las prendas de la tienda, solo las del publico que se nombra (si se nombra)."""
+    publicos = publico_mencionado(mensaje)
+    return [p for p in _productos(db, tienda) if not publicos or p.publico in publicos]
+
+
 def productos_mencionados(db: Session, tienda: Tienda, mensaje: str, limite: int = 4) -> list:
     """Productos que el cliente nombra (por nombre, categoria o marca)."""
     palabras = _palabras(mensaje)
     if not palabras:
         return []
     puntaje = []
-    for f in _productos(db, tienda):
+    for f in _para_quien(db, tienda, mensaje):
         nombre = _raices(f.nombre)
         resto = _raices(f"{f.categoria} {f.marca or ''}")
         valor = 2 * len(palabras & nombre) + len(palabras & resto)
@@ -206,13 +233,16 @@ def _nombre(p, tienda: Tienda) -> str:
 def _por_precio(db: Session, tienda: Tienda, mensaje: str, rango: tuple[float | None, float | None, str]) -> str:
     minimo, maximo, orden = rango
     categorias = _categorias_mencionadas(db, tienda, mensaje)
-    filas = [p for p in _productos(db, tienda)
+    filas = [p for p in _para_quien(db, tienda, mensaje)
              if (minimo is None or float(p.precio) >= minimo) and (maximo is None or float(p.precio) <= maximo)
              and (not categorias or p.categoria in categorias)]
     filas.sort(key=lambda p: float(p.precio), reverse=orden == "desc")
     cual = (f" entre {_bs(minimo)} y {_bs(maximo)}" if minimo is not None and maximo is not None
             else f" de hasta {_bs(maximo)}" if maximo is not None else f" desde {_bs(minimo)}" if minimo is not None else "")
     que = _lista(sorted(c.lower() for c in categorias)) if categorias else "prendas"
+    publicos = publico_mencionado(mensaje)
+    if publicos:
+        que += " para " + PUBLICOS[publicos[0]]
     if not filas:
         return f"No encontré {que}{cual}. " + ("Prueba con otro monto." if cual else "")
     if not cual:
@@ -426,6 +456,11 @@ def responder(db: Session, tienda: Tienda, cliente_id: int | None, cliente_nombr
 
     productos = productos_mencionados(db, tienda, mensaje)
     if intencion == "recomendacion":
+        publicos = publico_mencionado(mensaje)
+        if not productos and publicos:
+            productos = sorted(_para_quien(db, tienda, mensaje), key=lambda p: -float(p.precio_original or p.precio))[:3]
+            if not productos:
+                return f"Por ahora no hay prendas para {PUBLICOS[publicos[0]]} en {tienda.nombre}."
         elegidos = productos[:3] or _mas_vendidos(db, tienda)
         if not elegidos:
             return None

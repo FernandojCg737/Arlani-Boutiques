@@ -76,6 +76,24 @@
     }
   </section>
 
+  @if (publicos().length > 1) {
+    <section class="filter-group">
+      <div class="filter-group__header">
+        <h3>Para quién</h3>
+      </div>
+      <label class="filter-check" [class.filter-check--active]="!publicoSeleccionado()">
+        <input type="checkbox" [checked]="!publicoSeleccionado()" (change)="seleccionarPublico(null)" />
+        <span>Todos</span>
+      </label>
+      @for (o of publicos(); track o.id) {
+        <label class="filter-check" [class.filter-check--active]="publicoSeleccionado() === o.id">
+          <input type="checkbox" [checked]="publicoSeleccionado() === o.id" (change)="seleccionarPublico(o.id)" />
+          <span>{{ o.etiqueta }}</span>
+        </label>
+      }
+    </section>
+  }
+
   <section class="filter-group">
     <div class="filter-group__header">
       <h3>Categorias</h3>

@@ -52,6 +52,7 @@ from app.schemas.productos import (
     ArFotoTrabajoOut,
     ArSesionOut,
     CatalogoBaseOut,
+    CategoriaCreate,
     ColorCreate,
     DisponibilidadOut,
     ImagenOut,
@@ -67,6 +68,7 @@ from app.schemas.productos import (
     ProductoOut,
     ProductoPublicoOut,
     ProductoUpdate,
+    TallaOut,
 )
 
 router = APIRouter()
@@ -98,6 +100,7 @@ def _to_out(producto: Producto) -> ProductoOut:
         estado=producto.estado,
         categoria_id=producto.categoria_id,
         categoria_nombre=producto.categoria.nombre,
+        publico=producto.publico,
         marca_id=producto.marca_id,
         marca_nombre=producto.marca.nombre,
         proveedor_id=producto.proveedor_id,
@@ -142,7 +145,10 @@ def get_catalogo_base(
         db.query(Coleccion).options(joinedload(Coleccion.temporada)).order_by(Coleccion.nombre).all()
     )
     return CatalogoBaseOut(
-        categorias=[OpcionOut.model_validate(c) for c in db.query(Categoria).order_by(Categoria.nombre).all()],
+        # Las base y las propias de la tienda (RLS); sin tienda elegida, solo las base.
+        categorias=[OpcionOut.model_validate(c) for c in db.query(Categoria).filter(
+            (Categoria.empresa_id.is_(None)) | (Categoria.empresa_id == text("fn_empresa_actual()"))
+        ).order_by(Categoria.nombre).all()],
         marcas=[OpcionOut.model_validate(m) for m in db.query(Marca).order_by(Marca.nombre).all()],
         temporadas=[OpcionOut.model_validate(t) for t in db.query(Temporada).order_by(Temporada.nombre).all()],
         colecciones=[
@@ -153,11 +159,34 @@ def get_catalogo_base(
             for p in db.query(Proveedor).filter(Proveedor.estado == "activo").order_by(Proveedor.nombre).all()
         ],
         sucursales=[OpcionOut.model_validate(s) for s in db.query(Sucursal).order_by(Sucursal.nombre).all()],
-        tallas=[
-            OpcionOut(id=t.id, nombre=t.codigo) for t in db.query(Talla).order_by(Talla.id).all()
-        ],
+        tallas=[TallaOut(id=t.id, nombre=t.codigo, tipo=t.tipo) for t in db.query(Talla).order_by(Talla.id).all()],
         colores=[OpcionOut.model_validate(c) for c in db.query(Color).order_by(Color.nombre).all()],
     )
+
+
+@router.post("/categorias", response_model=OpcionOut, status_code=status.HTTP_201_CREATED)
+def create_categoria(
+    payload: CategoriaCreate,
+    db: Session = Depends(get_db),
+    _usuario: Usuario = Depends(require_permiso("CU05")),
+) -> OpcionOut:
+    """Categoria propia de la tienda (ej. "Vestidos de novia"). Si ya existe
+    una base o propia con ese nombre, se usa esa."""
+    nombre = " ".join(payload.nombre.split())
+    existente = db.execute(
+        text("""SELECT id, nombre FROM categoria WHERE lower(nombre) = lower(:n)
+                AND (empresa_id IS NULL OR empresa_id = fn_empresa_actual()) ORDER BY empresa_id NULLS FIRST LIMIT 1"""),
+        {"n": nombre},
+    ).first()
+    if existente:
+        return OpcionOut(id=existente.id, nombre=existente.nombre)
+    if db.execute(text("SELECT fn_empresa_actual()")).scalar() is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Elige primero la tienda.")
+    fila = db.execute(
+        text("INSERT INTO categoria (nombre, empresa_id) VALUES (:n, fn_empresa_actual()) RETURNING id, nombre"), {"n": nombre}
+    ).first()
+    db.commit()
+    return OpcionOut(id=fila.id, nombre=fila.nombre)
 
 
 @router.post("/marcas", response_model=MarcaOut, status_code=status.HTTP_201_CREATED)
@@ -204,6 +233,7 @@ def _to_publico(producto: Producto) -> ProductoPublicoOut:
         precio_original=producto.precio_original,
         marca_nombre=producto.marca.nombre,
         categoria_nombre=producto.categoria.nombre,
+        publico=producto.publico,
         temporada_nombre=producto.temporada.nombre,
         imagenes=[i.url for i in producto.imagenes],
         sucursales_disponibles=_sucursales_disponibles(producto),
@@ -474,6 +504,7 @@ def create_producto(
         },
     )
     producto_id = result.scalar_one()
+    db.execute(text("UPDATE producto SET publico = :p WHERE id = :id"), {"p": payload.publico, "id": producto_id})
     db.commit()
 
     producto = _get_producto_or_404(db, producto_id)
@@ -510,6 +541,7 @@ def update_producto(
             "estado": payload.estado,
         },
     )
+    db.execute(text("UPDATE producto SET publico = :p WHERE id = :id"), {"p": payload.publico, "id": producto_id})
     db.commit()
 
     producto = _get_producto_or_404(db, producto_id)

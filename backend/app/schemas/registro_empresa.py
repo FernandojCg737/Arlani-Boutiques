@@ -13,6 +13,8 @@ class BoutiqueRegistroIn(BaseModel):
     # Sucursales que piensa abrir: no puede pasar el maximo del plan elegido.
     sucursales: int = Field(ge=1, le=500)
     color: str = Field(pattern=COLOR_HEX)
+    # Para quien vende: mujer, hombre, unisex, nina, nino, bebe.
+    publicos: list[str] = Field(default_factory=list, max_length=6)
 
 
 class AdministradorRegistroIn(BaseModel):
