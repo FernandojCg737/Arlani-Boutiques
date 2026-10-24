@@ -64,6 +64,13 @@ def _enviar_por_apps_script(to: str, subject: str, html_body: str, adjuntos: lis
     if resp.status_code >= 400 or not datos.get("ok"):
         motivo = datos.get("error") or resp.text[:200]
         raise RuntimeError(f"El script de Gmail no envio el correo ({resp.status_code}): {motivo}")
+    # El script actualizado responde cuantos archivos adjunto; uno viejo los
+    # ignora (el correo sale sin el archivo): se avisa en vez de callarlo.
+    if adjuntos and datos.get("adjuntos") != len(adjuntos):
+        raise RuntimeError(
+            "el correo salió sin el archivo adjunto porque el Google Apps Script de Gmail está desactualizado. "
+            "Actualízalo con la versión que adjunta archivos."
+        )
 
 
 def _enviar_por_smtp(to: str, subject: str, html_body: str, adjuntos: list[Adjunto]) -> None:
