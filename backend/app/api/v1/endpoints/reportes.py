@@ -274,6 +274,11 @@ def exportar_ventas(
 # --------------------------------------------------------------- asistencia --
 
 
+def _empresa_de(db: Session, usuario: Usuario) -> int | None:
+    """La tienda del personal, o la que eligio el SuperAdministrador (X-Empresa)."""
+    return usuario.empresa_id if usuario.empresa_id is not None else db.info.get("empresa_scope")
+
+
 def _datos_asistencia(
     db: Session,
     desde: datetime,
@@ -363,7 +368,7 @@ def reporte_asistencia(
     _empleado: Usuario = Depends(require_permiso("CU16")),
 ) -> ReporteAsistenciaOut:
     desde, hasta = _rango_fechas(fecha_desde, fecha_hasta)
-    return _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id, _empleado.empresa_id)
+    return _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id, _empresa_de(db, _empleado))
 
 
 @router.get("/asistencia/exportar")
@@ -377,7 +382,7 @@ def exportar_asistencia(
     _empleado: Usuario = Depends(require_permiso("CU16")),
 ) -> Response:
     desde, hasta = _rango_fechas(fecha_desde, fecha_hasta)
-    datos = _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id, _empleado.empresa_id)
+    datos = _datos_asistencia(db, desde, hasta, sucursal_id, empleado_id, _empresa_de(db, _empleado))
     headers = ["Empleado", "Sucursal", "Fecha", "Hora entrada", "Hora salida", "Horas conectado"]
     filas = [
         [

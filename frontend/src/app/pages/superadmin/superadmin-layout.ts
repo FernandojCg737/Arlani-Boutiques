@@ -127,6 +127,11 @@ export class SuperadminLayout {
   protected irAlSegundo(codigo: string): void {
     const u = buscarCaso('p2', codigo);
     if (!u) return;
+    if (u.caso.porEmpresa) {
+      // Por tienda: primero se elige la empresa.
+      void this.router.navigate(['/superadmin/tiendas', codigo]);
+      return;
+    }
     void this.router.navigate(u.caso.ruta ? ['/superadmin', u.caso.ruta] : ['/superadmin/cu', codigo]);
   }
 
