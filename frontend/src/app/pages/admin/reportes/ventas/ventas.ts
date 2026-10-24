@@ -4,8 +4,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { MarcaTienda } from '../../../../services/marca-tienda';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { ExportarReporte } from '../../../../components/reporte/exportar-reporte';
 import { environment } from '../../../../../environments/environment';
-import { descargarArchivo } from '../reportes-export';
 
 interface SerieCategoria {
   etiqueta: string;
@@ -48,11 +48,13 @@ function hoy(): string {
 
 @Component({
   selector: 'app-reporte-ventas',
-  imports: [DatePipe, DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink, ExportarReporte],
   templateUrl: './ventas.html',
   styleUrl: './ventas.scss',
 })
 export class ReporteVentasPage implements OnInit {
+  // Exportar (PDF, Excel, CSV, HTML) o enviar por correo, con los filtros de la pantalla.
+  protected readonly urlExportar = `${environment.apiUrl}/reportes/ventas/exportar`;
   // Logo y nombre de la tienda en el encabezado del reporte.
   protected readonly marca = inject(MarcaTienda);
   private readonly http = inject(HttpClient);
@@ -66,7 +68,6 @@ export class ReporteVentasPage implements OnInit {
   protected readonly datos = signal<ReporteVentas | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal('');
-  protected readonly exportando = signal(false);
 
   ngOnInit(): void {
     void this.cargarSucursales();
@@ -82,7 +83,7 @@ export class ReporteVentasPage implements OnInit {
     }
   }
 
-  private params(): Record<string, string> {
+  protected params(): Record<string, string> {
     const params: Record<string, string> = { fecha_desde: this.fechaDesde(), fecha_hasta: this.fechaHasta() };
     if (this.sucursalId()) params['sucursal_id'] = String(this.sucursalId());
     if (this.tipo()) params['tipo'] = this.tipo();
@@ -105,24 +106,4 @@ export class ReporteVentasPage implements OnInit {
     }
   }
 
-  protected imprimir(): void {
-    window.print();
-  }
-
-  protected async exportar(formato: 'csv' | 'excel'): Promise<void> {
-    this.exportando.set(true);
-    try {
-      const blob = await firstValueFrom(
-        this.http.get(`${environment.apiUrl}/reportes/ventas/exportar`, {
-          params: { ...this.params(), formato },
-          responseType: 'blob',
-        }),
-      );
-      descargarArchivo(blob, `reporte_ventas.${formato === 'excel' ? 'xlsx' : 'csv'}`);
-    } catch {
-      this.error.set('No se pudo exportar el reporte.');
-    } finally {
-      this.exportando.set(false);
-    }
-  }
 }

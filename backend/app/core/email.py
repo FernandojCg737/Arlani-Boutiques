@@ -1,3 +1,4 @@
+import base64
 import smtplib
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -23,17 +24,21 @@ def nombre_marca(db: Session, empresa_id: int | None) -> str:
     return nombre or MARCA_PLATAFORMA
 
 
-def send_email(to: str, subject: str, html_body: str) -> None:
+# Archivo adjunto: (nombre, contenido, tipo MIME), p. ej. un reporte en PDF.
+Adjunto = tuple[str, bytes, str]
+
+
+def send_email(to: str, subject: str, html_body: str, adjuntos: list[Adjunto] | None = None) -> None:
     # Render (plan gratis) bloquea la salida por SMTP (puertos 25/465/587):
     # en produccion el correo sale de la cuenta de Gmail a traves de un Google
     # Apps Script (HTTPS). Sin script configurado (desarrollo local), SMTP.
     if settings.GMAIL_SCRIPT_URL:
-        _enviar_por_apps_script(to, subject, html_body)
+        _enviar_por_apps_script(to, subject, html_body, adjuntos or [])
     else:
-        _enviar_por_smtp(to, subject, html_body)
+        _enviar_por_smtp(to, subject, html_body, adjuntos or [])
 
 
-def _enviar_por_apps_script(to: str, subject: str, html_body: str) -> None:
+def _enviar_por_apps_script(to: str, subject: str, html_body: str, adjuntos: list[Adjunto]) -> None:
     resp = requests.post(
         settings.GMAIL_SCRIPT_URL,
         json={
@@ -43,8 +48,12 @@ def _enviar_por_apps_script(to: str, subject: str, html_body: str) -> None:
             "html": html_body,
             "texto": TEXTO_PLANO,
             "nombre": FROM_NAME,
+            # El script los convierte en adjuntos (Utilities.newBlob).
+            "adjuntos": [
+                {"nombre": n, "mime": m, "base64": base64.b64encode(c).decode("ascii")} for n, c, m in adjuntos
+            ],
         },
-        timeout=30,
+        timeout=60,
     )
     # El script responde {"ok": true} o {"ok": false, "error": "..."}; si la
     # URL esta mal, Google devuelve una pagina HTML en vez de JSON.
@@ -57,13 +66,16 @@ def _enviar_por_apps_script(to: str, subject: str, html_body: str) -> None:
         raise RuntimeError(f"El script de Gmail no envio el correo ({resp.status_code}): {motivo}")
 
 
-def _enviar_por_smtp(to: str, subject: str, html_body: str) -> None:
+def _enviar_por_smtp(to: str, subject: str, html_body: str, adjuntos: list[Adjunto]) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = formataddr((FROM_NAME, settings.SMTP_FROM))
     msg["To"] = to
     msg.set_content(TEXTO_PLANO)
     msg.add_alternative(html_body, subtype="html")
+    for nombre, contenido, mime in adjuntos:
+        principal, _, sub = mime.partition("/")
+        msg.add_attachment(contenido, maintype=principal, subtype=sub or "octet-stream", filename=nombre)
 
     with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
         if settings.SMTP_USE_TLS:

@@ -7,7 +7,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso
-from app.core.exportar import exportar_csv, exportar_excel
+from app.core.email import nombre_marca
+from app.core.rate_limit import verificar_limite
+from app.core.reporte_export import descargar, desde_listas, enviar
 from app.db.session import get_db
 from app.models import Usuario
 from app.schemas.reportes import (
@@ -249,7 +251,9 @@ def reporte_ventas(
 
 @router.get("/ventas/exportar")
 def exportar_ventas(
-    formato: str = Query(pattern="^(csv|excel)$"),
+    formato: str = Query(pattern="^(csv|excel|html|pdf)$"),
+    # Con correo, el reporte se envia como adjunto en vez de descargarse.
+    correo: str | None = Query(default=None, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
@@ -266,12 +270,19 @@ def exportar_ventas(
          d.estado_pago, float(d.total)]
         for d in datos.detalle
     ]
-    if formato == "csv":
-        return exportar_csv("reporte_ventas", headers, filas)
-    return exportar_excel("reporte_ventas", "Reporte de Ventas", headers, filas)
+    return _responder(db, _empleado, "Reporte de Ventas", headers, filas, formato, correo)
 
 
 # --------------------------------------------------------------- asistencia --
+
+
+def _responder(db: Session, usuario: Usuario, titulo: str, headers: list[str], filas: list[list], formato: str, correo: str | None):
+    """Descarga el reporte o lo envia por correo como adjunto (CU07)."""
+    r = desde_listas(titulo, headers, filas, marca=nombre_marca(db, _empresa_de(db, usuario)))
+    if correo:
+        verificar_limite("reporte_correo", str(usuario.id), 10, 600)
+        return enviar(r, formato, correo)
+    return descargar(r, formato)
 
 
 def _empresa_de(db: Session, usuario: Usuario) -> int | None:
@@ -373,7 +384,9 @@ def reporte_asistencia(
 
 @router.get("/asistencia/exportar")
 def exportar_asistencia(
-    formato: str = Query(pattern="^(csv|excel)$"),
+    formato: str = Query(pattern="^(csv|excel|html|pdf)$"),
+    # Con correo, el reporte se envia como adjunto en vez de descargarse.
+    correo: str | None = Query(default=None, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
@@ -393,9 +406,7 @@ def exportar_asistencia(
         ]
         for d in datos.detalle
     ]
-    if formato == "csv":
-        return exportar_csv("reporte_asistencia", headers, filas)
-    return exportar_excel("reporte_asistencia", "Reporte de Asistencia", headers, filas)
+    return _responder(db, _empleado, "Reporte de Asistencia", headers, filas, formato, correo)
 
 
 # --------------------------------------------------------------- inventario --
@@ -474,7 +485,9 @@ def reporte_inventario(
 
 @router.get("/inventario/exportar")
 def exportar_inventario(
-    formato: str = Query(pattern="^(csv|excel)$"),
+    formato: str = Query(pattern="^(csv|excel|html|pdf)$"),
+    # Con correo, el reporte se envia como adjunto en vez de descargarse.
+    correo: str | None = Query(default=None, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
     sucursal_id: int | None = Query(default=None),
     umbral: int = Query(default=5, ge=0),
     db: Session = Depends(get_db),
@@ -484,9 +497,7 @@ def exportar_inventario(
     datos = _datos_inventario(db, sucursal_id, umbral, desde, hasta)
     headers = ["Producto", "Talla", "Color", "Sucursal", "Cantidad en stock"]
     filas = [[f.producto_nombre, f.talla_codigo, f.color_nombre, f.sucursal_nombre, f.cantidad] for f in datos.stock]
-    if formato == "csv":
-        return exportar_csv("reporte_inventario", headers, filas)
-    return exportar_excel("reporte_inventario", "Reporte de Inventario", headers, filas)
+    return _responder(db, _empleado, "Reporte de Inventario", headers, filas, formato, correo)
 
 
 # ---------------------------------------------------------------- productos --
@@ -563,7 +574,9 @@ def reporte_productos(
 
 @router.get("/productos/exportar")
 def exportar_productos(
-    formato: str = Query(pattern="^(csv|excel)$"),
+    formato: str = Query(pattern="^(csv|excel|html|pdf)$"),
+    # Con correo, el reporte se envia como adjunto en vez de descargarse.
+    correo: str | None = Query(default=None, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
@@ -580,9 +593,7 @@ def exportar_productos(
          float(f.precio_promedio), float(f.total_vendido)]
         for f in datos.detalle
     ]
-    if formato == "csv":
-        return exportar_csv("reporte_productos", headers, filas)
-    return exportar_excel("reporte_productos", "Productos Mas Vendidos", headers, filas)
+    return _responder(db, _empleado, "Productos Mas Vendidos", headers, filas, formato, correo)
 
 
 # ----------------------------------------------------------------- reservas --
@@ -644,7 +655,9 @@ def reporte_reservas(
 
 @router.get("/reservas/exportar")
 def exportar_reservas(
-    formato: str = Query(pattern="^(csv|excel)$"),
+    formato: str = Query(pattern="^(csv|excel|html|pdf)$"),
+    # Con correo, el reporte se envia como adjunto en vez de descargarse.
+    correo: str | None = Query(default=None, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"),
     fecha_desde: date | None = Query(default=None),
     fecha_hasta: date | None = Query(default=None),
     sucursal_id: int | None = Query(default=None),
@@ -662,6 +675,4 @@ def exportar_reservas(
         ]
         for d in datos.detalle
     ]
-    if formato == "csv":
-        return exportar_csv("reporte_reservas", headers, filas)
-    return exportar_excel("reporte_reservas", "Reporte de Reservas", headers, filas)
+    return _responder(db, _empleado, "Reporte de Reservas", headers, filas, formato, correo)

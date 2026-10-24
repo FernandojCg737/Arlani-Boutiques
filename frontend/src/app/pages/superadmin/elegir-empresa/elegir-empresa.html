@@ -4,6 +4,9 @@
       @if (ubicacion(); as u) {
         <h1>{{ u.caso.nombre }}</h1>
         <p>Elige la tienda con la que vas a trabajar en el {{ u.caso.codigo }}: vas a ver solo sus datos.</p>
+        @if (u.caso.codigo === 'CU07') {
+          <a class="boton-saas" routerLink="/superadmin/reportes-saas">Reporte SaaS (CU20): toda la plataforma →</a>
+        }
       } @else {
         <h1>Caso de uso no encontrado</h1>
       }

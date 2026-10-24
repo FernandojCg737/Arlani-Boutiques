@@ -1,0 +1,178 @@
+:host {
+  display: block;
+}
+
+.saas__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e5e5e5;
+
+  button {
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    padding: 11px 14px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #888;
+    cursor: pointer;
+
+    &.is-activa {
+      color: #1f2a44;
+      border-bottom-color: #1f2a44;
+    }
+  }
+}
+
+.saas__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin-bottom: 18px;
+
+  label span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #777;
+  }
+
+  input {
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    font: inherit;
+    font-size: 13px;
+  }
+
+  button {
+    border: none;
+    background: #1f2a44;
+    color: #fff;
+    padding: 9px 16px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+}
+
+.saas__error {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #fdecea;
+  color: #8c1d18;
+  font-size: 13px;
+}
+
+.saas__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+
+    &.is-principal {
+      background: #1f2a44;
+      border-color: #1f2a44;
+
+      span,
+      small,
+      strong {
+        color: #fff;
+      }
+    }
+  }
+
+  span {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #888;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1f2a44;
+    font-variant-numeric: tabular-nums;
+  }
+
+  small {
+    font-size: 12px;
+    color: #888;
+  }
+}
+
+.saas__bloque {
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #1f2a44;
+  }
+
+  header h2 {
+    margin: 0;
+  }
+
+  header p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #777;
+  }
+}
+
+.saas__planes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px;
+    background: #f7f7f5;
+    font-size: 13px;
+  }
+
+  strong {
+    color: #1f2a44;
+  }
+}
+
+.saas__vacio {
+  color: #888;
+}

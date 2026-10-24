@@ -1,0 +1,123 @@
+<div class="admin-content saas">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P5 · CU20</span>
+      <h1>Reportes de la plataforma (SaaS)</h1>
+      <p>
+        Lo que gana Arlani Boutiques: suscripciones de las tiendas y comisiones por sus ventas en línea, junto al MRR, las
+        tiendas, los planes y lo que está por vencer. Todo se puede exportar o enviar por correo.
+      </p>
+    </div>
+  </div>
+
+  <nav class="saas__tabs">
+    @for (v of vistas; track v.clave) {
+      <button type="button" [class.is-activa]="vista() === v.clave" (click)="cambiarVista(v.clave)">{{ v.etiqueta }}</button>
+    }
+  </nav>
+
+  @if (vista() !== 'dinamico') {
+    <div class="saas__filtros">
+      @if (vista() !== 'vencimientos') {
+        <label>
+          <span>Desde</span>
+          <input type="date" [value]="desde()" (change)="desde.set($any($event.target).value)" />
+        </label>
+        <label>
+          <span>Hasta</span>
+          <input type="date" [value]="hasta()" (change)="hasta.set($any($event.target).value)" />
+        </label>
+        <button type="button" (click)="cargar()">Aplicar</button>
+      }
+    </div>
+  }
+
+  @if (error()) {
+    <div class="saas__error">{{ error() }}</div>
+  }
+
+  @switch (vista()) {
+    @case ('resumen') {
+      @if (resumen(); as r) {
+        <div class="saas__kpis">
+          <div class="is-principal">
+            <span>Ingreso de Arlani</span>
+            <strong>Bs {{ +r.ingreso_total | number: '1.2-2' }}</strong>
+            <small>en el periodo</small>
+          </div>
+          <div>
+            <span>Suscripciones</span>
+            <strong>Bs {{ +r.ingreso_suscripciones | number: '1.2-2' }}</strong>
+            <small>{{ r.pagos_suscripcion }} {{ r.pagos_suscripcion === 1 ? 'pago' : 'pagos' }}</small>
+          </div>
+          <div>
+            <span>Comisiones</span>
+            <strong>Bs {{ +r.ingreso_comisiones | number: '1.2-2' }}</strong>
+            <small>de {{ r.ventas_con_comision }} ventas en línea</small>
+          </div>
+          <div>
+            <span>MRR</span>
+            <strong>Bs {{ +r.mrr | number: '1.2-2' }}</strong>
+            <small>ingreso mensual recurrente</small>
+          </div>
+          <div>
+            <span>Vendido por las tiendas</span>
+            <strong>Bs {{ +r.gmv | number: '1.2-2' }}</strong>
+            <small>{{ r.ventas_tiendas }} ventas (GMV)</small>
+          </div>
+          <div>
+            <span>Tiendas</span>
+            <strong>{{ r.empresas_activas }} activas</strong>
+            <small>{{ r.empresas_prueba }} en prueba · {{ r.empresas_suspendidas }} suspendidas · {{ r.empresas_total }} en total</small>
+          </div>
+        </div>
+
+        <section class="saas__bloque">
+          <header>
+            <h2>Ingresos por mes</h2>
+            @if (tablaResumen(); as t) {
+              <app-exportar-reporte [tabla]="t" />
+            }
+          </header>
+          <app-chart type="bar" [labels]="etiquetasMes()" [data]="[]" [series]="seriesMes()" />
+        </section>
+
+        <section class="saas__bloque">
+          <h2>Tiendas e ingreso mensual por plan</h2>
+          <div class="saas__planes">
+            @for (p of r.por_plan; track p.plan) {
+              <div>
+                <strong>{{ p.plan }}</strong>
+                <span>{{ p.tiendas }} {{ p.tiendas === 1 ? 'tienda' : 'tiendas' }}</span>
+                <span>Bs {{ +p.mrr | number: '1.2-2' }} / mes</span>
+              </div>
+            }
+          </div>
+        </section>
+      } @else if (cargando()) {
+        <p class="saas__vacio">Cargando…</p>
+      }
+    }
+    @case ('dinamico') {
+      <app-reporte-dinamico ambito="plataforma" [empresas]="empresas()" />
+    }
+    @default {
+      @if (tabla(); as t) {
+        <section class="saas__bloque">
+          <header>
+            <div>
+              <h2>{{ t.titulo }}</h2>
+              @if (t.subtitulo) {
+                <p>{{ t.subtitulo }}</p>
+              }
+            </div>
+            <app-exportar-reporte [tabla]="t" />
+          </header>
+          <app-tabla-reporte [tabla]="t" />
+        </section>
+      } @else if (cargando()) {
+        <p class="saas__vacio">Cargando…</p>
+      }
+    }
+  }
+</div>

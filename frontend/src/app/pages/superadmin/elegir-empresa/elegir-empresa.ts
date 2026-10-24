@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
@@ -15,7 +15,7 @@ import { ParcialId, buscarCaso } from '../superadmin-menu';
 // sucursales y CU04 catalogo, que luego muestran solo lo de esa tienda).
 @Component({
   selector: 'app-superadmin-elegir-empresa',
-  imports: [AdminClientes],
+  imports: [AdminClientes, RouterLink],
   templateUrl: './elegir-empresa.html',
   styleUrl: './elegir-empresa.scss',
 })

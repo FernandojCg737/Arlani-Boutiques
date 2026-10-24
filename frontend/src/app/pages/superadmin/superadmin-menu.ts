@@ -249,6 +249,7 @@ export const PARCIALES: ParcialMenu[] = [
               { etiqueta: 'Inventario', ruta: 'reportes/inventario' },
               { etiqueta: 'Reservas', ruta: 'reportes/reservas' },
               { etiqueta: 'Productos', ruta: 'reportes/productos' },
+              { etiqueta: 'Dinámico', ruta: 'reportes/dinamico' },
             ],
           },
           {
@@ -259,6 +260,14 @@ export const PARCIALES: ParcialMenu[] = [
               'Pedir un reporte en lenguaje natural, por texto o por voz, y exportarlo. Disponible solo en el plan Profesional.',
           },
           { codigo: 'CU18', nombre: 'Gestionar modelos de ML', ruta: 'recomendaciones', antes: 'CU18', plataformas: ['WEB'] },
+          {
+            codigo: 'CU20',
+            nombre: 'Gestionar reportes de la plataforma (SaaS)',
+            ruta: 'reportes-saas',
+            plataformas: ['WEB'],
+            descripcion:
+              'Lo que gana Arlani: suscripciones y comisiones por ventas, MRR, tiendas, planes y vencimientos. Reportes fijos y dinámicos; PDF, Excel, CSV, HTML y envío por correo.',
+          },
         ],
       },
     ],

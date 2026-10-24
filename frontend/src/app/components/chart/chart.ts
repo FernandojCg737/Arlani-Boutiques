@@ -33,6 +33,8 @@ export class AppChart implements OnDestroy {
   readonly labels = input.required<string[]>();
   readonly data = input.required<number[]>();
   readonly label = input<string>('');
+  // Varias series (p. ej. suscripciones y comisiones por mes): barras apiladas.
+  readonly series = input<{ label: string; data: number[] }[]>([]);
 
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private chart?: Chart;
@@ -43,22 +45,37 @@ export class AppChart implements OnDestroy {
       const labels = this.labels();
       const data = this.data();
       const label = this.label();
-      queueMicrotask(() => this.render(tipo, labels, data, label));
+      const series = this.series();
+      queueMicrotask(() => this.render(tipo, labels, data, label, series));
     });
   }
 
-  private render(tipo: ChartType, labels: string[], data: number[], label: string): void {
+  private render(
+    tipo: ChartType,
+    labels: string[],
+    data: number[],
+    label: string,
+    series: { label: string; data: number[] }[],
+  ): void {
     const ctx = this.canvasRef().nativeElement.getContext('2d');
     if (!ctx) return;
 
     this.chart?.destroy();
 
     const esCircular = tipo === 'pie' || tipo === 'doughnut';
+    const apiladas = series.length > 0 && !esCircular;
     const config: ChartConfiguration = {
       type: tipo,
       data: {
         labels,
-        datasets: [
+        datasets: apiladas
+          ? series.map((s, i) => ({
+              label: s.label,
+              data: s.data,
+              backgroundColor: PALETTE[i % PALETTE.length],
+              borderRadius: 3,
+            }))
+          : [
           {
             label,
             data,
@@ -75,13 +92,13 @@ export class AppChart implements OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: esCircular, position: 'bottom', labels: { font: { size: 11 } } },
+          legend: { display: esCircular || apiladas, position: 'bottom', labels: { font: { size: 11 } } },
         },
         scales: esCircular
           ? {}
           : {
-              y: { beginAtZero: true, ticks: { font: { size: 11 } } },
-              x: { ticks: { font: { size: 11 } } },
+              y: { beginAtZero: true, stacked: apiladas, ticks: { font: { size: 11 } } },
+              x: { stacked: apiladas, ticks: { font: { size: 11 } } },
             },
       },
     };
