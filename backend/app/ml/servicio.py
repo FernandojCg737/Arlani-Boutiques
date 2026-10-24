@@ -204,7 +204,7 @@ def preparar_modelos() -> None:
     from app.db.session import SessionLocal
 
     with SessionLocal() as db:
-        for tarea in ("reportes", "chatbot"):
+        for tarea in ("reportes", "reportes_saas", "chatbot"):
             existe = db.execute(text("SELECT 1 FROM fn_modelo_ml_activo(:t)"), {"t": tarea}).first()
             db.commit()
             if existe is None:

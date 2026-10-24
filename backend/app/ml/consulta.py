@@ -150,6 +150,65 @@ def interpretar(texto: str, intencion: str, hoy: date, sucursales: list[tuple[in
     return c
 
 
+NOMBRES_SAAS = {
+    "ingresos_suscripciones": "Ingresos por suscripciones", "suscripciones_tienda": "Suscripciones por tienda",
+    "comisiones": "Comisiones por ventas en línea", "ventas_tiendas": "Ventas de las tiendas",
+    "planes": "Tiendas y MRR por plan", "tiendas": "Tiendas registradas", "metodos_cobro": "Cobros por método",
+}
+
+SUGERENCIAS_SAAS = [
+    "Mostrame los ingresos por suscripciones de los últimos tres meses",
+    "¿Qué tienda generó más comisión en octubre?",
+    "Ventas de todas las tiendas por semana",
+    "¿Cuántas tiendas hay por plan?",
+    "Altas de tiendas por mes",
+]
+
+
+def interpretar_saas(texto: str, intencion: str, hoy: date, empresas: list[tuple[int, str]]) -> tuple[Consulta, int | None]:
+    """Como interpretar(), para los reportes de toda la plataforma (CU17 del
+    SaaS). Devuelve la consulta y la tienda nombrada en la frase (si hay)."""
+    t = normalizar(texto)
+    digitos = iter(re.findall(r"\d+", texto))
+    t_num = re.sub(r"\bnum\b", lambda _: next(digitos, "0"), t)
+    desde, hasta, texto_periodo = periodo(t_num, hoy)
+    filtros = [f"Periodo: {texto_periodo}"] if texto_periodo else []
+    grano = next((g for g, p in (("dia", r"\b(por|cada) dia|diari"), ("semana", r"\b(por|cada) semana|semanal"),
+                                 ("mes", r"\b(por|cada) mes|mensual")) if re.search(p, t)), None)
+    empresa_id = None
+    for eid, nombre in empresas:
+        if normalizar(nombre) in t:
+            empresa_id = eid
+            filtros.append(f"Tienda: {nombre}")
+            break
+
+    if intencion == "ingresos_suscripciones":
+        c = Consulta("suscripciones", [grano or "mes"], ["total_bob", "pagos"], grafico="line")
+    elif intencion == "suscripciones_tienda":
+        c = Consulta("suscripciones", ["tienda"], ["total_bob", "pagos"])
+    elif intencion == "comisiones":
+        c = Consulta("comisiones", [grano] if grano else ["tienda"], ["comision", "vendido", "ventas"], grafico="line" if grano else "bar")
+    elif intencion == "ventas_tiendas":
+        if re.search(r"online|en linea|offline|sin conexion|mostrador", t):
+            c = Consulta("ventas", ["tienda", "origen"], ["total", "cantidad"])
+        else:
+            c = Consulta("ventas", [grano] if grano else ["tienda"], ["total", "cantidad"], grafico="line" if grano else "bar")
+    elif intencion == "planes":
+        c = Consulta("empresas", ["plan"], ["cantidad", "mrr"], grafico="doughnut")
+    elif intencion == "tiendas":
+        dim = "ciudad" if "ciudad" in t else "estado" if re.search(r"activ|suspend|estado", t) else "mes"
+        c = Consulta("empresas", [dim], ["cantidad"], grafico="line" if dim == "mes" else "doughnut")
+    else:  # metodos_cobro
+        c = Consulta("suscripciones", ["metodo"], ["total_bob", "pagos"], grafico="doughnut")
+
+    # Planes y tiendas son de toda la historia salvo que se pida un periodo.
+    if desde is None and c.fuente not in ("empresas",):
+        desde, hasta = hoy - timedelta(days=89), hoy
+        filtros.append("Periodo: últimos 90 días (no se indicó)")
+    c.desde, c.hasta, c.filtros = desde, hasta, filtros
+    return c, empresa_id
+
+
 def narrar(intencion: str, tabla: dict) -> str:
     """Resumen en palabras del reporte (para leerlo en voz alta)."""
     filas, cols = tabla["filas"], tabla["columnas"]

@@ -44,6 +44,7 @@
 
   <nav class="ml__tabs">
     <button type="button" [class.is-activa]="vista() === 'reportes'" (click)="cambiarVista('reportes')">Reportes por voz (CU17)</button>
+    <button type="button" [class.is-activa]="vista() === 'reportes_saas'" (click)="cambiarVista('reportes_saas')">Reportes del SaaS (CU17)</button>
     <button type="button" [class.is-activa]="vista() === 'chatbot'" (click)="cambiarVista('chatbot')">Chatbot de las tiendas</button>
     <button type="button" [class.is-activa]="vista() === 'recomendaciones'" (click)="cambiarVista('recomendaciones')">Recomendador de prendas</button>
     <button type="button" [class.is-activa]="vista() === 'segmentos'" (click)="cambiarVista('segmentos')">Segmentación de clientes (K-Means)</button>
@@ -53,7 +54,7 @@
     <div class="admin-error">{{ error() }}</div>
   }
 
-  @if (vista() === 'reportes' || vista() === 'chatbot') {
+  @if (vista() === 'reportes' || vista() === 'reportes_saas' || vista() === 'chatbot') {
     @if (vista() === 'chatbot' && chatbots().length > 1) {
       <div class="ml__tiendas" role="group" aria-label="Modelo del chatbot">
         @for (c of chatbots(); track c.empresa_id) {

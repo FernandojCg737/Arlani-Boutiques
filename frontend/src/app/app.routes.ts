@@ -248,6 +248,8 @@ export const routes: Routes = [
       { path: 'reportes-saas', component: ReportesSaas },
       // CU17: reportes por voz o texto, de la tienda elegida.
       { path: 'reporte-voz', component: AdminReporteVoz, canActivate: [tiendaElegidaGuard] },
+      // CU17 del SaaS: reportes por voz de toda la plataforma.
+      { path: 'reporte-voz-saas', component: AdminReporteVoz, data: { ambito: 'saas' } },
       // CU18: clasificadores de intenciones (CU17 y chatbot) y K-Means.
       { path: 'modelos-ml', component: ModelosMl },
       { path: 'recomendaciones', component: AdminRecomendaciones },
