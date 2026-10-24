@@ -116,6 +116,7 @@ class Chatbot(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id"))
     canal: Mapped[str] = mapped_column(String(30))
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
     fecha_inicio: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     fecha_fin: Mapped[datetime | None] = mapped_column(DateTime)
 
@@ -133,5 +134,8 @@ class ChatbotMensaje(Base):
     remitente: Mapped[str] = mapped_column(String(10))  # 'cliente' | 'bot'
     mensaje: Mapped[str] = mapped_column(Text)
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # CU18: lo que el modelo de la tienda entendio del mensaje del cliente.
+    intencion: Mapped[str | None] = mapped_column(String(30))
+    confianza: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))
 
     chatbot: Mapped["Chatbot"] = relationship(back_populates="mensajes")

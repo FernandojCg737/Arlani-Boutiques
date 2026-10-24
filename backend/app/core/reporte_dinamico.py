@@ -169,6 +169,8 @@ def ejecutar(
     sucursal_id: int | None = None,
     empresa_id: int | None = None,
     marca: str = "Arlani Boutiques",
+    limite: int | None = None,
+    ascendente: bool = False,
 ) -> Reporte:
     f = fuentes.get(fuente)
     if f is None:
@@ -200,10 +202,11 @@ def ejecutar(
     mets_sql = [f"coalesce({f.metricas[m][1]}, 0) AS {m}" for m in metricas]
     grupos = ", ".join(str(i + 1) for i in range(len(agrupar)))
     # Tiempo en orden cronologico; si no, de mayor a menor en la primera medida.
-    orden = grupos if agrupar[0] in ("dia", "semana", "mes") else f"{len(agrupar) + 1} DESC"
+    # (ascendente: "los de menor existencia"; limite: "los 10 mas vendidos").
+    orden = grupos if agrupar[0] in ("dia", "semana", "mes") else f"{len(agrupar) + 1} {'ASC' if ascendente else 'DESC'}"
     sql = (
         f"SELECT {', '.join(dims_sql + mets_sql)} FROM {f.origen} WHERE {' AND '.join(condiciones)} "
-        f"GROUP BY {grupos} ORDER BY {orden} LIMIT 1000"
+        f"GROUP BY {grupos} ORDER BY {orden} LIMIT {min(limite or 1000, 1000)}"
     )
     filas = [dict(r) for r in db.execute(text(sql), params).mappings()]
 

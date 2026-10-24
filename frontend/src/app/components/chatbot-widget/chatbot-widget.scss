@@ -302,3 +302,18 @@
     cursor: default;
   }
 }
+
+// Asistente universal (portada y catálogo de Arlani): los colores del SaaS
+// en vez de los de una tienda -- azul noche, con el botón en coral.
+// En una tienda, --brand-dark ya es el color de su marca (TiendaActiva).
+:host(.chatbot--universal) {
+  --brand-dark: #1f2a44;
+
+  .chatbot-fab {
+    background: #c4503d;
+  }
+
+  .chatbot-panel__header strong {
+    color: #f2b8a6;
+  }
+}

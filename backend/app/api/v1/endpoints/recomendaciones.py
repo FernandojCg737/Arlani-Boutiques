@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import ADMIN_TIPOS, get_current_user, get_current_user_optional, require_permiso, require_permiso_cliente
 from app.core.gemini import generar_razones, generar_razones_relacionados
 from app.db.session import get_db
+from app.ml.recomendador import para_cliente, parecidas
+from app.ml.servicio import recomendador_activo
 from app.services.usuarios import codigos_permiso
 from app.models import Cliente, Usuario
 from app.schemas.recomendaciones import (
@@ -24,10 +26,13 @@ from app.schemas.recomendaciones import (
 router = APIRouter()
 
 # CU18 "Recomendar Prendas por IA": el ranking (que productos recomendar y
-# en que orden) lo calcula un motor de reglas en SQL --
-# "comprado junto a" (co-ocurrencia en ventas de otros clientes),
-# "similar a lo que ya compraste" (misma categoria/marca) y, si el cliente
-# no tiene historial, los mas vendidos en general. La IA (Gemini) no elige
+# en que orden) lo da el modelo de recomendacion de cada tienda
+# (app/ml/recomendador.py: hibrido de contenido TF-IDF y filtrado
+# colaborativo KNN, entrenado y evaluado con sus ventas y vistas). Las
+# reglas en SQL de abajo quedan de respaldo -- prendas nuevas que el modelo
+# todavia no conoce, o una tienda sin modelo entrenado --: "comprado junto
+# a" (co-ocurrencia en ventas de otros clientes), "similar a lo que ya
+# compraste" (misma categoria/marca) y los mas vendidos. La IA (Gemini) no elige
 # los productos: solo redacta la razon personalizada de cada uno, y tiene
 # una razon generica de respaldo si no hay API key o la llamada falla, asi
 # que la funcionalidad nunca depende 100% de un servicio externo.
@@ -72,7 +77,53 @@ def _historial_nombres(db: Session, cliente_id: int) -> list[str]:
     return [r[0] for r in rows]
 
 
+def _con_stock(db: Session, ids: list[int]) -> set[int]:
+    if not ids:
+        return set()
+    return {f[0] for f in db.execute(
+        text("""SELECT p.id FROM producto p WHERE p.id IN :ids AND p.estado = 'activo'
+                AND EXISTS (SELECT 1 FROM inventario inv WHERE inv.producto_id = p.id AND inv.cantidad > 0)"""
+             ).bindparams(bindparam("ids", expanding=True)),
+        {"ids": ids},
+    )}
+
+
+def _candidatos_modelo(db: Session, cliente_id: int, n: int) -> list[dict]:
+    """Con el modelo de cada tienda donde el cliente compro o miro algo: lo
+    parecido a su historial (compras pesan 3, vistas 1), sin lo que compro
+    en los ultimos 30 dias."""
+    filas = db.execute(
+        text(f"""SELECT p.empresa_id, x.producto_id, sum(x.peso) AS peso, bool_or(x.reciente) AS reciente FROM (
+                     SELECT dvc.producto_id, 3.0 AS peso, v.fecha > now() - interval '30 days' AS reciente
+                     FROM ({_DETALLE_BASE}) dvc JOIN venta v ON v.id = dvc.venta_id WHERE dvc.cliente_id = :cid
+                     UNION ALL
+                     SELECT producto_id, 1.0, false FROM vista_producto WHERE cliente_id = :cid
+                 ) x JOIN producto p ON p.id = x.producto_id GROUP BY p.empresa_id, x.producto_id"""),
+        {"cid": cliente_id},
+    ).all()
+    por_tienda: dict[int, list] = {}
+    for f in filas:
+        por_tienda.setdefault(f.empresa_id, []).append(f)
+    candidatos: list[dict] = []
+    for empresa_id, historial in por_tienda.items():
+        artefacto = recomendador_activo(db, empresa_id)
+        if artefacto is None:
+            continue
+        perfil = {f.producto_id: float(f.peso) for f in historial}
+        recientes = {f.producto_id for f in historial if f.reciente}
+        for pid, score in para_cliente(artefacto, perfil, recientes, n):
+            candidatos.append({"producto_id": pid, "score": score, "origen": "modelo_ml"})
+    disponibles = _con_stock(db, [c["producto_id"] for c in candidatos])
+    candidatos = [c for c in candidatos if c["producto_id"] in disponibles]
+    candidatos.sort(key=lambda c: -c["score"])
+    return candidatos[:n]
+
+
 def _generar_candidatos(db: Session, cliente_id: int, n: int = 8) -> list[dict]:
+    # Primero el modelo; las reglas completan si faltan.
+    candidatos = _candidatos_modelo(db, cliente_id, n)
+    if len(candidatos) >= n:
+        return candidatos
     compras = [
         r[0]
         for r in db.execute(
@@ -81,10 +132,9 @@ def _generar_candidatos(db: Session, cliente_id: int, n: int = 8) -> list[dict]:
         ).all()
     ]
 
-    candidatos: list[dict] = []
-    vistos: set[int] = set(compras)
+    vistos: set[int] = set(compras) | {c["producto_id"] for c in candidatos}
 
-    if compras:
+    if compras and len(candidatos) < n:
         co_occurrence = db.execute(
             text(
                 f"""
@@ -325,26 +375,41 @@ _UMBRAL_REFRESH_RELACIONADOS = timedelta(hours=24)
 def _generar_relacionados(db: Session, producto_id: int, n: int = 6) -> list[dict]:
     candidatos: list[dict] = []
     vistos: set[int] = {producto_id}
+    # Solo prendas de la MISMA tienda (antes las reglas mezclaban tiendas).
+    empresa_id = db.execute(text("SELECT empresa_id FROM producto WHERE id = :pid"), {"pid": producto_id}).scalar()
+    e = {"e": empresa_id}
 
-    co_vista = db.execute(
+    # Primero el modelo de la tienda; las reglas completan si faltan.
+    artefacto = recomendador_activo(db, empresa_id) if empresa_id else None
+    if artefacto is not None:
+        sugeridas = parecidas(artefacto, producto_id, n * 2)
+        disponibles = _con_stock(db, [pid for pid, _ in sugeridas])
+        for pid, score in sugeridas:
+            if pid in disponibles and len(candidatos) < n:
+                candidatos.append({"producto_id": pid, "score": score, "origen": "modelo_ml"})
+                vistos.add(pid)
+
+    co_vista = [] if len(candidatos) >= n else db.execute(
         text(
             """
             SELECT vp2.producto_id, COUNT(DISTINCT vp2.cliente_id) AS frecuencia
             FROM vista_producto vp1
             JOIN vista_producto vp2 ON vp2.cliente_id = vp1.cliente_id AND vp2.producto_id != vp1.producto_id
             WHERE vp1.producto_id = :pid
-              AND EXISTS (SELECT 1 FROM producto pr WHERE pr.id = vp2.producto_id AND pr.estado = 'activo')
+              AND EXISTS (SELECT 1 FROM producto pr WHERE pr.id = vp2.producto_id AND pr.estado = 'activo' AND pr.empresa_id = :e)
               AND EXISTS (SELECT 1 FROM inventario inv WHERE inv.producto_id = vp2.producto_id AND inv.cantidad > 0)
             GROUP BY vp2.producto_id
             ORDER BY frecuencia DESC
             LIMIT 6
             """
         ),
-        {"pid": producto_id},
+        {"pid": producto_id, **e},
     ).all()
     if co_vista:
         max_frec = max(f for _, f in co_vista)
         for pid, frecuencia in co_vista:
+            if pid in vistos or len(candidatos) >= n:
+                continue
             candidatos.append({"producto_id": pid, "score": round(float(frecuencia) / max_frec, 4), "origen": "vistos_juntos"})
             vistos.add(pid)
 
@@ -355,7 +420,7 @@ def _generar_relacionados(db: Session, producto_id: int, n: int = 6) -> list[dic
                 SELECT p.id, (CASE WHEN p.categoria_id = pb.categoria_id THEN 1 ELSE 0 END
                             + CASE WHEN p.marca_id = pb.marca_id THEN 1 ELSE 0 END) AS coincidencias
                 FROM producto p, producto pb
-                WHERE pb.id = :pid AND p.id != :pid AND p.estado = 'activo'
+                WHERE pb.id = :pid AND p.id != :pid AND p.estado = 'activo' AND p.empresa_id = pb.empresa_id
                   AND (p.categoria_id = pb.categoria_id OR p.marca_id = pb.marca_id)
                   AND EXISTS (SELECT 1 FROM inventario inv WHERE inv.producto_id = p.id AND inv.cantidad > 0)
                 ORDER BY coincidencias DESC, p.id
@@ -381,14 +446,14 @@ def _generar_relacionados(db: Session, producto_id: int, n: int = 6) -> list[dic
                 SELECT dvc.producto_id, SUM(dvc.cantidad) AS unidades
                 FROM dvc
                 WHERE dvc.producto_id NOT IN :excluidos
-                  AND EXISTS (SELECT 1 FROM producto pr WHERE pr.id = dvc.producto_id AND pr.estado = 'activo')
+                  AND EXISTS (SELECT 1 FROM producto pr WHERE pr.id = dvc.producto_id AND pr.estado = 'activo' AND pr.empresa_id = :e)
                   AND EXISTS (SELECT 1 FROM inventario inv WHERE inv.producto_id = dvc.producto_id AND inv.cantidad > 0)
                 GROUP BY dvc.producto_id
                 ORDER BY unidades DESC
                 LIMIT 20
                 """
             ).bindparams(bindparam("excluidos", expanding=True)),
-            {"excluidos": excluidos},
+            {"excluidos": excluidos, **e},
         ).all()
         max_unidades = max((u for _, u in mas_vendidos), default=1)
         for pid, unidades in mas_vendidos:
@@ -413,13 +478,13 @@ def _generar_relacionados(db: Session, producto_id: int, n: int = 6) -> list[dic
             text(
                 """
                 SELECT p.id FROM producto p
-                WHERE p.id NOT IN :excluidos AND p.estado = 'activo'
+                WHERE p.id NOT IN :excluidos AND p.estado = 'activo' AND p.empresa_id = :e
                   AND EXISTS (SELECT 1 FROM inventario inv WHERE inv.producto_id = p.id AND inv.cantidad > 0)
                 ORDER BY p.id
                 LIMIT 12
                 """
             ).bindparams(bindparam("excluidos", expanding=True)),
-            {"excluidos": excluidos},
+            {"excluidos": excluidos, **e},
         ).all()
         for (pid,) in resto:
             if len(candidatos) >= n:

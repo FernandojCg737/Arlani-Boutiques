@@ -34,6 +34,24 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
+@app.on_event("startup")
+def preparar_modelos_ml() -> None:
+    # CU18: si falta algun modelo (primer despliegue), se entrena en segundo
+    # plano para no demorar el arranque.
+    import logging
+    import threading
+
+    from app.ml.servicio import preparar_modelos
+
+    def entrenar() -> None:
+        try:
+            preparar_modelos()
+        except Exception:  # noqa: BLE001 - se reintenta al primer uso
+            logging.getLogger(__name__).exception("No se pudieron preparar los modelos de ML")
+
+    threading.Thread(target=entrenar, daemon=True).start()
+
+
 @app.exception_handler(DBAPIError)
 async def datos_de_otra_tienda(request: Request, exc: DBAPIError) -> JSONResponse:
     # Row Level Security (migracion a8d3f1c6e924): el personal de una tienda

@@ -23,12 +23,16 @@
       phoneNumber="59173766956"
       message="Hola, quisiera información sobre los planes de suscripción de Arlani Boutiques (o necesito ayuda de soporte)."
     />
+    <!-- Portada y catálogo universal: el asistente de Arlani (todas las tiendas,
+         planes y cómo crear una boutique); también para visitantes sin sesión -->
+    @if (chatbotUniversal()) {
+      <app-chatbot-widget [universal]="true" />
+    }
   } @else {
-    <!-- El asistente es de la tienda Atelier Aranier: no va en la portada de Arlani -->
     <app-footer />
     <app-whatsapp-float />
-    <!-- El asistente conoce el catalogo de Atelier: solo en su tienda -->
-    @if (auth.hasPermiso('CU19') && tiendaActiva.esOriginal()) {
+    <!-- Cada tienda tiene su asistente, con su modelo y sus datos -->
+    @if (auth.hasPermiso('CU19')) {
       <app-chatbot-widget />
     }
   }

@@ -9,6 +9,7 @@ import {
   computed,
   effect,
   inject,
+  input,
   signal,
   viewChild,
 } from '@angular/core';
@@ -17,6 +18,8 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Auth } from '../../services/auth';
 import { ChatbotService } from '../../services/chatbot';
+import { TiendaActiva } from '../../services/tienda-activa';
+import { hablar as leerEnVoz } from '../../services/voz';
 
 // El navegador todavia no tiene tipos DOM oficiales para el Web Speech API
 // (sigue siendo un borrador) -- se declara lo minimo que se usa.
@@ -42,17 +45,33 @@ interface SpeechRecognitionLike extends EventTarget {
   selector: 'app-chatbot-widget',
   imports: [DatePipe],
   templateUrl: './chatbot-widget.html',
+  host: { '[class.chatbot--universal]': 'universal()' },
   styleUrl: './chatbot-widget.scss',
 })
 export class ChatbotWidget implements OnInit, OnDestroy {
   protected readonly auth = inject(Auth);
   protected readonly chat = inject(ChatbotService);
+  private readonly tiendaActiva = inject(TiendaActiva);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  // true en el catálogo universal: el asistente de Arlani, con todas las tiendas.
+  readonly universal = input(false);
+  protected readonly titulo = computed(() =>
+    this.universal() ? 'Asistente Arlani Boutiques' : `Asistente ${this.tiendaActiva.nombre()}`.trim(),
+  );
+  protected readonly subtitulo = computed(() =>
+    this.universal()
+      ? 'Prendas de todas las tiendas, planes y cómo crear tu boutique'
+      : 'Pregunta por stock, precios o nuestros servicios',
+  );
 
   protected readonly esClienteConSesion = computed(
     () => !!this.auth.currentUser() && this.auth.currentUser()?.tipo === 'cliente',
   );
+  // El universal (portada y catálogo de Arlani) también lo usa quien no
+  // tiene sesión; el de una tienda, solo sus clientes con sesión.
+  protected readonly visible = computed(() => this.universal() || this.esClienteConSesion());
 
   protected readonly abierto = signal(false);
   protected readonly texto = signal('');
@@ -88,7 +107,8 @@ export class ChatbotWidget implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    if (this.esClienteConSesion()) void this.chat.cargar();
+    this.chat.universal.set(this.universal());
+    if (this.visible()) void this.chat.cargar();
 
     this.watchCurrentRouteHero();
     this.router.events
@@ -175,9 +195,6 @@ export class ChatbotWidget implements OnInit, OnDestroy {
   }
 
   private hablar(texto: string): void {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(texto);
-    utterance.lang = 'es-BO';
-    window.speechSynthesis.speak(utterance);
+    void leerEnVoz(texto);
   }
 }

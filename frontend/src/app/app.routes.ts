@@ -19,6 +19,7 @@ import { SinConexionCliente } from './pages/sin-conexion/sin-conexion-cliente';
 import { PagarCompras } from './pages/pagar-compras/pagar-compras';
 import { SeguimientoOffline } from './pages/superadmin/seguimiento-offline/seguimiento-offline';
 import { ReportesSaas } from './pages/superadmin/reportes-saas/reportes-saas';
+import { ModelosMl } from './pages/superadmin/modelos-ml/modelos-ml';
 import { ReporteDinamicoPage } from './pages/admin/reportes/dinamico/dinamico';
 import { ComprobanteCambio } from './pages/comprobante-cambio/comprobante-cambio';
 import { AdminNotificaciones } from './pages/admin/notificaciones/notificaciones';
@@ -32,6 +33,7 @@ import { AdminRecomendaciones } from './pages/admin/recomendaciones/recomendacio
 import { AdminChatbot } from './pages/admin/chatbot/chatbot';
 import { AdminChatbotDetalle } from './pages/admin/chatbot-detalle/chatbot-detalle';
 import { AdminCalificaciones } from './pages/admin/calificaciones/calificaciones';
+import { AdminReporteVoz } from './pages/admin/reporte-voz/reporte-voz';
 import { AdminReservas } from './pages/admin/reservas/reservas';
 import { AdminProveedores } from './pages/admin/proveedores/proveedores';
 import { AdminSesiones } from './pages/admin/sesiones/sesiones';
@@ -68,13 +70,14 @@ import { SuperadminLayout } from './pages/superadmin/superadmin-layout';
 import { tiendaElegidaGuard } from './pages/superadmin/por-tienda';
 
 export const routes: Routes = [
-  { path: '', component: Home, data: { header: 'plataforma' } },
+  { path: '', component: Home, data: { header: 'plataforma', chatbot: 'universal' } },
   // Alta de una boutique nueva en la plataforma (viene desde Precios). Pide
   // sesión: sin sesión, authGuard manda a /login y vuelve acá con el plan.
   { path: 'empezar', component: RegistroEmpresa, canActivate: [authGuard], data: { hideChrome: true } },
   { path: 'atelier', component: AtelierInicio },
   // Catalogo universal: los productos de todas las boutiques.
-  { path: 'catalogo', component: CatalogoUniversal, data: { header: 'plataforma' } },
+  // chatbot universal: el asistente responde con todas las tiendas.
+  { path: 'catalogo', component: CatalogoUniversal, data: { header: 'plataforma', chatbot: 'universal' } },
   // Documentos legales de la plataforma (Google los pide para el login con Google).
   { path: 'privacidad', component: Legal, data: { documento: 'privacidad', header: 'plataforma', encabezadoSolido: true } },
   { path: 'terminos', component: Legal, data: { documento: 'terminos', header: 'plataforma', encabezadoSolido: true } },
@@ -194,6 +197,7 @@ export const routes: Routes = [
       { path: 'chatbot', component: AdminChatbot, canActivate: [permisoGuard('CU19')] },
       { path: 'chatbot/:clienteId', component: AdminChatbotDetalle, canActivate: [permisoGuard('CU19')] },
       { path: 'calificaciones', component: AdminCalificaciones, canActivate: [permisoGuard('CU20')] },
+      { path: 'reporte-voz', component: AdminReporteVoz, canActivate: [permisoGuard('2P-CU17')] },
     ],
   },
   // Panel del SuperAdministrador: mismo esquema que el panel de una tienda,
@@ -242,6 +246,10 @@ export const routes: Routes = [
       { path: 'reportes/dinamico', component: ReporteDinamicoPage, canActivate: [tiendaElegidaGuard] },
       // CU20: reportes de la plataforma (SaaS), de todas las tiendas.
       { path: 'reportes-saas', component: ReportesSaas },
+      // CU17: reportes por voz o texto, de la tienda elegida.
+      { path: 'reporte-voz', component: AdminReporteVoz, canActivate: [tiendaElegidaGuard] },
+      // CU18: clasificadores de intenciones (CU17 y chatbot) y K-Means.
+      { path: 'modelos-ml', component: ModelosMl },
       { path: 'recomendaciones', component: AdminRecomendaciones },
       { path: 'cu/:codigo', component: SuperadminEnConstruccion },
       // 1er parcial (se elige la empresa primero)

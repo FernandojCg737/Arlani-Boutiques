@@ -15,6 +15,7 @@ _RAZON_GENERICA = {
     "mas_vendido": "Uno de los productos mas vendidos de la tienda.",
     "vistos_juntos": "Otros clientes que vieron esto tambien miraron esto.",
     "catalogo_general": "Otra prenda de la tienda que te podria gustar.",
+    "modelo_ml": "Se parece a lo que te gusta y la eligen clientes como vos.",
 }
 
 
@@ -23,12 +24,13 @@ def _razon_de_respaldo(origen: str) -> str:
 
 
 _SYSTEM_PROMPT_CHAT = (
-    "Sos el asistente virtual de Atelier Aranier, una tienda de ropa en Bolivia. "
+    "Sos el asistente virtual de {tienda}, {descripcion}. "
     "Respondes en espanol, de forma breve (maximo 4-5 lineas), clara y amigable, ayudando con dudas sobre "
-    "productos, stock, tallas, precios, sucursales, metodos de pago, reservas y compras. "
+    "productos, stock, tallas, precios, sucursales, metodos de pago, reservas y compras{extra}. "
     "Usa SOLO la informacion que te paso en el contexto para hablar de precios o stock -- si no esta ahi, "
     "decilo con honestidad ('no tengo esa info ahora mismo') y sugeri contactar a la tienda por WhatsApp, "
-    "en vez de inventar numeros. No uses markdown ni emojis, es para leerse en voz alta."
+    "en vez de inventar numeros. Si te preguntan algo que no tiene que ver con la tienda, responde con amabilidad "
+    "en una linea y ofrece ayuda con la tienda. No uses markdown ni emojis, es para leerse en voz alta."
 )
 
 _RESPUESTA_SIN_IA = (
@@ -37,12 +39,15 @@ _RESPUESTA_SIN_IA = (
 )
 
 
-def generar_respuesta_chat(historial: list[tuple[str, str]], contexto: str, mensaje: str) -> str:
+def generar_respuesta_chat(
+    historial: list[tuple[str, str]], contexto: str, mensaje: str, tienda: str = "la tienda", plataforma: bool = False
+) -> str:
     """historial: [(remitente, mensaje), ...] en orden cronologico, remitente
     'cliente'|'bot' (sin incluir el mensaje nuevo). contexto: info real del
-    catalogo/stock/sucursales relevante a la pregunta. Si no hay API key o
-    la llamada falla, devuelve una disculpa generica -- el chat sigue
-    funcionando, solo sin IA."""
+    catalogo/stock/sucursales relevante a la pregunta. plataforma: el chat
+    universal de Arlani (todas las tiendas, planes para duenos de boutiques).
+    Si no hay API key o la llamada falla, devuelve una disculpa generica -- el
+    chat sigue funcionando, solo sin IA."""
     if not settings.GEMINI_API_KEY:
         return _RESPUESTA_SIN_IA
 
@@ -52,8 +57,14 @@ def generar_respuesta_chat(historial: list[tuple[str, str]], contexto: str, mens
     ]
     contents.append({"role": "user", "parts": [{"text": mensaje}]})
 
+    prompt = _SYSTEM_PROMPT_CHAT.format(
+        tienda=tienda,
+        descripcion="la plataforma de boutiques de Bolivia, con el catalogo de todas sus tiendas" if plataforma
+        else "una tienda de ropa en Bolivia",
+        extra=", y para duenos de boutiques: planes de suscripcion y como crear su tienda" if plataforma else "",
+    )
     body = {
-        "systemInstruction": {"parts": [{"text": f"{_SYSTEM_PROMPT_CHAT}\n\nContexto para esta consulta:\n{contexto}"}]},
+        "systemInstruction": {"parts": [{"text": f"{prompt}\n\nContexto para esta consulta:\n{contexto}"}]},
         "contents": contents,
     }
 

@@ -1,4 +1,4 @@
-@if (esClienteConSesion()) {
+@if (visible()) {
   <button
     type="button"
     class="chatbot-fab"
@@ -23,8 +23,8 @@
     <div class="chatbot-panel">
       <header class="chatbot-panel__header">
         <div>
-          <strong>Asistente Atelier Aranier</strong>
-          <span>Pregunta por stock, precios o nuestros servicios</span>
+          <strong>{{ titulo() }}</strong>
+          <span>{{ subtitulo() }}</span>
         </div>
         @if (soportaSintesis) {
           <button
@@ -54,7 +54,12 @@
       <div class="chatbot-panel__mensajes" #mensajesEl>
         @if (chat.mensajes().length === 0) {
           <p class="chatbot-vacio">
-            Hola! Preguntame sobre el stock de un producto, precios, sucursales o metodos de pago.
+            @if (universal()) {
+              ¡Hola! Pregúntame por prendas de todas las tiendas (precios como «menos de 200 Bs», stock, qué tienda vende qué) o,
+              si tienes una boutique, por los planes y cómo crear la tuya en Arlani.
+            } @else {
+              ¡Hola! Pregúntame sobre el stock de un producto, precios, sucursales o métodos de pago.
+            }
           </p>
         }
         @for (m of chat.mensajes(); track m.id) {

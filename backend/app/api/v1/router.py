@@ -21,6 +21,8 @@ from app.api.v1.endpoints.notificaciones import router as notificaciones_router
 from app.api.v1.endpoints.offline import router as offline_router
 from app.api.v1.endpoints.perfil import router as perfil_router
 from app.api.v1.endpoints.mi_empresa import router as mi_empresa_router
+from app.api.v1.endpoints.modelos_ml import router as modelos_ml_router
+from app.api.v1.endpoints.reporte_voz import router as reporte_voz_router
 from app.api.v1.endpoints.mi_empresa import tiendas_router
 from app.api.v1.endpoints.metodos_pago import router as metodos_pago_router
 from app.api.v1.endpoints.registro_empresa import router as registro_empresa_router
@@ -69,6 +71,8 @@ api_router.include_router(notificaciones_router, prefix="/notificaciones", tags=
 api_router.include_router(reportes_router, prefix="/reportes", tags=["reportes"])
 api_router.include_router(reportes_comun_router, prefix="/reportes", tags=["reportes"])
 api_router.include_router(reportes_saas_router, prefix="/reportes-saas", tags=["reportes-saas"])
+api_router.include_router(modelos_ml_router, prefix="/modelos-ml", tags=["modelos-ml"])
+api_router.include_router(reporte_voz_router, prefix="/reportes-voz", tags=["reportes-voz"])
 api_router.include_router(recomendaciones_router, prefix="/recomendaciones", tags=["recomendaciones"])
 api_router.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["calificaciones"])

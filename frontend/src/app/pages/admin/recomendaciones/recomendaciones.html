@@ -4,14 +4,16 @@
       <span class="admin-content__eyebrow">P5 · CU18</span>
       <h1>Recomendar Prendas por IA</h1>
       <p>
-        El ranking lo calcula un motor de reglas (compra conjunta, similitud, mas vendidos) y Gemini redacta la razon
-        de cada una. Panel de solo lectura para auditar que se recomendo y si se convirtio en venta.
+        El ranking lo calcula el modelo de recomendación de cada tienda (híbrido de contenido y filtrado colaborativo,
+        en el CU18 Modelos de ML), con reglas de respaldo para prendas nuevas, y Gemini redacta la razón de cada una.
+        Panel de solo lectura para auditar qué se recomendó y si se convirtió en venta.
       </p>
     </div>
 
     <div class="admin-filtros">
       <select [value]="filtroOrigen()" (change)="filtroOrigen.set($any($event.target).value); filtrar()">
         <option value="">Todos los origenes</option>
+        <option value="modelo_ml">Modelo de ML (híbrido)</option>
         <option value="compra_conjunta">Comprado junto a...</option>
         <option value="similar_categoria">Similar a tus compras</option>
         <option value="mas_vendido">Mas vendido</option>
@@ -107,6 +109,7 @@
     <div class="admin-filtros">
       <select [value]="filtroOrigenRel()" (change)="filtroOrigenRel.set($any($event.target).value); filtrarRelacionados()">
         <option value="">Todos los origenes</option>
+        <option value="modelo_ml">Modelo de ML (híbrido)</option>
         <option value="vistos_juntos">Vistos juntos</option>
         <option value="similar_categoria">Misma categoria/marca</option>
         <option value="mas_vendido">Mas vendido</option>

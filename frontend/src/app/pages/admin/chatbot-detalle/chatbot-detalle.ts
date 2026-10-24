@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -10,11 +10,14 @@ interface MensajeChat {
   remitente: 'cliente' | 'bot';
   mensaje: string;
   fecha: string;
+  // CU18: lo que entendió el modelo de la tienda (mensajes del cliente).
+  intencion: string | null;
+  confianza: number | null;
 }
 
 @Component({
   selector: 'app-admin-chatbot-detalle',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink],
   templateUrl: './chatbot-detalle.html',
   styleUrl: './chatbot-detalle.scss',
 })

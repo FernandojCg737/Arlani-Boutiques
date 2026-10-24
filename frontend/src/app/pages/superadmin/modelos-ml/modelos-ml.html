@@ -1,0 +1,384 @@
+<div class="admin-content ml">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P5 · CU18</span>
+      <h1>Modelos de machine learning</h1>
+      <p>
+        Clasificadores que entienden lo que piden los usuarios: los reportes por voz o texto (CU17) y las preguntas al
+        chatbot de cada tienda; el recomendador de prendas de cada tienda; y la segmentación de clientes con K-Means.
+        Lo que recomienda a cada cliente: <a routerLink="/superadmin/recomendaciones">recomendaciones de prendas</a>.
+      </p>
+    </div>
+  </div>
+
+  <ol class="ml__pipeline">
+    @for (p of pasos; track p.n) {
+      <li>
+        <span>{{ p.n }}</span>
+        <strong>{{ p.nombre }}</strong>
+        <small>{{ p.detalle }}</small>
+      </li>
+    }
+  </ol>
+
+  @if (lenguaje(); as l) {
+    <p class="ml__lenguaje" [class.is-activo]="l.habilitado">
+      <b>Modelo de lenguaje preentrenado</b> · {{ l.nombre }} ({{ l.dimensiones }} dimensiones):
+      @switch (l.modo) {
+        @case ('remoto') {
+          corre en un servicio aparte (Hugging Face) y el backend le pide los vectores.
+          {{ l.disponible ? 'Respondiendo.' : 'No responde ahora (puede estar despertando): los chats usan su modelo de respaldo sin embeddings.' }}
+        }
+        @case ('local') {
+          corre dentro de este servidor.
+        }
+        @default {
+          desactivado en este servidor (ML_EMBEDDINGS_URL o ML_EMBEDDINGS). Se usan BoW y TF-IDF.
+        }
+      }
+      @if (l.habilitado) {
+        Entra a la comparación como representación (solo o junto a TF-IDF) y entiende frases dichas con otras palabras.
+      }
+    </p>
+  }
+
+  <nav class="ml__tabs">
+    <button type="button" [class.is-activa]="vista() === 'reportes'" (click)="cambiarVista('reportes')">Reportes por voz (CU17)</button>
+    <button type="button" [class.is-activa]="vista() === 'chatbot'" (click)="cambiarVista('chatbot')">Chatbot de las tiendas</button>
+    <button type="button" [class.is-activa]="vista() === 'recomendaciones'" (click)="cambiarVista('recomendaciones')">Recomendador de prendas</button>
+    <button type="button" [class.is-activa]="vista() === 'segmentos'" (click)="cambiarVista('segmentos')">Segmentación de clientes (K-Means)</button>
+  </nav>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  @if (vista() === 'reportes' || vista() === 'chatbot') {
+    @if (vista() === 'chatbot' && chatbots().length > 1) {
+      <div class="ml__tiendas" role="group" aria-label="Modelo del chatbot">
+        @for (c of chatbots(); track c.empresa_id) {
+          <button type="button" [class.is-activa]="chatEmpresa() === c.empresa_id" (click)="elegirChatbot(c.empresa_id)">
+            {{ c.empresa_id === null ? 'Universal (catálogo de todas)' : c.nombre.replace('Chatbot de ', '') }}
+            <small>v{{ c.activo.version }} · F1 {{ c.activo.metricas.f1_cv | percent: '1.0-0' }}</small>
+          </button>
+        }
+      </div>
+      <p class="ml__nota">
+        Cada tienda tiene su propio modelo: se entrena con las frases generales más sus productos, categorías y sucursales,
+        y responde con sus datos (horarios, stock, precios, pagos, pedidos). El universal (chat del catálogo universal) se entrena con los datos de todas las tiendas; una tienda sin modelo propio usa ese.
+      </p>
+    }
+    @if (modelo(); as m) {
+      <section class="ml__bloque ml__activo">
+        <div>
+          <span class="ml__etiqueta">Modelo activo · versión {{ m.activo.version }}</span>
+          <h2>{{ m.activo.representacion }} + {{ m.activo.algoritmo }}</h2>
+          <p class="ml__sub">
+            Entrenado el {{ m.activo.entrenado_en | date: 'dd/MM/yyyy HH:mm' }}{{ m.activo.entrenado_por ? ' por ' + m.activo.entrenado_por : ' (automático)' }}
+            · {{ m.activo.n_ejemplos }} ejemplos ({{ m.activo.metricas.n_entrenamiento }} para entrenar, {{ m.activo.metricas.n_prueba }} de prueba)
+            · {{ m.activo.metricas.clases.length }} intenciones · vocabulario de {{ m.activo.metricas.vocabulario }} términos
+          </p>
+        </div>
+        <button type="button" class="ml__boton" [disabled]="entrenando()" (click)="reentrenar()">
+          {{ entrenando() ? 'Entrenando…' : 'Reentrenar' }}
+        </button>
+        <div class="ml__kpis">
+          <div><span>F1 (prueba)</span><strong>{{ m.activo.metricas.f1 | percent: '1.1-1' }}</strong></div>
+          <div><span>F1 validación cruzada</span><strong>{{ m.activo.metricas.f1_cv | percent: '1.1-1' }}</strong></div>
+          <div><span>Exactitud</span><strong>{{ m.activo.metricas.accuracy | percent: '1.1-1' }}</strong></div>
+          <div><span>Precisión</span><strong>{{ m.activo.metricas.precision | percent: '1.1-1' }}</strong></div>
+          <div><span>Exhaustividad</span><strong>{{ m.activo.metricas.recall | percent: '1.1-1' }}</strong></div>
+        </div>
+      </section>
+
+      <section class="ml__bloque">
+        <h2>Probar una frase</h2>
+        <div class="ml__probar">
+          <input type="text" [value]="frase()" (input)="frase.set($any($event.target).value)" (keyup.enter)="probar()"
+                 placeholder="Escribe lo que pediría un usuario" />
+          <button type="button" class="ml__boton" [disabled]="probando()" (click)="probar()">{{ probando() ? 'Analizando…' : 'Analizar' }}</button>
+        </div>
+        <div class="ml__ejemplos">
+          @for (e of ejemplos(); track e) {
+            <button type="button" (click)="probar(e)">{{ e }}</button>
+          }
+        </div>
+        @if (prueba(); as p) {
+          <div class="ml__pasos">
+            <div><span>1 · Normalizado</span><code>{{ p.normalizado }}</code></div>
+            <div><span>2 · Tokens</span><p>@for (t of p.tokens; track $index) {<em>{{ t }}</em>}</p></div>
+            <div><span>3 · Sin stopwords</span><p>@for (t of p.sin_stopwords; track $index) {<em>{{ t }}</em>}</p></div>
+            <div><span>4 · Lemas</span><p>@for (t of p.lemas; track $index) {<em class="is-lema">{{ t }}</em>}</p></div>
+            <div>
+              <span>5 · Vector ({{ modelo()?.activo?.representacion }})</span>
+              <ul class="ml__vector">
+                @for (v of p.vector; track v.termino) {
+                  <li><b>{{ v.termino }}</b><i [style.width.%]="v.peso * 100"></i><small>{{ v.peso | number: '1.3-3' }}</small></li>
+                }
+              </ul>
+            </div>
+            <div class="ml__resultado" [class.is-duda]="p.intencion === 'no_entendido'">
+              <span>6 · Predicción</span>
+              <strong>{{ etiqueta(p.intencion) }}</strong>
+              <small>confianza {{ p.confianza | percent: '1.0-0' }}</small>
+              <ol>
+                @for (a of p.alternativas; track a.intencion) {
+                  <li>{{ etiqueta(a.intencion) }} · {{ a.probabilidad | percent: '1.0-0' }}</li>
+                }
+              </ol>
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="ml__bloque">
+        <h2>Comparación de modelos</h2>
+        <p class="ml__sub">
+          Todas las combinaciones de representación y algoritmo. Se elige por el promedio del F1 de prueba y el F1 de
+          paráfrasis{{ m.activo.metricas.n_parafrasis ? ' (' + m.activo.metricas.n_parafrasis + ' frases escritas a mano con otras palabras, que nunca se usan para entrenar)' : '' }}.
+        </p>
+        <table class="ml__tabla">
+          <thead>
+            <tr><th>Representación</th><th>Algoritmo</th><th>F1 prueba</th><th>F1 paráfrasis</th><th>Puntaje</th><th>F1 validación cruzada</th><th>Exactitud</th></tr>
+          </thead>
+          <tbody>
+            @for (c of m.activo.comparacion; track c.representacion + c.algoritmo; let i = $index) {
+              <tr [class.is-mejor]="i === 0">
+                <td>{{ c.representacion }}</td><td>{{ c.algoritmo }}{{ i === 0 ? ' ★' : '' }}</td>
+                <td>{{ c.f1 | percent: '1.1-1' }}</td>
+                <td>{{ c.f1_parafrasis !== undefined ? (c.f1_parafrasis | percent: '1.1-1') : '—' }}</td>
+                <td>{{ c.puntaje !== undefined ? (c.puntaje | percent: '1.1-1') : '—' }}</td>
+                <td>{{ c.f1_cv | percent: '1.1-1' }}</td><td>{{ c.accuracy | percent: '1.1-1' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <div class="ml__dos">
+        <section class="ml__bloque">
+          <h2>Matriz de confusión</h2>
+          <p class="ml__sub">Filas: intención real · columnas: predicha (conjunto de prueba).</p>
+          <div class="ml__matriz-wrap">
+            <table class="ml__matriz">
+              <thead>
+                <tr><th></th>@for (c of m.activo.metricas.clases; track c) {<th><span>{{ etiqueta(c) }}</span></th>}</tr>
+              </thead>
+              <tbody>
+                @for (fila of m.activo.metricas.matriz_confusion; track $index; let i = $index) {
+                  <tr>
+                    <th>{{ etiqueta(m.activo.metricas.clases[i]) }}</th>
+                    @for (v of fila; track $index; let j = $index) {
+                      <td [class.is-diag]="i === j" [style.--o]="opacidad(v)">{{ v || '' }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="ml__bloque">
+          <h2>Métricas por intención</h2>
+          <table class="ml__tabla">
+            <thead><tr><th>Intención</th><th>Precisión</th><th>Exhaust.</th><th>F1</th><th>Casos</th></tr></thead>
+            <tbody>
+              @for (c of m.activo.metricas.por_clase; track c.clase) {
+                <tr><td>{{ etiqueta(c.clase) }}</td><td>{{ c.precision | percent: '1.0-0' }}</td><td>{{ c.recall | percent: '1.0-0' }}</td><td>{{ c.f1 | percent: '1.0-0' }}</td><td>{{ c.soporte }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      @if (datos(); as d) {
+        <section class="ml__bloque">
+          <h2>Datos de entrenamiento (sintéticos)</h2>
+          <p class="ml__sub">{{ d.total }} frases generadas con plantillas y variaciones de cómo habla la gente (voseo, sin tildes como llega un dictado).</p>
+          <div class="ml__intenciones">
+            @for (i of d.por_intencion; track i.intencion) {
+              <span>{{ etiqueta(i.intencion) }} <b>{{ i.ejemplos }}</b></span>
+            }
+          </div>
+          <ul class="ml__muestra">
+            @for (x of d.muestra.slice(0, 16); track $index) {
+              <li><q>{{ x.texto }}</q><small>{{ etiqueta(x.intencion) }}</small></li>
+            }
+          </ul>
+        </section>
+      }
+
+      <section class="ml__bloque">
+        <h2>Versiones entrenadas</h2>
+        <table class="ml__tabla">
+          <thead><tr><th>Versión</th><th>Modelo</th><th>F1</th><th>Exactitud</th><th>Entrenado</th><th></th></tr></thead>
+          <tbody>
+            @for (h of m.historial; track h.version) {
+              <tr><td>v{{ h.version }}</td><td>{{ h.representacion }} + {{ h.algoritmo }}</td><td>{{ h.f1 | percent: '1.1-1' }}</td>
+                <td>{{ h.accuracy | percent: '1.1-1' }}</td><td>{{ h.entrenado_en | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ h.activo ? 'Activo' : '' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    } @else if (cargando()) {
+      <p class="ml__sub">Cargando modelos (la primera vez se entrenan)…</p>
+    }
+  } @else if (vista() === 'recomendaciones') {
+    <section class="ml__bloque">
+      <h2>Recomendador de prendas (uno por tienda)</h2>
+      <p class="ml__sub">
+        Híbrido: <b>contenido</b> (nombre, descripción, categoría, marca y colores de cada prenda con los pasos 1 a 5:
+        dos prendas se parecen si su descripción se parece) y <b>filtrado colaborativo KNN ítem-ítem</b> (dos prendas se
+        parecen si las eligen los mismos clientes: compras pesan 3, vistas 1). Se evalúa con las ventas más nuevas: dada una
+        prenda de una venta, ¿pone a la otra entre sus primeras sugerencias? Lo usan «También te puede interesar» y
+        «Recomendado para ti».
+      </p>
+      <div class="ml__probar">
+        <select [value]="empresaId() ?? ''" (change)="elegirTiendaRecom(+$any($event.target).value)">
+          @for (e of empresas(); track e.id) {
+            <option [value]="e.id">{{ e.nombre }}</option>
+          }
+        </select>
+        <button type="button" class="ml__boton" [disabled]="entrenando() || !recom()" (click)="reentrenarRecom()">
+          {{ entrenando() ? 'Entrenando…' : 'Reentrenar' }}
+        </button>
+      </div>
+    </section>
+    @if (recom(); as r) {
+      <section class="ml__bloque ml__activo">
+        <div>
+          <span class="ml__etiqueta">Modelo activo · versión {{ r.activo.version }}</span>
+          <h2>{{ r.activo.algoritmo }}</h2>
+          <p class="ml__sub">
+            Entrenado el {{ r.activo.entrenado_en | date: 'dd/MM/yyyy HH:mm' }}{{ r.activo.entrenado_por ? ' por ' + r.activo.entrenado_por : ' (automático)' }}
+            · {{ r.activo.metricas.n_productos }} prendas · {{ r.activo.metricas.n_clientes }} clientes ·
+            {{ r.activo.metricas.n_ventas }} ventas · {{ r.activo.metricas.n_vistas }} vistas ·
+            {{ r.activo.metricas.n_pares_prueba }} pares de prueba · {{ r.activo.metricas.vecinos }} vecinos por prenda
+          </p>
+        </div>
+        <div class="ml__kpis">
+          <div><span>Acierto en las {{ r.activo.metricas.k }} primeras</span><strong>{{ r.activo.metricas.acierto | percent: '1.1-1' }}</strong></div>
+          <div><span>MRR</span><strong>{{ r.activo.metricas.mrr | number: '1.3-3' }}</strong></div>
+          <div><span>Más vendidas (referencia)</span><strong>{{ r.activo.metricas.referencia.acierto | percent: '1.1-1' }}</strong></div>
+          <div><span>Al azar</span><strong>{{ r.activo.metricas.azar | percent: '1.1-1' }}</strong></div>
+        </div>
+      </section>
+      <div class="ml__dos">
+        <section class="ml__bloque">
+          <h2>Comparación de modelos</h2>
+          <p class="ml__sub">Se usa el mejor por acierto (desempate por MRR). «Más vendidas» y «al azar» son la referencia a superar.</p>
+          <table class="ml__tabla">
+            <thead><tr><th>Modelo</th><th>Acierto</th><th>MRR</th></tr></thead>
+            <tbody>
+              @for (c of r.activo.comparacion; track c.modelo) {
+                <tr [class.is-mejor]="c.modelo === r.activo.algoritmo">
+                  <td>{{ c.modelo }}{{ c.modelo === r.activo.algoritmo ? ' ★' : '' }}</td>
+                  <td>{{ c.acierto | percent: '1.1-1' }}</td><td>{{ c.mrr | number: '1.3-3' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+        <section class="ml__bloque">
+          <h2>Probar: «También te puede interesar»</h2>
+          <div class="ml__probar">
+            <select [value]="recomProducto() ?? ''" (change)="probarRecom(+$any($event.target).value)">
+              <option value="" disabled>Elige una prenda</option>
+              @for (p of r.productos; track p.id) {
+                <option [value]="p.id">{{ p.nombre }}</option>
+              }
+            </select>
+          </div>
+          @if (recomPrueba(); as lista) {
+            <table class="ml__tabla">
+              <thead><tr><th>Prenda sugerida</th><th>Categoría</th><th>Precio (Bs)</th><th>Similitud</th></tr></thead>
+              <tbody>
+                @for (x of lista; track x.producto_id) {
+                  <tr><td>{{ x.nombre }}</td><td>{{ x.categoria }}</td><td>{{ x.precio | number: '1.2-2' }}</td><td>{{ x.similitud | number: '1.3-3' }}</td></tr>
+                } @empty {
+                  <tr><td colspan="4">El modelo todavía no conoce esta prenda (se usan las reglas de respaldo).</td></tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      </div>
+      <section class="ml__bloque">
+        <h2>Versiones entrenadas</h2>
+        <table class="ml__tabla">
+          <thead><tr><th>Versión</th><th>Modelo</th><th>Acierto</th><th>MRR</th><th>Entrenado</th><th></th></tr></thead>
+          <tbody>
+            @for (h of r.historial; track h.version) {
+              <tr><td>v{{ h.version }}</td><td>{{ h.algoritmo }}</td><td>{{ h.acierto | percent: '1.1-1' }}</td>
+                <td>{{ h.mrr | number: '1.3-3' }}</td><td>{{ h.entrenado_en | date: 'dd/MM/yyyy HH:mm' }}</td><td>{{ h.activo ? 'Activo' : '' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    } @else if (recomCargando()) {
+      <p class="ml__sub">Cargando el recomendador (la primera vez se entrena)…</p>
+    }
+  } @else {
+    <section class="ml__bloque">
+      <h2>Segmentación de clientes (aprendizaje no supervisado)</h2>
+      <p class="ml__sub">
+        K-Means agrupa a los clientes de la tienda por Recencia (días desde su última compra), Frecuencia (compras) y Monto
+        (Bs). El número de grupos se elige por el coeficiente de silueta.
+      </p>
+      <div class="ml__probar">
+        <select [value]="empresaId() ?? ''" (change)="empresaId.set(+$any($event.target).value)">
+          @for (e of empresas(); track e.id) {
+            <option [value]="e.id">{{ e.nombre }}</option>
+          }
+        </select>
+        <button type="button" class="ml__boton" [disabled]="segmentando()" (click)="segmentar()">{{ segmentando() ? 'Agrupando…' : 'Ejecutar K-Means' }}</button>
+      </div>
+    </section>
+    @if (segmentos(); as s) {
+      <div class="ml__kpis ml__kpis--seg">
+        <div><span>Clientes analizados</span><strong>{{ s.clientes_analizados }}</strong></div>
+        <div><span>Grupos (k)</span><strong>{{ s.k }}</strong></div>
+        <div><span>Silueta</span><strong>{{ s.silueta | number: '1.2-2' }}</strong></div>
+        <div><span>Corrida</span><strong>v{{ s.version }}</strong></div>
+      </div>
+      <div class="ml__dos">
+        <section class="ml__bloque">
+          <h2>Segmentos</h2>
+          <app-chart type="doughnut" [labels]="segmentosLabels(s)" [data]="segmentosData(s)" label="Clientes" />
+          <table class="ml__tabla">
+            <thead><tr><th>Segmento</th><th>Clientes</th><th>Compras prom.</th><th>Monto prom. (Bs)</th><th>Días sin comprar</th></tr></thead>
+            <tbody>
+              @for (g of s.segmentos; track g.segmento) {
+                <tr><td><b>{{ g.segmento }}</b></td><td>{{ g.clientes }}</td><td>{{ g.compras | number: '1.1-1' }}</td>
+                  <td>{{ g.monto | number: '1.2-2' }}</td><td>{{ g.recencia_dias | number: '1.0-0' }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </section>
+        <section class="ml__bloque">
+          <h2>Elección de k (silueta)</h2>
+          <app-chart type="line" [labels]="s.siluetas.map(x => 'k=' + x.k)" [data]="s.siluetas.map(x => x.silueta)" label="Silueta" />
+          <table class="ml__tabla">
+            <thead><tr><th>k</th><th>Silueta</th><th>Inercia</th></tr></thead>
+            <tbody>
+              @for (x of s.siluetas; track x.k) {
+                <tr [class.is-mejor]="x.k === s.k"><td>{{ x.k }}</td><td>{{ x.silueta | number: '1.3-3' }}</td><td>{{ x.inercia | number: '1.1-1' }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      </div>
+      <section class="ml__bloque">
+        <h2>Clientes y su segmento</h2>
+        <table class="ml__tabla">
+          <thead><tr><th>Cliente</th><th>Segmento</th><th>Compras</th><th>Monto (Bs)</th><th>Última compra</th></tr></thead>
+          <tbody>
+            @for (c of s.clientes; track c.cliente) {
+              <tr><td>{{ c.cliente }}</td><td>{{ c.segmento }}</td><td>{{ c.compras }}</td><td>{{ c.monto | number: '1.2-2' }}</td><td>{{ c.ultima_compra }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+  }
+</div>
