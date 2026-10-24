@@ -18,7 +18,7 @@ export const RUTAS_POR_TIENDA = new Set(
 // null si la pantalla no es por tienda.
 export function tiendaDeUrl(url: UrlTree): number | null {
   const segs = url.root.children['primary']?.segments.map((s) => s.path) ?? [];
-  if (segs[0] !== 'superadmin' || segs.length !== 2 || !RUTAS_POR_TIENDA.has(segs[1])) return null;
+  if (segs[0] !== 'superadmin' || !RUTAS_POR_TIENDA.has(segs.slice(1).join('/'))) return null;
   const id = Number(url.queryParamMap.get('empresa'));
   return Number.isInteger(id) && id > 0 ? id : null;
 }

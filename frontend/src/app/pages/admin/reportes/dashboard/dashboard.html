@@ -82,7 +82,7 @@
     <h2>Reportes detallados</h2>
     <div class="reportes-links__grid">
       @for (r of reportesLinks; track r.route) {
-        <a [routerLink]="r.route" class="reportes-link-card">
+        <a [routerLink]="r.route" queryParamsHandling="preserve" class="reportes-link-card">
           <strong>{{ r.label }}</strong>
           <span>{{ r.desc }}</span>
         </a>

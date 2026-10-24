@@ -235,7 +235,22 @@ export const PARCIALES: ParcialMenu[] = [
         codigo: 'P5',
         nombre: 'Inteligencia y Reportes',
         casos: [
-          { codigo: 'CU07', permisos: ['CU16'], nombre: 'Gestionar reportes y dashboards', ruta: 'reportes', antes: 'CU16', plataformas: ['WEB'] },
+          {
+            codigo: 'CU07', permisos: ['CU16'],
+            nombre: 'Gestionar reportes y dashboards',
+            ruta: 'reportes',
+            antes: 'CU16',
+            plataformas: ['WEB'],
+            porEmpresa: true,
+            subs: [
+              { etiqueta: 'Dashboard', ruta: 'reportes' },
+              { etiqueta: 'Ventas', ruta: 'reportes/ventas' },
+              { etiqueta: 'Asistencia', ruta: 'reportes/asistencia' },
+              { etiqueta: 'Inventario', ruta: 'reportes/inventario' },
+              { etiqueta: 'Reservas', ruta: 'reportes/reservas' },
+              { etiqueta: 'Productos', ruta: 'reportes/productos' },
+            ],
+          },
           {
             codigo: 'CU17', permisos: ['2P-CU17'],
             nombre: 'Solicitar y exportar reporte generativo (texto o voz)',
