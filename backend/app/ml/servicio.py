@@ -22,7 +22,14 @@ warnings.filterwarnings("ignore", category=Warning, message=".*iprint.*")
 
 _cache: dict[tuple[str, int | None], tuple[int, object]] = {}
 _lock = threading.Lock()
-_entrenando: set[int] = set()
+_entrenando: set = set()
+# De a un entrenamiento por vez: en un servidor chico, varios a la vez dejan
+# sin CPU (y sin conexiones a la base) al resto del sistema.
+_entrenar_lock = threading.Lock()
+
+
+class ModeloNoListo(RuntimeError):
+    """Todavia no hay modelo entrenado; se esta entrenando en segundo plano."""
 
 
 def _a_json(valor):
@@ -50,8 +57,15 @@ def datos_tienda(db: Session, empresa_id: int | None) -> dict[str, list[str]]:
 
 
 def guardar_entrenamiento(db: Session, tarea: str, usuario_id: int | None, empresa_id: int | None = None) -> dict:
-    datos = dataset(tarea, datos_tienda(db, empresa_id), empresa_id or 0) if tarea == "chatbot" else None
-    r = entrenar_clasificador(tarea, datos)
+    with _entrenar_lock:
+        datos = dataset(tarea, datos_tienda(db, empresa_id), empresa_id or 0) if tarea == "chatbot" else None
+        # Se suelta la conexion mientras se entrena (puede tardar minutos).
+        db.commit()
+        r = entrenar_clasificador(tarea, datos)
+    return _guardar_clasificador(db, tarea, usuario_id, empresa_id, r)
+
+
+def _guardar_clasificador(db: Session, tarea: str, usuario_id: int | None, empresa_id: int | None, r: dict) -> dict:
     filtro = "empresa_id = :e" if empresa_id else "empresa_id IS NULL"
     p = {"t": tarea, "e": empresa_id}
     version = (db.execute(text(f"SELECT coalesce(max(version), 0) FROM modelo_ml WHERE tarea = :t AND {filtro}"), p).scalar() or 0) + 1
@@ -101,8 +115,9 @@ def modelo_activo(db: Session, tarea: str, empresa_id: int | None = None):
         text("SELECT id, empresa_id, artefacto FROM fn_modelo_ml_activo(:t, :e)"), {"t": tarea, "e": empresa_id}
     ).first()
     if fila is None:
-        guardar_entrenamiento(db, tarea, None)
-        return _cache[(tarea, None)][1]
+        # Nunca se entrena dentro de una peticion: se encarga en segundo plano.
+        _en_segundo_plano((tarea, None), lambda d: guardar_entrenamiento(d, tarea, None))
+        raise ModeloNoListo(f"El modelo de {tarea} se esta entrenando.")
     if empresa_id and fila.empresa_id is None and tarea == "chatbot":
         _entrenar_tienda_en_segundo_plano(empresa_id)
     clave = (tarea, fila.empresa_id)
@@ -120,7 +135,8 @@ def guardar_recomendador(db: Session, empresa_id: int, usuario_id: int | None) -
     "Tambien te puede interesar" guardados (se rearman con el modelo nuevo)."""
     from app.ml.recomendador import entrenar
 
-    r = entrenar(db, empresa_id)
+    with _entrenar_lock:
+        r = entrenar(db, empresa_id)
     p = {"e": empresa_id}
     version = (db.execute(text("SELECT coalesce(max(version), 0) FROM modelo_ml WHERE tarea = 'recomendaciones' AND empresa_id = :e"),
                           p).scalar() or 0) + 1
@@ -189,7 +205,10 @@ def preparar_modelos() -> None:
 
     with SessionLocal() as db:
         for tarea in ("reportes", "chatbot"):
-            modelo_activo(db, tarea)
+            existe = db.execute(text("SELECT 1 FROM fn_modelo_ml_activo(:t)"), {"t": tarea}).first()
+            db.commit()
+            if existe is None:
+                guardar_entrenamiento(db, tarea, None)
         sin_modelo = db.execute(
             text("""SELECT e.id FROM empresa e WHERE e.estado = 'activa' AND NOT EXISTS (
                         SELECT 1 FROM modelo_ml m WHERE m.tarea = 'chatbot' AND m.empresa_id = e.id AND m.activo)""")

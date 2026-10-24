@@ -129,6 +129,7 @@ def _evaluar(matriz: np.ndarray, pares: list[tuple[int, int]]) -> dict:
 
 def entrenar(db: Session, empresa_id: int) -> dict:
     d = _datos(db, empresa_id)
+    db.commit()  # se suelta la conexion mientras se calcula
     productos, compras, vistas = d["productos"], d["compras"], d["vistas"]
     if len(productos) < 3:
         raise ValueError("La tienda necesita al menos 3 prendas activas para entrenar el recomendador.")

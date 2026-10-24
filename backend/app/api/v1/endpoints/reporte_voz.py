@@ -22,7 +22,7 @@ from app.core.reporte_dinamico import FUENTES_TIENDA, ejecutar
 from app.db.session import get_db
 from app.ml.consulta import NOMBRES, SUGERENCIAS, interpretar, narrar
 from app.ml.entrenamiento import predecir
-from app.ml.servicio import _a_json, modelo_activo
+from app.ml.servicio import ModeloNoListo, _a_json, modelo_activo
 from app.models import Usuario
 
 router = APIRouter()
@@ -67,7 +67,10 @@ def generar(
     if not disponible:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"Los reportes con IA son del plan Profesional (la tienda tiene el plan {plan or 'actual'}).")
 
-    pred = _a_json(predecir(modelo_activo(db, "reportes"), payload.texto))
+    try:
+        pred = _a_json(predecir(modelo_activo(db, "reportes"), payload.texto))
+    except ModeloNoListo:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "El modelo de IA se está preparando. Intenta en unos minutos.")
     if pred["intencion"] in ("no_entendido", "no_soportado"):
         return {
             "entendido": False,

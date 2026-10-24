@@ -28,7 +28,7 @@ from app.ml.datos import dataset
 from app.ml.entrenamiento import predecir, segmentar_clientes
 from app.ml import embeddings
 from app.ml.recomendador import parecidas
-from app.ml.servicio import _a_json, datos_tienda, guardar_entrenamiento, guardar_recomendador, modelo_activo, recomendador_activo
+from app.ml.servicio import ModeloNoListo, _a_json, datos_tienda, guardar_entrenamiento, guardar_recomendador, modelo_activo, recomendador_activo
 from app.models import Usuario
 
 router = APIRouter()
@@ -75,7 +75,10 @@ def listar(db: Session = Depends(get_db), _: Usuario = Depends(require_superadmi
     tambien el de cada tienda)."""
     salida = []
     for tarea, nombre in TAREAS.items():
-        modelo_activo(db, tarea)  # entrena la primera vez
+        try:
+            modelo_activo(db, tarea)  # la primera vez lo encarga en segundo plano
+        except ModeloNoListo:
+            continue
         salida.append(_modelo(db, tarea, None, nombre))
     for e in db.execute(text("SELECT id, nombre FROM empresa WHERE estado = 'activa' ORDER BY nombre")):
         m = _modelo(db, "chatbot", e.id, f"Chatbot de {e.nombre}")
@@ -193,7 +196,10 @@ def probar(
     _: Usuario = Depends(require_superadmin),
 ) -> dict:
     """Muestra cada paso del pipeline y la intencion que predice el modelo."""
-    return _a_json(predecir(modelo_activo(db, _tarea(tarea, empresa_id), empresa_id), payload.texto))
+    try:
+        return _a_json(predecir(modelo_activo(db, _tarea(tarea, empresa_id), empresa_id), payload.texto))
+    except ModeloNoListo:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "El modelo se está entrenando. Intenta en unos minutos.")
 
 
 @router.get("/segmentos")

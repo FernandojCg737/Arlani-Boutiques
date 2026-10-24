@@ -5,7 +5,9 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+# El pooler de Supabase (modo sesion) admite 15 conexiones en total: cada
+# proceso usa hasta 8, asi entran dos instancias durante un despliegue.
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True, pool_size=4, max_overflow=4, pool_timeout=20)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

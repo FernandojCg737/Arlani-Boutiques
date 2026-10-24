@@ -10,7 +10,7 @@ from app.core.rate_limit import verificar_limite
 from app.db.session import get_db
 from app.ml.chatbot import Tienda, contexto_gemini, responder
 from app.ml.entrenamiento import predecir
-from app.ml.servicio import modelo_activo
+from app.ml.servicio import ModeloNoListo, modelo_activo
 from app.models import Chatbot, ChatbotMensaje, Cliente, Usuario
 from app.schemas.chatbot import ChatbotUsuarioOut, MensajeIn, MensajeOut, MensajePublicoIn, RespuestaPublicaOut
 
@@ -86,6 +86,14 @@ def _get_or_create_sesion(db: Session, cliente_id: int, empresa_id: int | None) 
     return nueva
 
 
+def _intencion(db: Session, mensaje: str, empresa_id: int | None) -> dict:
+    """Lo que pregunta el cliente; sin modelo listo todavia, la responde Gemini."""
+    try:
+        return predecir(modelo_activo(db, "chatbot", empresa_id), mensaje)
+    except ModeloNoListo:
+        return {"intencion": "no_entendido", "confianza": 0.0}
+
+
 def _salida(m: ChatbotMensaje) -> MensajeOut:
     return MensajeOut(
         id=m.id, remitente=m.remitente, mensaje=m.mensaje, fecha=m.fecha, intencion=m.intencion,
@@ -110,7 +118,7 @@ def enviar_mensaje(
     tienda = _tienda(db, payload.tienda, payload.universal)
     sesion = _get_or_create_sesion(db, cliente.id, tienda.id)
 
-    pred = predecir(modelo_activo(db, "chatbot", tienda.id), payload.mensaje)
+    pred = _intencion(db, payload.mensaje, tienda.id)
     db.add(ChatbotMensaje(chatbot_id=sesion.id, remitente="cliente", mensaje=payload.mensaje,
                           intencion=pred["intencion"], confianza=pred["confianza"]))
     db.commit()
@@ -146,7 +154,7 @@ def mensaje_publico(payload: MensajePublicoIn, request: Request, db: Session = D
     verificar_limite("chatbot-publico-min", ip, maximo=10, segundos=60)
     verificar_limite("chatbot-publico-dia", ip, maximo=150, segundos=86_400)
     tienda = _tienda(db, None, universal=True)
-    pred = predecir(modelo_activo(db, "chatbot"), payload.mensaje)
+    pred = _intencion(db, payload.mensaje, None)
     respuesta = responder(db, tienda, None, "", pred["intencion"], payload.mensaje)
     if respuesta is None:
         historial = [(m.remitente, m.mensaje) for m in payload.historial[-10:]]
