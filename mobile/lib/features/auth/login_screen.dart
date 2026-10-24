@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
-import '../../core/theme.dart';
 import 'auth_provider.dart';
 import 'google_auth.dart';
 import 'google_auth_button.dart';
@@ -109,85 +108,195 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  // Mismo diseño que el login de la web (version celular): fondo claro con la
+  // marca de agua de Arlani, campos subrayados y botones redondeados.
+  static const _tinta = Color(0xFF121A2C);
+  static const _gris = Color(0xFF6B6B6B);
+  static const _linea = Color(0xFFE2E2E2);
+
+  static const _etiqueta = TextStyle(fontSize: 11, letterSpacing: 1.4, fontWeight: FontWeight.w700, color: _gris);
+
+  InputDecoration _campo(String pista, {Widget? sufijo}) => InputDecoration(
+        hintText: pista,
+        hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 15),
+        suffixIcon: sufijo,
+        filled: false,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        border: const UnderlineInputBorder(borderSide: BorderSide(color: _linea)),
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: _linea)),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: _tinta, width: 1.4)),
+      );
+
+  Widget _ventaja(String titulo, String detalle) => Expanded(
+        child: Column(
+          children: [
+            Text(titulo, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _tinta)),
+            const SizedBox(height: 2),
+            Text(detalle, style: const TextStyle(fontSize: 9, letterSpacing: 1.2, color: _gris, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
+    final volver = widget.onSuccess != null ? () => Navigator.of(context).pop() : () => context.go('/');
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(child: Image.asset('assets/logo.png', height: 72)),
-                const SizedBox(height: 32),
-                const EyebrowText('Bienvenido de nuevo'),
-                const SizedBox(height: 8),
-                const Text(
-                  'INICIAR SESION',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.brandDark),
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          // Marca de agua de Arlani detras del formulario (como en la web).
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Center(
+                child: Opacity(
+                  opacity: 0.05,
+                  child: Transform.rotate(angle: -0.12, child: Image.asset('assets/arlani_marca_agua.png', width: 520)),
                 ),
-                const SizedBox(height: 28),
-                if (_error != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    color: AppColors.dangerBg,
-                    child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 13)),
-                  ),
-                TextField(
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'CORREO ELECTRONICO'),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _passwordCtrl,
-                  obscureText: _obscure,
-                  decoration: InputDecoration(
-                    labelText: 'CONTRASENA',
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, size: 20),
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => context.push('/recuperar'),
-                    child: const Text('Olvidaste tu contrasena?'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _loading ? null : _submit,
-                  child: Text(_loading ? 'INGRESANDO...' : 'INICIAR SESION'),
-                ),
-                const OrDivider(),
-                GoogleAuthButton(label: 'CONTINUAR CON GOOGLE', loading: _loadingGoogle, onPressed: _continuarConGoogle),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('No tenes cuenta?', style: TextStyle(color: AppColors.grayTextDark)),
-                    TextButton(onPressed: _irARegistro, child: const Text('Crear una cuenta')),
-                  ],
-                ),
-                TextButton(
-                  // Abierta desde una accion (onSuccess): "volver" regresa a
-                  // donde estaba el cliente, no al inicio.
-                  onPressed: widget.onSuccess != null ? () => Navigator.of(context).pop() : () => context.go('/'),
-                  child: Text(
-                    widget.onSuccess != null ? 'Volver' : 'Volver al inicio',
-                    style: const TextStyle(color: AppColors.grayText),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(28, 20, 28, 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: volver,
+                          style: TextButton.styleFrom(foregroundColor: _gris, padding: EdgeInsets.zero),
+                          icon: const Icon(Icons.arrow_back, size: 16),
+                          label: Text(widget.onSuccess != null ? 'VOLVER' : 'VOLVER AL INICIO', style: _etiqueta),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Image.asset('assets/arlani_logo_claro.png', height: 64, semanticLabel: 'Arlani Boutiques'),
+                      ),
+                      const SizedBox(height: 26),
+                      const Row(
+                        children: [
+                          SizedBox(width: 24, child: Divider(color: _linea, thickness: 1)),
+                          SizedBox(width: 10),
+                          Text('ACCESO', style: _etiqueta),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('INICIAR SESIÓN', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w500, color: _tinta)),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Accede a tu cuenta para gestionar pedidos y explorar el catálogo.',
+                        style: TextStyle(fontSize: 15, height: 1.5, color: Color(0xFF555555)),
+                      ),
+                      const SizedBox(height: 26),
+                      if (_error != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          color: const Color(0xFFFDECEA),
+                          child: Text(_error!, style: const TextStyle(color: Color(0xFFB3261E), fontSize: 13)),
+                        ),
+                      const Text('CORREO ELECTRÓNICO', style: _etiqueta),
+                      TextField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                        decoration: _campo('Introduce tu email'),
+                      ),
+                      const SizedBox(height: 26),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('CONTRASEÑA', style: _etiqueta)),
+                          GestureDetector(
+                            onTap: () => context.push('/recuperar'),
+                            child: const Text(
+                              '¿Olvidaste tu contraseña?',
+                              style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w700, color: _tinta, decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextField(
+                        controller: _passwordCtrl,
+                        obscureText: _obscure,
+                        autofillHints: const [AutofillHints.password],
+                        onSubmitted: (_) => _loading ? null : _submit(),
+                        decoration: _campo(
+                          '••••••••',
+                          sufijo: IconButton(
+                            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: _gris),
+                            onPressed: () => setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: _loading ? null : _submit,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _tinta,
+                            disabledBackgroundColor: _tinta.withValues(alpha: 0.5),
+                            foregroundColor: Colors.white,
+                            shape: const StadiumBorder(),
+                            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 1.2),
+                          ),
+                          child: Text(_loading ? 'INGRESANDO...' : 'INICIAR SESIÓN'),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Row(
+                        children: [
+                          Expanded(child: Divider(color: _linea)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14),
+                            child: Text('O', style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA))),
+                          ),
+                          Expanded(child: Divider(color: _linea)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      GoogleAuthButton(label: 'Continuar con Google', loading: _loadingGoogle, onPressed: _continuarConGoogle),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('¿No tienes cuenta? ', style: TextStyle(color: Color(0xFF555555))),
+                          GestureDetector(
+                            onTap: _irARegistro,
+                            child: const Text(
+                              'Crea una aquí',
+                              style: TextStyle(fontWeight: FontWeight.w700, color: _tinta, decoration: TextDecoration.underline),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 26),
+                      const Divider(color: _linea),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _ventaja('Tienda', 'ONLINE'),
+                          _ventaja('Caja', 'SIN INTERNET'),
+                          _ventaja('Probador', 'VIRTUAL'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

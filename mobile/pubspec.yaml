@@ -113,19 +113,20 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon/icon.png"
-  adaptive_icon_background: "#203C40"
+  adaptive_icon_background: "#1F2A44"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 flutter_native_splash:
-  color: "#FFFFFF"
-  image: assets/logo.png
+  # Arlani Boutiques: el bolsito sobre azul noche.
+  color: "#1F2A44"
+  image: assets/splash_bolso.png
   android_12:
     # En Android 12+ el ícono central SIEMPRE se recorta a un círculo (regla
     # del sistema operativo, no configurable) -- "splash_icon.png" es el
     # mismo logo pero con mucho mas margen alrededor para que ese recorte
     # no le coma el texto.
     image: assets/splash_icon.png
-    color: "#FFFFFF"
+    color: "#1F2A44"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -140,6 +141,8 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/arlani_logo_claro.png
+    - assets/arlani_marca_agua.png
     - assets/qr-transferencia.png
     - assets/whatsapp.svg
     - assets/video/hero.mp4
