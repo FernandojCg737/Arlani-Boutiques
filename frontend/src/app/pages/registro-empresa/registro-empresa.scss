@@ -1111,3 +1111,33 @@
   flex-wrap: wrap;
   gap: 12px;
 }
+
+.campo__etiqueta {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.publicos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.publicos__opcion {
+  padding: 7px 14px;
+  border: 1px solid #d6d2cf;
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: #1f2a44;
+  cursor: pointer;
+
+  &.is-activo {
+    border-color: #1f2a44;
+    background: #1f2a44;
+    color: #fff;
+  }
+}

@@ -6,6 +6,8 @@ export class TiendaFiltros {
   readonly tiendaSeleccionada = signal<string | null>(null);
   readonly temporadaSeleccionada = signal<string | null>(null);
   readonly categoriaSeleccionada = signal<string | null>(null);
+  // Para quién: mujer, hombre, nina, nino o bebe (null = todos).
+  readonly publicoSeleccionado = signal<string | null>(null);
   readonly marcasSeleccionadas = signal<Set<string>>(new Set());
   readonly sucursalSeleccionada = signal<string | null>(null);
   readonly precioMin = signal<number | null>(null);
@@ -31,6 +33,10 @@ export class TiendaFiltros {
 
   seleccionarTemporada(nombre: string | null): void {
     this.temporadaSeleccionada.set(nombre);
+  }
+
+  seleccionarPublico(id: string | null): void {
+    this.publicoSeleccionado.set(id);
   }
 
   seleccionarCategoria(id: string | null): void {
@@ -62,6 +68,7 @@ export class TiendaFiltros {
     this.tiendaSeleccionada.set(null);
     this.temporadaSeleccionada.set(null);
     this.categoriaSeleccionada.set(null);
+    this.publicoSeleccionado.set(null);
     this.marcasSeleccionadas.set(new Set());
     this.sucursalSeleccionada.set(null);
     this.precioMin.set(null);

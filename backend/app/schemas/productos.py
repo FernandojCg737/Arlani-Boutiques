@@ -48,8 +48,12 @@ class ArFotoEstadoOut(BaseModel):
     error: bool = False
 
 
+PUBLICO = "^(mujer|hombre|unisex|nina|nino|bebe)$"
+
+
 class ProductoCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=150)
+    publico: str = Field(default="unisex", pattern=PUBLICO)
     descripcion: str | None = None
     precio: Decimal = Field(gt=0, decimal_places=2)
     precio_original: Decimal | None = Field(default=None, gt=0, decimal_places=2)
@@ -76,6 +80,7 @@ class ProductoOut(BaseModel):
     precio: Decimal
     precio_original: Decimal | None
     estado: str
+    publico: str
     categoria_id: int
     categoria_nombre: str
     marca_id: int
@@ -100,6 +105,16 @@ class OpcionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TallaOut(BaseModel):
+    id: int
+    nombre: str
+    tipo: str
+
+
+class CategoriaCreate(BaseModel):
+    nombre: str = Field(min_length=2, max_length=100)
+
+
 class CatalogoBaseOut(BaseModel):
     categorias: list[OpcionOut]
     marcas: list[OpcionOut]
@@ -107,7 +122,7 @@ class CatalogoBaseOut(BaseModel):
     colecciones: list[OpcionOut]
     proveedores: list[OpcionOut]
     sucursales: list[OpcionOut]
-    tallas: list[OpcionOut]
+    tallas: list[TallaOut]
     colores: list[OpcionOut]
 
 
@@ -163,6 +178,7 @@ class ProductoPublicoOut(BaseModel):
     precio_original: Decimal | None
     marca_nombre: str
     categoria_nombre: str
+    publico: str
     temporada_nombre: str
     imagenes: list[str]
     sucursales_disponibles: list[str]

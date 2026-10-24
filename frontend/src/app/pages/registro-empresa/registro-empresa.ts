@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { PUBLICOS } from '../../data/publicos';
 import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PLANES, Periodo, Plan, esPrueba, precioAnual, precioPorMes } from '../../data/planes';
@@ -87,6 +88,13 @@ export class RegistroEmpresa {
   // Mientras el usuario no edite el enlace a mano, sigue al nombre.
   private subdominioEditado = false;
   protected readonly ciudad = signal('Santa Cruz');
+  // Para quién vende (mujer, hombre, niños...): se puede elegir más de uno.
+  protected readonly opcionesPublico = PUBLICOS;
+  protected readonly publicos = signal<string[]>([]);
+
+  protected alternarPublico(id: string): void {
+    this.publicos.update((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
+  }
   protected readonly sucursales = signal(1);
   protected readonly color = signal(COLORES[0].valor);
   protected readonly colorPropio = computed(() => !COLORES.some((c) => c.valor === this.color()));
@@ -239,6 +247,7 @@ export class RegistroEmpresa {
         subdominio: this.subdominio(),
         ciudad: this.ciudad(),
         sucursales: this.sucursales(),
+        publicos: this.publicos(),
         color: this.color(),
       },
       administrador: { nombre: this.adminNombre().trim(), email: this.adminEmail().trim().toLowerCase() },

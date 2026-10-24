@@ -12,6 +12,7 @@ export interface SolicitudSuscripcion {
     subdominio: string;
     ciudad: string;
     sucursales: number;
+    publicos?: string[];
     color: string;
   };
   // Usuario con el que la boutique entra a su panel. Las credenciales llegan

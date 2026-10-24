@@ -25,6 +25,7 @@ interface ProductoPublico {
   precio_original: string | null;
   marca_nombre: string;
   categoria_nombre: string;
+  publico: string;
   temporada_nombre: string;
   imagenes: string[];
   sucursales_disponibles: string[];
@@ -73,6 +74,7 @@ function toProduct(p: ProductoPublico): Product {
     gallery: p.imagenes.length ? p.imagenes : [PLACEHOLDER_IMAGE],
     category: p.categoria_nombre.toLowerCase(),
     categoryLabel: p.categoria_nombre,
+    publico: p.publico,
     temporada: p.temporada_nombre,
     isNew: false,
     colors: [],

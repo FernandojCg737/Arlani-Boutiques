@@ -1,4 +1,5 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { coincidePublico } from '../../data/publicos';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Product } from '../../data/products';
@@ -38,6 +39,7 @@ export class ProductGrid implements OnInit {
     const termino = this.busqueda().trim().toLowerCase();
     const temporada = this.filtros.temporadaSeleccionada();
     const categoria = this.filtros.categoriaSeleccionada();
+    const publico = this.filtros.publicoSeleccionado();
     const marcas = this.filtros.marcasSeleccionadas();
     const sucursal = this.filtros.sucursalSeleccionada();
     const precioMin = this.filtros.precioMin();
@@ -53,6 +55,7 @@ export class ProductGrid implements OnInit {
         (this.esUniversal() && (p.tiendaNombre ?? '').toLowerCase().includes(termino));
       const coincideTemporada = !temporada || p.temporada === temporada;
       const coincideCategoria = !categoria || p.category === categoria;
+      const paraQuien = coincidePublico(p.publico, publico);
       const coincideMarca = marcas.size === 0 || (p.brand ? marcas.has(p.brand) : false);
       const coincideSucursal = !sucursal || p.branchesInStock.includes(sucursal);
       const coincidePrecioMin = precioMin === null || p.price >= precioMin;
@@ -62,6 +65,7 @@ export class ProductGrid implements OnInit {
         coincideBusqueda &&
         coincideTemporada &&
         coincideCategoria &&
+        paraQuien &&
         coincideMarca &&
         coincideSucursal &&
         coincidePrecioMin &&

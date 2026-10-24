@@ -207,6 +207,9 @@ def confirmar_suscripcion(
                 "usd": cot.monto_usd if order_id else Decimal(0),
             },
         ).mappings().one()
+        publicos = sorted({x for x in payload.boutique.publicos if x in ("mujer", "hombre", "unisex", "nina", "nino", "bebe")})
+        db.execute(text("UPDATE empresa SET publicos = :p WHERE subdominio = :s"),
+                   {"p": publicos, "s": payload.boutique.subdominio})
         db.commit()
     except Exception as err:
         db.rollback()

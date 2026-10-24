@@ -75,7 +75,9 @@ PLANTILLAS_REPORTES: dict[str, list[str]] = {
 }
 
 PRODUCTO = ["la polera negra", "el jean slim", "la chaqueta de cuero", "el hoodie gris", "la camisa blanca", "la chompa beige"]
-CATEGORIA = ["poleras", "jeans", "chaquetas", "camisas", "vestidos", "pantalones", "accesorios", "hoodies"]
+CATEGORIA = ["poleras", "jeans", "chaquetas", "camisas", "vestidos", "pantalones", "accesorios", "hoodies", "faldas",
+             "blusas", "leggings", "pijamas", "zapatos"]
+PUBLICO = ["mujer", "dama", "hombre", "caballero", "nina", "nino", "ninos", "bebe", "mi hija", "mi hijo", "mi esposa", "mi novio"]
 MONTO = ["100", "150", "200", "250", "300", "500", "cien", "doscientos", "trescientos", "quinientos", "80", "120"]
 MONEDA = ["bolivianos", "bs", "", "pesos"]
 NOMBRE_TIENDA = ["atelier", "fashion store", "la boutique", "esa tienda"]
@@ -107,7 +109,8 @@ PLANTILLAS_CHATBOT: dict[str, list[str]] = {
               "hay {producto} en negro", "les queda talla l de {producto}", "tienen tallas grandes", "hay disponibilidad de {producto}",
               "tienen {producto}", "venden {producto}", "hay {producto}", "todavia tienen {producto}", "les llego {producto}",
               "tienen {categoria}", "hay {categoria} en talla s", "en que tallas viene {producto}", "{producto} en que colores hay",
-              "hay talla xl de {categoria}", "se agoto {producto}"],
+              "hay talla xl de {categoria}", "se agoto {producto}", "tienen {categoria} para {publico}",
+              "hay ropa para {publico}", "que tallas tienen para {publico}", "hay {categoria} de {publico} en talla 8"],
     "precio": ["cuanto cuesta {producto}", "precio de {producto}", "cuanto sale {producto}", "que precio tiene {producto}",
                "tienen ofertas", "hay descuentos", "{producto} esta en oferta", "cuanto vale {producto}",
                "que productos tienen precio menor a {monto} {moneda}", "que productos cuestan menos de {monto} {moneda}",
@@ -116,11 +119,13 @@ PLANTILLAS_CHATBOT: dict[str, list[str]] = {
                "que es lo mas economico", "prendas baratas", "busco algo barato", "tienen algo economico", "lo mas caro que tengan",
                "{categoria} de menos de {monto} {moneda}", "{categoria} baratas", "cuanto cuestan las {categoria}",
                "tengo {monto} {moneda} que puedo comprar", "mi presupuesto es de {monto} {moneda}", "precios de {categoria}",
-               "{categoria} en oferta", "que hay en liquidacion", "precio maximo {monto} {moneda}"],
+               "{categoria} en oferta", "que hay en liquidacion", "precio maximo {monto} {moneda}",
+               "{categoria} para {publico} de menos de {monto} {moneda}", "cuanto cuestan los {categoria} de {publico}"],
     "recomendacion": ["que me recomiendas", "que me queda bien para una fiesta", "busco ropa para el trabajo", "que esta de moda",
                       "recomiendame algo casual", "que combina con {producto}", "busco un regalo", "que ropa tienen para el frio",
                       "que me sugieres", "ideas para un outfit", "que {categoria} me recomiendas", "que es lo mas vendido",
-                      "que prendas son tendencia", "busco algo para una boda"],
+                      "que prendas son tendencia", "busco algo para una boda", "que me recomiendas para {publico}",
+                      "busco un regalo para {publico}", "que ropa tienen para {publico}", "ideas de outfit para {publico}"],
     "reservas": ["puedo reservar {producto}", "como hago una reserva", "me guardan {producto}", "quiero apartar una prenda",
                  "cuanto tiempo dura la reserva", "puedo reservar y pagar en tienda", "como reservo sin pagar",
                  "quiero reservar para recoger manana", "se puede separar una prenda"],
@@ -130,7 +135,8 @@ PLANTILLAS_CHATBOT: dict[str, list[str]] = {
     "tiendas": ["que tiendas hay", "que tiendas tienen", "cuales son las tiendas", "que boutiques hay en arlani",
                 "en que tienda encuentro {producto}", "que tienda vende {producto}", "donde puedo comprar {producto}",
                 "que tiendas venden {categoria}", "cuantas tiendas hay", "tiendas disponibles", "que marcas venden aqui",
-                "quien vende {categoria}", "que hay en {tienda}", "que vende {tienda}", "otras tiendas"],
+                "quien vende {categoria}", "que hay en {tienda}", "que vende {tienda}", "otras tiendas",
+                "que tiendas venden ropa de {publico}", "hay tiendas para {publico}"],
     # Plataforma (portada de Arlani): para duenos de boutiques que quieren su tienda.
     "planes": ["que planes tienen", "cuanto cuesta la suscripcion", "precio de los planes", "cuanto cuesta el plan {plan}",
                "que incluye el plan {plan}", "diferencia entre el plan basico y el profesional", "hay plan gratis",
@@ -174,7 +180,7 @@ def generar(
 ) -> list[tuple[str, str]]:
     """rellenos: valores propios para {producto}, {sucursal}... (los de una tienda)."""
     valores = {"ver": VER, "periodo": PERIODO, "grano": GRANO, "top": TOP, "sucursal": SUCURSAL, "producto": PRODUCTO,
-               "categoria": CATEGORIA, "monto": MONTO, "moneda": MONEDA, "tienda": NOMBRE_TIENDA, "plan": PLAN,
+               "categoria": CATEGORIA, "publico": PUBLICO, "monto": MONTO, "moneda": MONEDA, "tienda": NOMBRE_TIENDA, "plan": PLAN,
                **{k: v for k, v in (rellenos or {}).items() if v}}
     rnd = random.Random(semilla)
     datos: list[tuple[str, str]] = []

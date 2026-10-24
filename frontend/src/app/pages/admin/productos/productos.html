@@ -134,6 +134,23 @@
             @for (c of catalogo().categorias; track c.id) {
               <option [value]="c.id" [selected]="c.id === fCategoriaId()">{{ c.nombre }}</option>
             }
+            <option [value]="categoriaOtra" [selected]="categoriaOtra === fCategoriaId()">Otra...</option>
+          </select>
+        </label>
+
+        @if (fCategoriaId() === categoriaOtra) {
+          <label class="modal-field">
+            <span>Nombre de la categoría nueva (solo para tu tienda)</span>
+            <input type="text" maxlength="100" [value]="fCategoriaNueva()" (input)="fCategoriaNueva.set($any($event.target).value)" />
+          </label>
+        }
+
+        <label class="modal-field">
+          <span>Para quién</span>
+          <select (change)="fPublico.set($any($event.target).value)">
+            @for (o of publicos; track o.id) {
+              <option [value]="o.id" [selected]="o.id === fPublico()">{{ o.etiqueta }}</option>
+            }
           </select>
         </label>
 
@@ -315,8 +332,14 @@
               }
             </select>
             <select (change)="nStockTallaId.set(+$any($event.target).value)">
-              @for (t of catalogo().tallas; track t.id) {
-                <option [value]="t.id" [selected]="t.id === nStockTallaId()">{{ t.nombre }}</option>
+              @for (g of tiposTalla; track g.id) {
+                <optgroup [label]="g.etiqueta">
+                  @for (t of catalogo().tallas; track t.id) {
+                    @if (t.tipo === g.id) {
+                      <option [value]="t.id" [selected]="t.id === nStockTallaId()">{{ t.nombre }}</option>
+                    }
+                  }
+                </optgroup>
               }
             </select>
             <select (change)="nStockColorId.set(+$any($event.target).value)">

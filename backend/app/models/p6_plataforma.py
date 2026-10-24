@@ -5,7 +5,7 @@ migracion c4e8a1f7b2d9); estos modelos sirven para lecturas y relaciones."""
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -35,6 +35,8 @@ class Empresa(Base):
     subdominio: Mapped[str] = mapped_column(String(40), unique=True)
     ciudad: Mapped[str | None] = mapped_column(String(80))
     color_marca: Mapped[str] = mapped_column(String(7), default="#1f2a44")
+    # Para quien vende la boutique (mujer, hombre, unisex, nina, nino, bebe).
+    publicos: Mapped[list[str]] = mapped_column(ARRAY(String(10)), default=list)
     logo_url: Mapped[str | None] = mapped_column(String(500))
     email_contacto: Mapped[str | None] = mapped_column(String(150))
     estado: Mapped[str] = mapped_column(String(20), default="activa")

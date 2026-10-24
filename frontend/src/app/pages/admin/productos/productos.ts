@@ -1,4 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { ETIQUETA_PUBLICO, PUBLICOS } from '../../../data/publicos';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -42,6 +43,7 @@ interface Producto {
   precio: string;
   precio_original: string | null;
   estado: string;
+  publico: string;
   categoria_id: number;
   categoria_nombre: string;
   marca_id: number;
@@ -69,11 +71,20 @@ interface CatalogoBase {
   colecciones: Opcion[];
   proveedores: Opcion[];
   sucursales: Opcion[];
-  tallas: Opcion[];
+  tallas: (Opcion & { tipo: string })[];
   colores: Opcion[];
 }
 
 const MARCA_OTRO = -1;
+const CATEGORIA_OTRA = -1;
+// Grupos de tallas en el selector de stock.
+const TIPOS_TALLA: { id: string; etiqueta: string }[] = [
+  { id: 'letra', etiqueta: 'Letras' },
+  { id: 'numero', etiqueta: 'Números (pantalón, vestido)' },
+  { id: 'calzado', etiqueta: 'Calzado' },
+  { id: 'nino', etiqueta: 'Niños (años)' },
+  { id: 'bebe', etiqueta: 'Bebés (meses)' },
+];
 const COLOR_OTRO = -1;
 
 @Component({
@@ -97,6 +108,10 @@ export class AdminProductos implements OnInit {
     colores: [],
   });
   protected readonly marcaOtro = MARCA_OTRO;
+  protected readonly categoriaOtra = CATEGORIA_OTRA;
+  protected readonly publicos = PUBLICOS;
+  protected readonly etiquetaPublico = ETIQUETA_PUBLICO;
+  protected readonly tiposTalla = TIPOS_TALLA;
   protected readonly colorOtro = COLOR_OTRO;
   protected readonly buscar = signal('');
   protected readonly loading = signal(false);
@@ -109,6 +124,8 @@ export class AdminProductos implements OnInit {
   protected readonly fPrecio = signal('');
   protected readonly fPrecioOriginal = signal('');
   protected readonly fCategoriaId = signal<number | null>(null);
+  protected readonly fCategoriaNueva = signal('');
+  protected readonly fPublico = signal('unisex');
   protected readonly fMarcaId = signal<number | null>(null);
   protected readonly fMarcaNueva = signal('');
   protected readonly fProveedorId = signal<number | null>(null);
@@ -145,6 +162,8 @@ export class AdminProductos implements OnInit {
     this.fPrecio.set('');
     this.fPrecioOriginal.set('');
     this.fCategoriaId.set(this.catalogo().categorias[0]?.id ?? null);
+    this.fCategoriaNueva.set('');
+    this.fPublico.set('unisex');
     // Sin marcas todavia (tienda nueva): "Otro..." elegido, con el campo para escribirla.
     this.fMarcaId.set(this.catalogo().marcas[0]?.id ?? MARCA_OTRO);
     this.fMarcaNueva.set('');
@@ -163,6 +182,8 @@ export class AdminProductos implements OnInit {
     this.fPrecio.set(p.precio);
     this.fPrecioOriginal.set(p.precio_original ?? '');
     this.fCategoriaId.set(p.categoria_id);
+    this.fCategoriaNueva.set('');
+    this.fPublico.set(p.publico ?? 'unisex');
     this.fMarcaId.set(p.marca_id);
     this.fMarcaNueva.set('');
     this.fProveedorId.set(p.proveedor_id);
@@ -186,7 +207,8 @@ export class AdminProductos implements OnInit {
     const faltan = [
       !this.fNombre() && 'el nombre',
       !this.fPrecio() && 'el precio',
-      !this.fCategoriaId() && 'la categoría',
+      (!this.fCategoriaId() || (this.fCategoriaId() === CATEGORIA_OTRA && !this.fCategoriaNueva().trim())) &&
+        'la categoría',
       (!this.fMarcaId() || (this.fMarcaId() === this.marcaOtro && !this.fMarcaNueva().trim())) &&
         'el nombre de la marca',
       !this.fProveedorId() && 'un proveedor',
@@ -210,12 +232,25 @@ export class AdminProductos implements OnInit {
         marcaId = marca.id;
       }
 
+      let categoriaId = this.fCategoriaId();
+      if (categoriaId === CATEGORIA_OTRA) {
+        const categoria = await firstValueFrom(
+          this.http.post<Opcion>(`${environment.apiUrl}/productos/categorias`, { nombre: this.fCategoriaNueva().trim() }),
+        );
+        this.catalogo.update((c) => ({
+          ...c,
+          categorias: [...c.categorias.filter((x) => x.id !== categoria.id), categoria].sort((a, b) => a.nombre.localeCompare(b.nombre)),
+        }));
+        categoriaId = categoria.id;
+      }
+
       const payload = {
         nombre: this.fNombre(),
+        publico: this.fPublico(),
         descripcion: this.fDescripcion() || null,
         precio: this.fPrecio(),
         precio_original: this.fPrecioOriginal() || null,
-        categoria_id: this.fCategoriaId(),
+        categoria_id: categoriaId,
         marca_id: marcaId,
         proveedor_id: this.fProveedorId(),
         temporada_id: this.fTemporadaId(),
@@ -262,6 +297,7 @@ export class AdminProductos implements OnInit {
           descripcion: p.descripcion,
           precio: p.precio,
           precio_original: p.precio_original,
+          publico: p.publico,
           categoria_id: p.categoria_id,
           marca_id: p.marca_id,
           proveedor_id: p.proveedor_id,

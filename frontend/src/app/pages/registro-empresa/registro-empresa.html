@@ -224,6 +224,23 @@
               }
             </div>
 
+            <div class="campo">
+              <span class="campo__etiqueta" id="publicos-titulo">¿Para quién vendes? <small>(puedes elegir varios)</small></span>
+              <div class="publicos" role="group" aria-labelledby="publicos-titulo">
+                @for (o of opcionesPublico; track o.id) {
+                  <button
+                    type="button"
+                    class="publicos__opcion"
+                    [class.is-activo]="publicos().includes(o.id)"
+                    [attr.aria-pressed]="publicos().includes(o.id)"
+                    (click)="alternarPublico(o.id)"
+                  >
+                    {{ o.etiqueta }}
+                  </button>
+                }
+              </div>
+            </div>
+
             <div class="campo__fila">
               <div class="campo">
                 <label for="ciudad">Ciudad</label>

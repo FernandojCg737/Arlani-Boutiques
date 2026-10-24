@@ -1,4 +1,5 @@
 import { HttpClient } from '@angular/common/http';
+import { PUBLICOS } from '../../data/publicos';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Component, DestroyRef, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
@@ -49,6 +50,19 @@ export class ShopFilters implements OnInit {
 
   protected readonly categorias = this.catalogo.categorias;
   protected readonly categoriaSeleccionada = this.filtros.categoriaSeleccionada;
+
+  // Para quién: solo las opciones que tienen prendas (unisex cuenta como mujer y hombre).
+  protected readonly publicoSeleccionado = this.filtros.publicoSeleccionado;
+  protected readonly publicos = computed(() => {
+    const hay = new Set(this.catalogo.products().map((p) => p.publico ?? 'unisex'));
+    return PUBLICOS.filter(
+      (o) => o.id !== 'unisex' && (hay.has(o.id) || (hay.has('unisex') && (o.id === 'mujer' || o.id === 'hombre'))),
+    );
+  });
+
+  protected seleccionarPublico(id: string | null): void {
+    this.filtros.seleccionarPublico(id);
+  }
 
   // Catalogo universal (sin boutique fija): se puede elegir la boutique.
   protected readonly esUniversal = computed(() => !this.catalogo.tienda());
