@@ -117,3 +117,13 @@
     }
   }
 }
+
+.chat-msg__intencion {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  background: #f1f0ef;
+  color: #3e4c6d;
+  font-size: 11px;
+  text-transform: capitalize;
+}

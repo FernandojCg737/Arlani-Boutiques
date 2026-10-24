@@ -43,12 +43,14 @@ interface RelacionadoPage {
 }
 
 const ORIGEN_LABEL: Record<string, string> = {
+  modelo_ml: 'Modelo de ML (híbrido)',
   compra_conjunta: 'Comprado junto a...',
   similar_categoria: 'Similar a tus compras',
   mas_vendido: 'Mas vendido',
 };
 
 const ORIGEN_LABEL_RELACIONADOS: Record<string, string> = {
+  modelo_ml: 'Modelo de ML (híbrido)',
   vistos_juntos: 'Vistos juntos',
   similar_categoria: 'Misma categoria/marca',
   mas_vendido: 'Mas vendido',
@@ -56,8 +58,9 @@ const ORIGEN_LABEL_RELACIONADOS: Record<string, string> = {
 };
 
 // CU18 "Recomendar Prendas por IA": panel de solo lectura -- el ranking lo
-// arma un motor de reglas en SQL (compra conjunta / similares / mas
-// vendidos) y Gemini redacta la razon de cada una; aca solo se audita a
+// arma el modelo de recomendacion de cada tienda (con las reglas en SQL de
+// respaldo: compra conjunta / similares / mas vendidos) y Gemini redacta la
+// razon de cada una; aca solo se audita a
 // quien se le recomendo que, y si esa recomendacion termino en una compra
 // real (convertido, marcado solo por un trigger cuando el cliente compra).
 @Component({

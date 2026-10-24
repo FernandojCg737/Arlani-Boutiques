@@ -24,7 +24,17 @@
         <div class="chat-msg" [class.chat-msg--bot]="m.remitente === 'bot'">
           <span class="chat-msg__remitente">{{ m.remitente === 'bot' ? 'Asistente' : 'Cliente' }}</span>
           <p>{{ m.mensaje }}</p>
-          <span class="chat-msg__fecha">{{ m.fecha | date: "d MMM yyyy, h:mm a" }}</span>
+          <span class="chat-msg__fecha">
+            {{ m.fecha | date: "d MMM yyyy, h:mm a" }}
+            @if (m.intencion) {
+              <span class="chat-msg__intencion" [title]="'Intención detectada por el modelo (CU18)'">
+                {{ m.intencion === 'no_entendido' ? 'no entendido' : m.intencion.replace('_', ' ') }}
+                @if (m.confianza !== null) {
+                  · {{ m.confianza * 100 | number: '1.0-0' }}%
+                }
+              </span>
+            }
+          </span>
         </div>
       }
     </div>

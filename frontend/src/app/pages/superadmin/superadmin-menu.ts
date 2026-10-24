@@ -255,11 +255,23 @@ export const PARCIALES: ParcialMenu[] = [
           {
             codigo: 'CU17', permisos: ['2P-CU17'],
             nombre: 'Solicitar y exportar reporte generativo (texto o voz)',
+            ruta: 'reporte-voz',
+            porEmpresa: true,
             plataformas: ['WEB', 'MÓVIL'],
             descripcion:
               'Pedir un reporte en lenguaje natural, por texto o por voz, y exportarlo. Disponible solo en el plan Profesional.',
           },
-          { codigo: 'CU18', nombre: 'Gestionar modelos de ML', ruta: 'recomendaciones', antes: 'CU18', plataformas: ['WEB'] },
+          {
+            codigo: 'CU18',
+            nombre: 'Gestionar modelos de ML',
+            ruta: 'modelos-ml',
+            antes: 'CU18',
+            plataformas: ['WEB'],
+            subs: [
+              { etiqueta: 'Modelos y entrenamiento', ruta: 'modelos-ml' },
+              { etiqueta: 'Recomendaciones', ruta: 'recomendaciones' },
+            ],
+          },
           {
             codigo: 'CU20',
             nombre: 'Gestionar reportes de la plataforma (SaaS)',

@@ -61,6 +61,9 @@ export class App implements OnInit {
   // Páginas de la plataforma sin hero (data: { encabezadoSolido: true }):
   // el encabezado de Arlani va sólido desde arriba.
   protected readonly encabezadoSolido = signal(false);
+  // Páginas de la plataforma con el asistente de todas las tiendas
+  // (data: { chatbot: 'universal' }), como el catálogo universal.
+  protected readonly chatbotUniversal = signal(false);
 
   @HostListener('document:click')
   protected onDocumentClick(): void {
@@ -88,6 +91,7 @@ export class App implements OnInit {
         // En las paginas de la plataforma no hay marca de tienda.
         if (current.data['header'] === 'plataforma') this.tiendaActiva.salir();
         this.encabezadoSolido.set(!!current.data['encabezadoSolido']);
+        this.chatbotUniversal.set(current.data['chatbot'] === 'universal');
       });
   }
 }

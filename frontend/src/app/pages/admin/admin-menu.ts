@@ -65,6 +65,7 @@ export const ADMIN_MENU: AdminPackage[] = [
       { code: 'CU18', label: 'Recomendar Prendas por IA', route: '/admin/recomendaciones' },
       { code: 'CU19', label: 'Atender Cliente con Chatbot', route: '/admin/chatbot' },
       { code: 'CU20', label: 'Reputacion y Calificaciones', route: '/admin/calificaciones' },
+      { code: 'CU25', label: 'Reportes por Voz (IA)', route: '/admin/reporte-voz', permiso: '2P-CU17' },
     ],
   },
 ];
