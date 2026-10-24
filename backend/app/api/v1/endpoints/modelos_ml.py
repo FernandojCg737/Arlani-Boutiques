@@ -33,7 +33,7 @@ from app.models import Usuario
 
 router = APIRouter()
 
-TAREAS = {"reportes": "Reportes por voz o texto (CU17)", "chatbot": "Chatbot universal (catálogo de todas las tiendas)"}
+TAREAS = {"reportes": "Reportes por voz o texto (CU17)", "reportes_saas": "Reportes del SaaS por voz o texto (CU17)", "chatbot": "Chatbot universal (catálogo de todas las tiendas)"}
 
 
 class ProbarIn(BaseModel):

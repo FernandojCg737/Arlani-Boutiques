@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { AppChart } from '../../../components/chart/chart';
@@ -56,8 +57,15 @@ function crearReconocedor(): Reconocedor | null {
   imports: [AppChart, ExportarReporte, TablaReporteComponent],
   template: `
     <div class="voz-page">
-      <h1 class="voz-titulo">Reportes por voz</h1>
-      <p class="voz-intro">Pide el reporte como se lo pedirías a una persona. Lo entiende un modelo entrenado para tu tienda.</p>
+      <h1 class="voz-titulo">{{ esSaas ? 'Reportes del SaaS por voz' : 'Reportes por voz' }}</h1>
+      <p class="voz-intro">
+        @if (esSaas) {
+          Pide reportes de toda la plataforma (suscripciones, comisiones, ventas de las tiendas, planes) como se los pedirías a
+          una persona. Los entiende el modelo de reportes del SaaS (CU18).
+        } @else {
+          Pide el reporte como se lo pedirías a una persona. Lo entiende un modelo entrenado para tu tienda.
+        }
+      </p>
 
       @if (estado(); as e) {
         @if (!e.disponible) {
@@ -85,7 +93,7 @@ function crearReconocedor(): Reconocedor | null {
               <input
                 type="text"
                 maxlength="300"
-                [placeholder]="escuchando() ? 'Te escucho…' : 'Ej.: ventas de septiembre agrupadas por sucursal'"
+                [placeholder]="escuchando() ? 'Te escucho…' : esSaas ? 'Ej.: ingresos por suscripciones de los últimos tres meses' : 'Ej.: ventas de septiembre agrupadas por sucursal'"
                 [value]="texto()"
                 (input)="texto.set($any($event.target).value)"
                 (keydown.enter)="pedir(false)"
@@ -351,7 +359,9 @@ function crearReconocedor(): Reconocedor | null {
 })
 export class AdminReporteVoz implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/reportes-voz`;
+  // data: { ambito: 'saas' }: los reportes de toda la plataforma (SuperAdministrador).
+  protected readonly esSaas = inject(ActivatedRoute).snapshot.data['ambito'] === 'saas';
+  private readonly base = `${environment.apiUrl}/reportes-voz${this.esSaas ? '/saas' : ''}`;
   private reconocedor: Reconocedor | null = null;
 
   protected readonly soportaVoz = !!crearReconocedor();

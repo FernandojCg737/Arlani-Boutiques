@@ -31,7 +31,7 @@ interface Metricas extends Comparacion {
 }
 
 interface Modelo {
-  tarea: 'reportes' | 'chatbot';
+  tarea: Clasificador;
   // El chatbot tiene uno general (null) y uno por tienda.
   empresa_id: number | null;
   nombre: string;
@@ -109,10 +109,16 @@ interface Sugerida {
   similitud: number;
 }
 
-type Vista = 'reportes' | 'chatbot' | 'recomendaciones' | 'segmentos';
-type Clasificador = 'reportes' | 'chatbot';
+type Vista = 'reportes' | 'reportes_saas' | 'chatbot' | 'recomendaciones' | 'segmentos';
+type Clasificador = 'reportes' | 'reportes_saas' | 'chatbot';
 
-const EJEMPLOS: Record<'reportes' | 'chatbot', string[]> = {
+const EJEMPLOS: Record<'reportes' | 'reportes_saas' | 'chatbot', string[]> = {
+  reportes_saas: [
+    'Mostrame los ingresos por suscripciones de los últimos tres meses',
+    '¿Qué tienda generó más comisión en octubre?',
+    '¿Cuántas tiendas hay por plan?',
+    'Altas de tiendas por mes',
+  ],
   reportes: [
     'Mostrame las ventas de septiembre agrupadas por sucursal',
     '¿Cuáles fueron los diez productos más vendidos este mes?',
@@ -173,7 +179,7 @@ export class ModelosMl implements OnInit {
   protected readonly recomPrueba = signal<Sugerida[] | null>(null);
 
   private get esClasificador(): boolean {
-    return this.vista() === 'reportes' || this.vista() === 'chatbot';
+    return ['reportes', 'reportes_saas', 'chatbot'].includes(this.vista());
   }
 
   // Chatbot: el general (null) o el de una tienda.
@@ -185,7 +191,7 @@ export class ModelosMl implements OnInit {
   );
   protected readonly ejemplos = computed(() => {
     const v = this.vista();
-    return v === 'reportes' || v === 'chatbot' ? EJEMPLOS[v] : [];
+    return v === 'reportes' || v === 'reportes_saas' || v === 'chatbot' ? EJEMPLOS[v] : [];
   });
   protected readonly maxMatriz = computed(() => Math.max(1, ...(this.modelo()?.activo.metricas.matriz_confusion.flat() ?? [1])));
 
@@ -240,7 +246,7 @@ export class ModelosMl implements OnInit {
     this.vista.set(v);
     this.prueba.set(null);
     this.error.set('');
-    if (v === 'reportes' || v === 'chatbot') {
+    if (v === 'reportes' || v === 'reportes_saas' || v === 'chatbot') {
       this.frase.set(EJEMPLOS[v as Clasificador][0]);
       void this.cargarDatos();
     }

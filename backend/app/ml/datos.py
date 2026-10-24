@@ -159,6 +159,49 @@ PLANTILLAS_CHATBOT: dict[str, list[str]] = {
 }
 
 
+# CU17 del SaaS: lo que pide el SuperAdministrador sobre toda la plataforma.
+PLANTILLAS_REPORTES_SAAS: dict[str, list[str]] = {
+    "ingresos_suscripciones": [
+        "{ver} los ingresos por suscripciones {periodo}", "cuanto cobramos de suscripciones {periodo}",
+        "cuanto pagaron las tiendas {periodo}", "cobros de planes por {grano}", "ingresos de la plataforma {periodo}",
+        "{ver} lo recaudado por suscripciones", "cuanto entro por planes {periodo}", "evolucion de los cobros por {grano}",
+        "pagos de suscripcion {periodo}", "facturacion del saas {periodo}",
+    ],
+    "suscripciones_tienda": [
+        "cuanto pago cada tienda {periodo}", "suscripciones por tienda {periodo}", "que tienda pago mas de suscripcion",
+        "cobros de suscripcion de {tienda}", "{ver} los pagos de cada boutique", "ranking de tiendas por pagos de plan",
+    ],
+    "comisiones": [
+        "{ver} las comisiones {periodo}", "cuanto ganamos en comisiones {periodo}", "comisiones por tienda {periodo}",
+        "que tienda genero mas comision", "comisiones de {tienda} {periodo}", "comision por ventas en linea {periodo}",
+        "{ver} las comisiones por {grano}", "cuanto cobro la plataforma por ventas {periodo}",
+    ],
+    "ventas_tiendas": [
+        "ventas de todas las tiendas {periodo}", "cuanto vendio cada tienda {periodo}", "{ver} las ventas por tienda",
+        "que boutique vende mas {periodo}", "ventas de {tienda} {periodo}", "ventas de la plataforma por {grano}",
+        "comparar las ventas de las tiendas {periodo}", "ventas online contra offline de las tiendas {periodo}",
+    ],
+    "planes": [
+        "cuantas tiendas hay por plan", "{ver} las tiendas por plan", "que plan tiene mas tiendas", "mrr por plan",
+        "cuanto ingreso mensual recurrente tenemos", "distribucion de planes", "cuantas tiendas tienen el plan profesional",
+        "ingreso recurrente por plan",
+    ],
+    "tiendas": [
+        "cuantas tiendas se registraron {periodo}", "altas de tiendas por {grano}", "tiendas por ciudad",
+        "{ver} las tiendas activas y suspendidas", "estado de las tiendas", "cuantas boutiques nuevas hay {periodo}",
+        "tiendas registradas {periodo}", "en que ciudades estan las tiendas",
+    ],
+    "metodos_cobro": [
+        "suscripciones pagadas con paypal {periodo}", "cobros por metodo de pago", "cuanto se pago por paypal y cuanto se asigno",
+        "metodos de pago de las suscripciones", "pagos de planes por metodo {periodo}",
+    ],
+    "no_soportado": [
+        "que hora es", "contame un chiste", "como esta el clima", "pone musica", "escribe un poema", "hola como estas",
+        "gracias", "quien gano el partido", "traduce esto al ingles",
+    ],
+}
+
+
 def _sin_tildes(texto: str) -> str:
     return "".join(ch for ch in unicodedata.normalize("NFD", texto) if unicodedata.category(ch) != "Mn")
 
@@ -212,6 +255,8 @@ def dataset(tarea: str, tienda: dict[str, list[str]] | None = None, semilla: int
     como preguntan sus clientes."""
     if tarea == "reportes":
         return generar(PLANTILLAS_REPORTES, 70, 18)
+    if tarea == "reportes_saas":
+        return generar(PLANTILLAS_REPORTES_SAAS, 60, 21)
     if not tienda:
         return generar(PLANTILLAS_CHATBOT, 60, 19)
     plantillas = {k: v + (PLANTILLAS_TIENDA.get(k, []) if tienda.get("sucursal") else []) for k, v in PLANTILLAS_CHATBOT.items()}
@@ -241,6 +286,17 @@ PARAFRASIS: dict[str, list[tuple[str, str]]] = {
         ("cuanto se vendio en linea", "origen"), ("ventas sincronizadas despues del corte", "origen"),
         ("pone una cancion", "no_soportado"), ("que tiempo hace hoy", "no_soportado"),
         ("cuentame algo gracioso", "no_soportado"), ("quien es el presidente", "no_soportado"),
+    ],
+    "reportes_saas": [
+        ("cuanta plata nos dejaron los planes en octubre", "ingresos_suscripciones"),
+        ("lo que facturamos por mensualidades", "ingresos_suscripciones"),
+        ("que boutique nos pago mas", "suscripciones_tienda"), ("lo que aporto cada local por su plan", "suscripciones_tienda"),
+        ("cuanto nos quedamos de lo que venden", "comisiones"), ("el porcentaje cobrado a cada tienda", "comisiones"),
+        ("cuanto movieron las boutiques", "ventas_tiendas"), ("que local facturo mas este mes", "ventas_tiendas"),
+        ("cuantos negocios tienen cada plan", "planes"), ("el ingreso fijo de cada mes", "planes"),
+        ("cuantos negocios se sumaron", "tiendas"), ("de que ciudades son las boutiques", "tiendas"),
+        ("con que pagan los planes", "metodos_cobro"), ("cuanto vino por paypal", "metodos_cobro"),
+        ("cantame una cancion", "no_soportado"), ("que dia es hoy", "no_soportado"),
     ],
     "chatbot": [
         ("que onda", "saludo"), ("buen dia como va", "saludo"), ("holaa", "saludo"),
