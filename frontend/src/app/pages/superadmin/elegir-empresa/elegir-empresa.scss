@@ -223,3 +223,17 @@
     animation: none;
   }
 }
+
+// CU07: acceso al reporte de toda la plataforma (CU20).
+.boton-saas {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: #1f2a44;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}

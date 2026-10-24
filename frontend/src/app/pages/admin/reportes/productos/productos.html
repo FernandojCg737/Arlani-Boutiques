@@ -9,9 +9,7 @@
     </a>
 
     <div class="reporte-acciones">
-      <button type="button" (click)="imprimir()">Imprimir / PDF</button>
-      <button type="button" [disabled]="exportando()" (click)="exportar('excel')">Excel</button>
-      <button type="button" [disabled]="exportando()" (click)="exportar('csv')">CSV</button>
+      <app-exportar-reporte [url]="urlExportar" [params]="params()" nombreArchivo="reporte_productos" />
     </div>
   </div>
 

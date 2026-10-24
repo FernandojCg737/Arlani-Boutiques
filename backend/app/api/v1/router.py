@@ -29,6 +29,8 @@ from app.api.v1.endpoints.productos import router as productos_router
 from app.api.v1.endpoints.proveedores import router as proveedores_router
 from app.api.v1.endpoints.recomendaciones import router as recomendaciones_router
 from app.api.v1.endpoints.reportes import router as reportes_router
+from app.api.v1.endpoints.reportes_comun import router as reportes_comun_router
+from app.api.v1.endpoints.reportes_comun import saas_router as reportes_saas_router
 from app.api.v1.endpoints.reservas import router as reservas_router
 from app.api.v1.endpoints.roles import router as roles_router
 from app.api.v1.endpoints.sesiones import router as sesiones_router
@@ -65,6 +67,8 @@ api_router.include_router(offline_router, prefix="/offline", tags=["offline"])
 api_router.include_router(direcciones_router, prefix="/direcciones", tags=["direcciones"])
 api_router.include_router(notificaciones_router, prefix="/notificaciones", tags=["notificaciones"])
 api_router.include_router(reportes_router, prefix="/reportes", tags=["reportes"])
+api_router.include_router(reportes_comun_router, prefix="/reportes", tags=["reportes"])
+api_router.include_router(reportes_saas_router, prefix="/reportes-saas", tags=["reportes-saas"])
 api_router.include_router(recomendaciones_router, prefix="/recomendaciones", tags=["recomendaciones"])
 api_router.include_router(chatbot_router, prefix="/chatbot", tags=["chatbot"])
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["calificaciones"])

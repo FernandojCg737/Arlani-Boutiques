@@ -18,6 +18,8 @@ import { AdminSinConexion } from './pages/admin/sin-conexion/sin-conexion';
 import { SinConexionCliente } from './pages/sin-conexion/sin-conexion-cliente';
 import { PagarCompras } from './pages/pagar-compras/pagar-compras';
 import { SeguimientoOffline } from './pages/superadmin/seguimiento-offline/seguimiento-offline';
+import { ReportesSaas } from './pages/superadmin/reportes-saas/reportes-saas';
+import { ReporteDinamicoPage } from './pages/admin/reportes/dinamico/dinamico';
 import { ComprobanteCambio } from './pages/comprobante-cambio/comprobante-cambio';
 import { AdminNotificaciones } from './pages/admin/notificaciones/notificaciones';
 import { AdminReportesDashboard } from './pages/admin/reportes/dashboard/dashboard';
@@ -187,6 +189,7 @@ export const routes: Routes = [
       { path: 'reportes/inventario', component: ReporteInventarioPage, canActivate: [permisoGuard('CU16')] },
       { path: 'reportes/reservas', component: ReporteReservasPage, canActivate: [permisoGuard('CU16')] },
       { path: 'reportes/productos', component: ReporteProductosPage, canActivate: [permisoGuard('CU16')] },
+      { path: 'reportes/dinamico', component: ReporteDinamicoPage, canActivate: [permisoGuard('CU16')] },
       { path: 'recomendaciones', component: AdminRecomendaciones, canActivate: [permisoGuard('CU18')] },
       { path: 'chatbot', component: AdminChatbot, canActivate: [permisoGuard('CU19')] },
       { path: 'chatbot/:clienteId', component: AdminChatbotDetalle, canActivate: [permisoGuard('CU19')] },
@@ -236,6 +239,9 @@ export const routes: Routes = [
       { path: 'reportes/inventario', component: ReporteInventarioPage, canActivate: [tiendaElegidaGuard] },
       { path: 'reportes/reservas', component: ReporteReservasPage, canActivate: [tiendaElegidaGuard] },
       { path: 'reportes/productos', component: ReporteProductosPage, canActivate: [tiendaElegidaGuard] },
+      { path: 'reportes/dinamico', component: ReporteDinamicoPage, canActivate: [tiendaElegidaGuard] },
+      // CU20: reportes de la plataforma (SaaS), de todas las tiendas.
+      { path: 'reportes-saas', component: ReportesSaas },
       { path: 'recomendaciones', component: AdminRecomendaciones },
       { path: 'cu/:codigo', component: SuperadminEnConstruccion },
       // 1er parcial (se elige la empresa primero)

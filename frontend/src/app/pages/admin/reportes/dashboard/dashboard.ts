@@ -38,6 +38,7 @@ const REPORTES_LINKS = [
   { label: 'Inventario', desc: 'Stock actual, alertas de stock bajo y movimientos', route: 'inventario' },
   { label: 'Reservas', desc: 'Reservas por estado y tasa de conversion a venta', route: 'reservas' },
   { label: 'Productos mas vendidos', desc: 'Ranking completo por unidades, con los que menos rotan tambien', route: 'productos' },
+  { label: 'Reporte dinamico', desc: 'Arma tu reporte: elige los datos, como agruparlos y que medir', route: 'dinamico' },
 ];
 
 // CU16 "Gestion Reportes y Dashboards": landing con KPIs y graficos de los
