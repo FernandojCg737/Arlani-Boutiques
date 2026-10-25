@@ -117,15 +117,13 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 flutter_native_splash:
-  # Arlani Boutiques: el bolsito sobre azul noche.
+  # Arlani Boutiques: el logo completo sobre azul noche (Android 11 o anterior).
   color: "#1F2A44"
-  image: assets/splash_bolso.png
+  image: assets/splash_logo.png
   android_12:
-    # En Android 12+ el ícono central SIEMPRE se recorta a un círculo (regla
-    # del sistema operativo, no configurable) -- "splash_icon.png" es el
-    # mismo logo pero con mucho mas margen alrededor para que ese recorte
-    # no le coma el texto.
-    image: assets/splash_icon.png
+    # Android 12+ solo admite un icono en circulo: va vacio (solo el azul) y
+    # enseguida la app muestra el logo completo con su indicador de carga.
+    image: assets/splash_vacio.png
     color: "#1F2A44"
 
 # For information on the generic Dart part of this file, see the
@@ -142,6 +140,7 @@ flutter:
   assets:
     - assets/logo.png
     - assets/arlani_logo_claro.png
+    - assets/arlani_logo_completo.png
     - assets/arlani_marca_agua.png
     - assets/qr-transferencia.png
     - assets/whatsapp.svg
