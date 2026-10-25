@@ -15,9 +15,19 @@ import 'plataforma_data.dart';
 /// pasa a "vidrio" (azul noche translucido y desenfocado) al bajar o al abrir
 /// el menu.
 class EncabezadoPlataforma extends ConsumerStatefulWidget {
-  const EncabezadoPlataforma({super.key, required this.solido, required this.onIrA, required this.onBuscar});
+  const EncabezadoPlataforma({
+    super.key,
+    required this.solido,
+    required this.onIrA,
+    required this.onBuscar,
+    this.pleno = false,
+  });
 
   final bool solido;
+
+  /// Paginas sin video detras (carrito...): azul noche solido desde arriba
+  /// (`encabezado--pleno` en la web).
+  final bool pleno;
   final void Function(SeccionPortada seccion) onIrA;
   final void Function(String texto) onBuscar;
 
@@ -44,11 +54,11 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
     widget.onIrA(seccion);
   }
 
-  // Catalogo y carrito viven en el shell con barra inferior: se va (go); el
-  // resto se apila sobre la portada (push) para volver con atras.
+  // El catalogo reemplaza la pagina (go); el resto se apila encima (push),
+  // asi el carrito o el login vuelven con atras a donde estaba la persona.
   void _navegar(String ruta) {
     _cerrar();
-    if (ruta == '/catalogo' || ruta == '/carrito') {
+    if (ruta == '/catalogo') {
       context.go(ruta);
     } else {
       context.push(ruta);
@@ -120,8 +130,8 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: const Cubic(0.16, 1, 0.3, 1),
-      color: vidrio ? Plataforma.vidrio : Colors.transparent,
-      child: vidrio
+      color: widget.pleno ? Plataforma.noche : (vidrio ? Plataforma.vidrio : Colors.transparent),
+      child: vidrio && !widget.pleno
           ? ClipRect(
               child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14), child: contenido),
             )

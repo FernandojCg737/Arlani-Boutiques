@@ -19,7 +19,17 @@ class DetalleCarrito {
     required this.cantidad,
     required this.precioUnitario,
     required this.subtotal,
+    this.tienda,
+    this.tiendaNombre,
+    this.tiendaLogo,
+    this.tiendaColor,
   });
+
+  // Boutique que vende la prenda: el carrito se agrupa por tienda.
+  final String? tienda;
+  final String? tiendaNombre;
+  final String? tiendaLogo;
+  final String? tiendaColor;
 
   final int id;
   final int productoId;
@@ -52,6 +62,10 @@ class DetalleCarrito {
       cantidad: json['cantidad'] as int,
       precioUnitario: num.parse(json['precio_unitario'].toString()).toDouble(),
       subtotal: num.parse(json['subtotal'].toString()).toDouble(),
+      tienda: json['tienda'] as String?,
+      tiendaNombre: json['tienda_nombre'] as String?,
+      tiendaLogo: json['tienda_logo'] as String?,
+      tiendaColor: json['tienda_color'] as String?,
     );
   }
 }

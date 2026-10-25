@@ -29,11 +29,11 @@ import 'features/auth/registro_screen.dart';
 import 'features/catalogo/catalogo_universal_screen.dart';
 import 'features/chatbot/chatbot_screen.dart';
 import 'features/portada/portada_screen.dart';
+import 'features/tienda/tienda_empresa_screen.dart';
 import 'features/storefront/carrito_screen.dart';
 import 'features/storefront/checkout_screen.dart';
 import 'features/storefront/cotizaciones_screen.dart';
 import 'features/storefront/producto_detalle_screen.dart';
-import 'root_shell.dart';
 
 /// Mapa ruta admin -> codigo CU requerido, derivado de `admin_menu.dart`
 /// (misma fuente que el sidebar) — equivalente a `permisoGuard('CUxx')` en
@@ -92,13 +92,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Catalogo universal: todas las boutiques, con el encabezado de la plataforma.
       GoRoute(path: '/catalogo', builder: (context, state) => const CatalogoUniversalScreen()),
       GoRoute(path: '/tienda', redirect: (context, state) => '/catalogo'),
+      // Pagina propia de cada boutique: su marca, su catalogo y sus sucursales.
+      GoRoute(
+        path: '/tienda/:subdominio',
+        builder: (context, state) => TiendaEmpresaScreen(subdominio: state.pathParameters['subdominio']!),
+      ),
       GoRoute(path: '/asistente', builder: (context, state) => const ChatbotScreen(universal: true)),
-      StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) => RootShell(navigationShell: navigationShell),
-        branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/carrito', builder: (context, state) => const CarritoScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/cuenta', builder: (context, state) => const CuentaTabRedirect())]),
-        ],
+      // Carrito de la plataforma (encabezado de Arlani, sin barra inferior).
+      GoRoute(path: '/carrito', builder: (context, state) => const CarritoScreen()),
+      GoRoute(
+        path: '/cuenta',
+        redirect: (context, state) => ProviderScope.containerOf(context).read(authProvider).isAuthenticated ? '/perfil' : '/login',
       ),
       GoRoute(path: '/cotizaciones', builder: (context, state) => const CotizacionesScreen()),
       GoRoute(path: '/checkout', builder: (context, state) => const CheckoutScreen()),

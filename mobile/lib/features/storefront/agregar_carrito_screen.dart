@@ -295,7 +295,7 @@ class _AgregarCarritoScreenState extends ConsumerState<AgregarCarritoScreen> {
               ),
               const SizedBox(width: 12),
               ElevatedButton(
-                onPressed: () => context.go('/carrito'),
+                onPressed: () => context.push('/carrito'),
                 style: ElevatedButton.styleFrom(shape: const RoundedRectangleBorder()),
                 child: const Text('IR AL CARRITO'),
               ),

@@ -15,8 +15,19 @@ import '../portada/flotantes_plataforma.dart';
 import '../portada/plataforma_data.dart';
 import '../storefront/catalogo_provider.dart';
 
-/// Azul noche de la plataforma: el "color de marca" del catalogo universal.
-const _marca = Plataforma.noche;
+/// Color de marca de la pagina: el azul noche de Arlani en el catalogo
+/// universal y el de cada boutique en su pagina (reemplaza a `--brand-dark`).
+class ColorCatalogo extends InheritedWidget {
+  const ColorCatalogo({super.key, required this.color, required super.child});
+
+  final Color color;
+
+  static Color of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ColorCatalogo>()?.color ?? Plataforma.noche;
+
+  @override
+  bool updateShouldNotify(ColorCatalogo oldWidget) => oldWidget.color != color;
+}
 
 /// Catalogo universal (`pages/catalogo-universal` de la web): las prendas de
 /// todas las boutiques de Arlani en un solo lugar. Encabezado de la
@@ -29,25 +40,27 @@ class CatalogoUniversalScreen extends ConsumerStatefulWidget {
   ConsumerState<CatalogoUniversalScreen> createState() => _CatalogoUniversalScreenState();
 }
 
-enum _Orden { predeterminado, menorPrecio, mayorPrecio, recientes }
+enum OrdenCatalogo { predeterminado, menorPrecio, mayorPrecio, recientes }
 
-const _etiquetasOrden = {
-  _Orden.predeterminado: 'Predeterminado',
-  _Orden.menorPrecio: 'Precio: menor a mayor',
-  _Orden.mayorPrecio: 'Precio: mayor a menor',
-  _Orden.recientes: 'Mas recientes',
+const etiquetasOrden = {
+  OrdenCatalogo.predeterminado: 'Predeterminado',
+  OrdenCatalogo.menorPrecio: 'Precio: menor a mayor',
+  OrdenCatalogo.mayorPrecio: 'Precio: mayor a menor',
+  OrdenCatalogo.recientes: 'Mas recientes',
 };
 
 class _CatalogoUniversalScreenState extends ConsumerState<CatalogoUniversalScreen> {
   final _scroll = ScrollController();
   bool _solido = false;
   bool _pasoElHero = false;
-  _Orden _orden = _Orden.predeterminado;
+  OrdenCatalogo _orden = OrdenCatalogo.predeterminado;
   final _reintentos = <ProviderOrFamily, int>{};
 
   @override
   void initState() {
     super.initState();
+    // Todas las boutiques, con los filtros limpios (se conserva lo buscado).
+    Future.microtask(() => ref.read(tiendaFiltrosProvider.notifier).entrarCatalogo());
     _scroll.addListener(() {
       final y = _scroll.offset;
       final solido = y > 24;
@@ -81,13 +94,13 @@ class _CatalogoUniversalScreenState extends ConsumerState<CatalogoUniversalScree
   List<ProductoPublico> _ordenar(List<ProductoPublico> lista) {
     final copia = [...lista];
     switch (_orden) {
-      case _Orden.menorPrecio:
+      case OrdenCatalogo.menorPrecio:
         copia.sort((a, b) => a.precio.compareTo(b.precio));
-      case _Orden.mayorPrecio:
+      case OrdenCatalogo.mayorPrecio:
         copia.sort((a, b) => b.precio.compareTo(a.precio));
-      case _Orden.recientes:
+      case OrdenCatalogo.recientes:
         copia.sort((a, b) => b.id.compareTo(a.id));
-      case _Orden.predeterminado:
+      case OrdenCatalogo.predeterminado:
         break;
     }
     return copia;
@@ -118,12 +131,12 @@ class _CatalogoUniversalScreenState extends ConsumerState<CatalogoUniversalScree
                   const SliverToBoxAdapter(child: _HeroCatalogo()),
                   const SliverPadding(
                     padding: EdgeInsets.fromLTRB(Plataforma.margen, 32, Plataforma.margen, 32),
-                    sliver: SliverToBoxAdapter(child: _FiltrosCatalogo()),
+                    sliver: SliverToBoxAdapter(child: FiltrosCatalogo()),
                   ),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: Plataforma.margen),
                     sliver: SliverToBoxAdapter(
-                      child: _BarraResultados(
+                      child: BarraResultados(
                         cantidad: visibles.length,
                         orden: _orden,
                         onOrden: (o) => setState(() => _orden = o),
@@ -162,7 +175,7 @@ class _CatalogoUniversalScreenState extends ConsumerState<CatalogoUniversalScree
                           mainAxisExtent: anchoTarjeta * 4 / 3 + 128,
                         ),
                         delegate: SliverChildBuilderDelegate(
-                          (context, i) => _TarjetaProducto(producto: visibles[i]),
+                          (context, i) => TarjetaProducto(producto: visibles[i]),
                           childCount: visibles.length,
                         ),
                       ),
@@ -301,14 +314,20 @@ class _HeroCatalogoState extends State<_HeroCatalogo> {
 // ================================================================ filtros
 
 /// `shop-filters` de la web: en celular va arriba de la grilla, completo.
-class _FiltrosCatalogo extends ConsumerStatefulWidget {
-  const _FiltrosCatalogo();
+class FiltrosCatalogo extends ConsumerStatefulWidget {
+  const FiltrosCatalogo({super.key, this.tienda});
+
+  /// null: el catalogo universal, donde se puede elegir la boutique. Con un
+  /// subdominio: el catalogo propio de esa tienda (sin filtro de boutique).
+  final String? tienda;
+
+  bool get universal => tienda == null;
 
   @override
-  ConsumerState<_FiltrosCatalogo> createState() => _FiltrosCatalogoState();
+  ConsumerState<FiltrosCatalogo> createState() => _FiltrosCatalogoState();
 }
 
-class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
+class _FiltrosCatalogoState extends ConsumerState<FiltrosCatalogo> {
   static const _precioMin = 0.0;
   static const _precioMax = 3500.0;
 
@@ -318,7 +337,7 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
 
   void _aplicarPrecio(RangeValues r) {
     setState(() => _rango = r);
-    ref.read(tiendaFiltrosProvider.notifier).setPrecio(
+    ref.read(filtrosCatalogoProvider(widget.tienda).notifier).setPrecio(
           r.start <= _precioMin ? null : r.start,
           r.end >= _precioMax ? null : r.end,
         );
@@ -326,9 +345,12 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
 
   @override
   Widget build(BuildContext context) {
-    final filtros = ref.watch(tiendaFiltrosProvider);
-    final notificador = ref.read(tiendaFiltrosProvider.notifier);
-    final productos = ref.watch(productosPublicosProvider).valueOrNull ?? const <ProductoPublico>[];
+    final marca = ColorCatalogo.of(context);
+    final filtros = ref.watch(filtrosCatalogoProvider(widget.tienda));
+    final notificador = ref.read(filtrosCatalogoProvider(widget.tienda).notifier);
+    final todos = ref.watch(productosPublicosProvider).valueOrNull ?? const <ProductoPublico>[];
+    // En la pagina de una tienda, las opciones salen solo de sus prendas.
+    final productos = widget.universal ? todos : todos.where((p) => p.tienda == widget.tienda).toList();
     final sucursales = ref.watch(sucursalesDeTiendaProvider(filtros.tienda)).valueOrNull ?? const [];
     final temporadas = ref.watch(temporadasDeTiendaProvider(filtros.tienda)).valueOrNull ?? const [];
 
@@ -359,7 +381,7 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
       children: [
         Row(
           children: [
-            Expanded(child: Text('Filtros', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: _marca))),
+            Expanded(child: Text('Filtros', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: marca))),
             GestureDetector(
               onTap: () {
                 notificador.limpiarTodo();
@@ -372,7 +394,7 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
           ],
         ),
         const SizedBox(height: 24),
-        _Grupo(
+        if (widget.universal) _Grupo(
           titulo: 'Boutique',
           children: [
             _Opcion(texto: 'Todas las Boutiques', marcada: filtros.tienda == null, onTap: () => notificador.setTienda(null)),
@@ -396,7 +418,7 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
                             ),
                     ),
                     const SizedBox(width: 8),
-                    Flexible(child: Text(t.tiendaNombre, style: _estiloOpcion(filtros.tienda == t.tienda))),
+                    Flexible(child: Text(t.tiendaNombre, style: _estiloOpcion(marca, filtros.tienda == t.tienda))),
                   ],
                 ),
               ),
@@ -409,7 +431,7 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
               marcada: filtros.sucursal == null,
               onTap: () => notificador.setSucursal(null),
               contenido: Text('Todas las Sucursales',
-                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _marca)),
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: marca)),
             ),
             for (final s in sucursales)
               _Opcion(
@@ -418,7 +440,7 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
                 contenido: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.nombre, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: _marca)),
+                    Text(s.nombre, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: marca)),
                     if (s.direccion.isNotEmpty)
                       Text(s.direccion, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF999999))),
                   ],
@@ -469,9 +491,9 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 3,
-                activeTrackColor: _marca,
+                activeTrackColor: marca,
                 inactiveTrackColor: const Color(0xFFE0E0E0),
-                thumbColor: _marca,
+                thumbColor: marca,
                 overlayShape: SliderComponentShape.noOverlay,
                 rangeThumbShape: const RoundRangeSliderThumbShape(enabledThumbRadius: 8),
               ),
@@ -501,10 +523,10 @@ class _FiltrosCatalogoState extends ConsumerState<_FiltrosCatalogo> {
   }
 }
 
-TextStyle _estiloOpcion(bool activa) => GoogleFonts.inter(
+TextStyle _estiloOpcion(Color marca, bool activa) => GoogleFonts.inter(
       fontSize: 14,
       fontWeight: activa ? FontWeight.w700 : FontWeight.w400,
-      color: activa ? _marca : const Color(0xFF333333),
+      color: activa ? marca : Color(0xFF333333),
     );
 
 class _Grupo extends StatelessWidget {
@@ -519,6 +541,7 @@ class _Grupo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final marca = ColorCatalogo.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFE5E5E5)))),
@@ -527,7 +550,7 @@ class _Grupo extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(titulo, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _marca))),
+              Expanded(child: Text(titulo, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: marca))),
               if (onAlternar != null)
                 GestureDetector(
                   onTap: onAlternar,
@@ -555,6 +578,7 @@ class _Opcion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final marca = ColorCatalogo.of(context);
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -568,14 +592,14 @@ class _Opcion extends StatelessWidget {
               child: Checkbox(
                 value: marcada,
                 onChanged: (_) => onTap(),
-                activeColor: _marca,
+                activeColor: marca,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
                 side: const BorderSide(color: Color(0xFF767676), width: 1.5),
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(child: contenido ?? Text(texto ?? '', style: _estiloOpcion(marcada && resaltar))),
+            Expanded(child: contenido ?? Text(texto ?? '', style: _estiloOpcion(marca, marcada && resaltar))),
           ],
         ),
       ),
@@ -617,6 +641,7 @@ class _CajaPrecioState extends State<_CajaPrecio> {
 
   @override
   Widget build(BuildContext context) {
+    final marca = ColorCatalogo.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(border: Border.all(color: const Color(0xFFDDDDDD))),
@@ -637,7 +662,7 @@ class _CajaPrecioState extends State<_CajaPrecio> {
                   _confirmar();
                 }
               },
-              style: GoogleFonts.inter(fontSize: 14, color: _marca),
+              style: GoogleFonts.inter(fontSize: 14, color: marca),
               decoration: const InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
@@ -655,8 +680,8 @@ class _CajaPrecioState extends State<_CajaPrecio> {
 
 // ================================================================== grilla
 
-class _BarraResultados extends StatelessWidget {
-  const _BarraResultados({
+class BarraResultados extends StatelessWidget {
+  const BarraResultados({
     required this.cantidad,
     required this.orden,
     required this.onOrden,
@@ -665,13 +690,14 @@ class _BarraResultados extends StatelessWidget {
   });
 
   final int cantidad;
-  final _Orden orden;
-  final ValueChanged<_Orden> onOrden;
+  final OrdenCatalogo orden;
+  final ValueChanged<OrdenCatalogo> onOrden;
   final String busqueda;
   final VoidCallback onQuitarBusqueda;
 
   @override
   Widget build(BuildContext context) {
+    final marca = ColorCatalogo.of(context);
     const gris = Color(0xFF8A97A3);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
@@ -683,7 +709,7 @@ class _BarraResultados extends StatelessWidget {
               children: [
                 Flexible(
                   child: Text('Resultados para «$busqueda»',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: _marca)),
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: marca)),
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
@@ -701,20 +727,20 @@ class _BarraResultados extends StatelessWidget {
                 child: Text('MOSTRANDO $cantidad RESULTADOS',
                     style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: gris)),
               ),
-              PopupMenuButton<_Orden>(
+              PopupMenuButton<OrdenCatalogo>(
                 onSelected: onOrden,
                 color: Colors.white,
                 shape: const RoundedRectangleBorder(side: BorderSide(color: Color(0xFFE5E5E5))),
                 itemBuilder: (_) => [
-                  for (final o in _Orden.values)
-                    PopupMenuItem(value: o, child: Text(_etiquetasOrden[o]!, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF333333)))),
+                  for (final o in OrdenCatalogo.values)
+                    PopupMenuItem(value: o, child: Text(etiquetasOrden[o]!, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF333333)))),
                 ],
                 child: Row(
                   children: [
                     Text('ORDENAR: ', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: gris)),
-                    Text(_etiquetasOrden[orden]!.toUpperCase(),
-                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: _marca)),
-                    const Icon(Icons.keyboard_arrow_down, size: 18, color: _marca),
+                    Text(etiquetasOrden[orden]!.toUpperCase(),
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: marca)),
+                    Icon(Icons.keyboard_arrow_down, size: 18, color: marca),
                   ],
                 ),
               ),
@@ -728,13 +754,17 @@ class _BarraResultados extends StatelessWidget {
 
 /// `.product-tile`: foto 3/4, insignia de agotado y, en el catalogo
 /// universal, la boutique que vende la prenda.
-class _TarjetaProducto extends StatelessWidget {
-  const _TarjetaProducto({required this.producto});
+class TarjetaProducto extends StatelessWidget {
+  const TarjetaProducto({super.key, required this.producto, this.mostrarTienda = true});
 
   final ProductoPublico producto;
 
+  /// Solo en el catalogo universal cada prenda dice de que boutique es.
+  final bool mostrarTienda;
+
   @override
   Widget build(BuildContext context) {
+    final marca = ColorCatalogo.of(context);
     final p = producto;
     return GestureDetector(
       onTap: () => context.push('/producto/${p.id}'),
@@ -776,7 +806,7 @@ class _TarjetaProducto extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (p.tiendaNombre.isNotEmpty)
+                    if (mostrarTienda && p.tiendaNombre.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
@@ -792,7 +822,7 @@ class _TarjetaProducto extends StatelessWidget {
                               child: Text(p.tiendaNombre,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _marca)),
+                                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: marca)),
                             ),
                           ],
                         ),
@@ -805,12 +835,12 @@ class _TarjetaProducto extends StatelessWidget {
                     Text(p.nombre.toUpperCase(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, fontStyle: FontStyle.italic, color: _marca)),
+                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, fontStyle: FontStyle.italic, color: marca)),
                     const Spacer(),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text('${p.precio.toStringAsFixed(0)} Bs',
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: _marca)),
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: marca)),
                     ),
                     if (p.temporadaNombre.isNotEmpty)
                       Text(p.temporadaNombre.toUpperCase(),

@@ -278,7 +278,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               const Spacer(),
               if (auth.hasPermiso('CU13'))
                 OutlinedButton.icon(
-                  onPressed: () => context.go('/carrito'),
+                  onPressed: () => context.push('/carrito'),
                   icon: const Icon(Icons.shopping_bag_outlined, size: 16),
                   label: const Text('MI CARRITO'),
                   style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder(), padding: const EdgeInsets.symmetric(horizontal: 12)),

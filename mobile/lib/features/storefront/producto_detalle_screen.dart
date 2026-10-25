@@ -11,6 +11,7 @@ import '../auth/login_requerido.dart';
 import 'agregar_carrito_screen.dart';
 import 'ar_foto_screen.dart';
 import 'ar_tryon_screen.dart';
+import '../portada/plataforma_data.dart';
 import 'catalogo_provider.dart';
 import 'relacionados_provider.dart';
 import 'reserva_form_screen.dart';
@@ -21,7 +22,8 @@ class ProductoDetalleScreen extends ConsumerStatefulWidget {
   final int productoId;
 
   @override
-  ConsumerState<ProductoDetalleScreen> createState() => _ProductoDetalleScreenState();
+  ConsumerState<ProductoDetalleScreen> createState() =>
+      _ProductoDetalleScreenState();
 }
 
 class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
@@ -31,7 +33,9 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
   @override
   void initState() {
     super.initState();
-    _future = ref.read(catalogoRepositoryProvider).getProducto(widget.productoId);
+    _future = ref
+        .read(catalogoRepositoryProvider)
+        .getProducto(widget.productoId);
   }
 
   // CU09 requiere sesion iniciada (queda registrado quien probo cada
@@ -41,7 +45,13 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
   Future<void> _abrirProbadorAr(int productoId) async {
     // Sin sesion: avisa e invita a iniciar sesion / registrarse; al volver
     // logueado retoma esta misma accion (ver asegurarSesion).
-    if (!await asegurarSesion(context, ref, accion: 'para probarte esta prenda con realidad aumentada')) return;
+    if (!await asegurarSesion(
+      context,
+      ref,
+      accion: 'para probarte esta prenda con realidad aumentada',
+    )) {
+      return;
+    }
     if (!mounted) return;
 
     final modo = await showModalBottomSheet<String>(
@@ -53,14 +63,26 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.videocam_outlined, color: AppColors.brandDark),
-              title: const Text('ONLINE', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(
+                Icons.videocam_outlined,
+                color: AppColors.brandDark,
+              ),
+              title: const Text(
+                'ONLINE',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle: const Text('Camara en vivo'),
               onTap: () => Navigator.of(ctx).pop('online'),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_camera_outlined, color: AppColors.brandDark),
-              title: const Text('VIRTUAL', style: TextStyle(fontWeight: FontWeight.bold)),
+              leading: const Icon(
+                Icons.photo_camera_outlined,
+                color: AppColors.brandDark,
+              ),
+              title: const Text(
+                'VIRTUAL',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               subtitle: const Text('Subir o tomar una foto'),
               onTap: () => Navigator.of(ctx).pop('virtual'),
             ),
@@ -71,182 +93,417 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
     if (!mounted || modo == null) return;
 
     if (modo == 'online') {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ArTryonScreen(productoId: productoId)));
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _conTema(ArTryonScreen(productoId: productoId)),
+        ),
+      );
     } else {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ArFotoScreen(productoId: productoId)));
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => _conTema(ArFotoScreen(productoId: productoId)),
+        ),
+      );
     }
   }
 
   // CU11 requiere sesion iniciada (el carrito queda ligado al cliente).
-  Future<void> _abrirAgregarCarrito(int productoId, String productoNombre) async {
-    if (!await asegurarSesion(context, ref, accion: 'para anadir productos a tu carrito')) return;
+  Future<void> _abrirAgregarCarrito(
+    int productoId,
+    String productoNombre,
+  ) async {
+    if (!await asegurarSesion(
+      context,
+      ref,
+      accion: 'para anadir productos a tu carrito',
+    )) {
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => AgregarCarritoScreen(productoId: productoId, productoNombre: productoNombre)),
+      MaterialPageRoute(
+        builder: (_) => _conTema(
+          AgregarCarritoScreen(
+            productoId: productoId,
+            productoNombre: productoNombre,
+          ),
+        ),
+      ),
     );
   }
 
   // CU10 requiere sesion iniciada (la reserva queda ligada al cliente que
   // la hizo, igual que CU09).
   Future<void> _abrirReserva(int productoId, String productoNombre) async {
-    if (!await asegurarSesion(context, ref, accion: 'para reservar este producto')) return;
+    if (!await asegurarSesion(
+      context,
+      ref,
+      accion: 'para reservar este producto',
+    )) {
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ReservaFormScreen(productoId: productoId, productoNombre: productoNombre)),
+      MaterialPageRoute(
+        builder: (_) => _conTema(
+          ReservaFormScreen(
+            productoId: productoId,
+            productoNombre: productoNombre,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Tema con el color de la tienda del producto: los botones, el precio y la
+  /// barra superior toman su marca, aunque se llegue desde el catalogo universal.
+  ThemeData? _temaTienda;
+
+  Widget _conTema(Widget pantalla) => _temaTienda == null
+      ? pantalla
+      : Theme(data: _temaTienda!, child: pantalla);
+
+  ThemeData _tema(BuildContext context, Color marca) {
+    final base = Theme.of(context);
+    WidgetStateProperty<Color?> solo(Color c) =>
+        WidgetStateProperty.resolveWith(
+          (estados) => estados.contains(WidgetState.disabled) ? null : c,
+        );
+    return base.copyWith(
+      colorScheme: base.colorScheme.copyWith(primary: marca),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: marca,
+        foregroundColor: Colors.white,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: (base.elevatedButtonTheme.style ?? const ButtonStyle()).copyWith(
+          backgroundColor: solo(marca),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('PRODUCTO')),
-      body: FutureBuilder<ProductoPublico>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError || !snapshot.hasData) {
-            return const Center(child: Text('Producto no encontrado.'));
-          }
-          final p = snapshot.data!;
-          final imagenes = p.imagenes.isEmpty ? <String>[] : p.imagenes;
-          final auth = ref.watch(authProvider);
+    return FutureBuilder<ProductoPublico>(
+      future: _future,
+      builder: (context, snapshot) {
+        final producto = snapshot.data;
+        final marca = producto == null
+            ? AppColors.brandDark
+            : colorMarca(producto.tiendaColor);
+        _temaTienda = producto == null ? null : _tema(context, marca);
+        final logo = producto?.tiendaLogo;
+        return Theme(
+          data: _temaTienda ?? Theme.of(context),
+          child: Scaffold(
+            appBar: AppBar(
+              title: producto == null
+                  ? const Text('PRODUCTO')
+                  : logo != null && logo.isNotEmpty
+                  ? SizedBox(
+                      height: 36,
+                      width: 140,
+                      child: ImagenTienda(
+                        logo,
+                        contorno: logo.startsWith('http'),
+                      ),
+                    )
+                  : Text(producto.tiendaNombre.toUpperCase()),
+            ),
+            body: Builder(
+              builder: (context) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return const Center(child: Text('Producto no encontrado.'));
+                }
+                final p = producto!;
+                final imagenes = p.imagenes.isEmpty ? <String>[] : p.imagenes;
+                final auth = ref.watch(authProvider);
 
-          return ListView(
-            padding: EdgeInsets.only(bottom: 32 + MediaQuery.of(context).padding.bottom),
-            children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: imagenes.isEmpty
-                    ? Container(color: AppColors.grayBorderLight)
-                    : CachedNetworkImage(imageUrl: imagenes[_activeImage], fit: BoxFit.cover),
-              ),
-              if (imagenes.length > 1)
-                SizedBox(
-                  height: 64,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: imagenes.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) => GestureDetector(
-                      onTap: () => setState(() => _activeImage = i),
-                      child: Container(
-                        width: 56,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: i == _activeImage ? AppColors.brandDark : AppColors.grayBorderLight, width: 2),
-                        ),
-                        child: CachedNetworkImage(imageUrl: imagenes[i], fit: BoxFit.cover),
-                      ),
-                    ),
+                return ListView(
+                  padding: EdgeInsets.only(
+                    bottom: 32 + MediaQuery.of(context).padding.bottom,
                   ),
-                ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(border: Border.all(color: p.agotado ? AppColors.danger : AppColors.grayBorder)),
-                      child: Text(
-                        p.agotado ? 'AGOTADO' : 'EN STOCK',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: p.agotado ? AppColors.danger : AppColors.grayTextDark),
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: imagenes.isEmpty
+                          ? Container(color: AppColors.grayBorderLight)
+                          : CachedNetworkImage(
+                              imageUrl: imagenes[_activeImage],
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    if (imagenes.length > 1)
+                      SizedBox(
+                        height: 64,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          itemCount: imagenes.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (context, i) => GestureDetector(
+                            onTap: () => setState(() => _activeImage = i),
+                            child: Container(
+                              width: 56,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: i == _activeImage
+                                      ? marca
+                                      : AppColors.grayBorderLight,
+                                  width: 2,
+                                ),
+                              ),
+                              child: CachedNetworkImage(
+                                imageUrl: imagenes[i],
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    EyebrowText(p.marcaNombre),
-                    Text(
-                      p.nombre,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.brandDark),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (p.tieneDescuento) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: p.agotado
+                                    ? AppColors.danger
+                                    : AppColors.grayBorder,
+                              ),
+                            ),
+                            child: Text(
+                              p.agotado ? 'AGOTADO' : 'EN STOCK',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: p.agotado
+                                    ? AppColors.danger
+                                    : AppColors.grayTextDark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          EyebrowText(p.marcaNombre),
+                          _VendidoPor(producto: p, marca: marca),
+                          const SizedBox(height: 10),
                           Text(
-                            '${p.precioOriginal!.toStringAsFixed(0)} Bs',
-                            style: const TextStyle(color: AppColors.grayText, decoration: TextDecoration.lineThrough),
+                            p.nombre,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: marca,
+                            ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (p.tieneDescuento) ...[
+                                Text(
+                                  '${p.precioOriginal!.toStringAsFixed(0)} Bs',
+                                  style: const TextStyle(
+                                    color: AppColors.grayText,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                '${p.precio.toStringAsFixed(0)} Bs',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: marca,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 32),
+                          Text(
+                            p.descripcion ?? 'Este producto no tiene una descripcion detallada todavia.',
+                          ),
+                          const Divider(height: 32),
+                          if (auth.mostrarAccionCliente('CU13'))
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                              onPressed: p.agotado
+                                  ? null
+                                  : () => _abrirAgregarCarrito(p.id, p.nombre),
+                              child: Text(
+                                p.agotado ? 'SIN STOCK' : 'AÑADIR AL CARRITO',
+                              ),
+                            ),
+                          if (p.hasPhotos &&
+                              auth.mostrarAccionCliente('CU09')) ...[
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: () => _abrirProbadorAr(p.id),
+                              icon: const Icon(Icons.camera_alt_outlined),
+                              label: const Text(
+                                'PROBARME CON REALIDAD AUMENTADA',
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                                foregroundColor: marca,
+                                side: BorderSide(color: marca),
+                                shape: const RoundedRectangleBorder(),
+                              ),
+                            ),
+                          ],
+                          if (!p.agotado &&
+                              auth.mostrarAccionCliente('CU10')) ...[
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: () => _abrirReserva(p.id, p.nombre),
+                              icon: const Icon(Icons.calendar_today_outlined),
+                              label: const Text('RESERVAR'),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                                foregroundColor: marca,
+                                side: BorderSide(color: marca),
+                                shape: const RoundedRectangleBorder(),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              const Text(
+                                'Sucursales con stock: ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  p.sucursalesDisponibles.isEmpty
+                                      ? 'Sin stock por el momento'
+                                      : p.sucursalesDisponibles.join(', '),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.grayTextDark,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Text(
+                                'Categoria: ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                p.categoriaNombre,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.grayTextDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Text(
+                                'Temporada: ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                p.temporadaNombre,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.grayTextDark,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
-                        Text(
-                          '${p.precio.toStringAsFixed(0)} Bs',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.brandDark),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 32),
-                    Text(p.descripcion ?? 'Este producto no tiene una descripcion detallada todavia.'),
-                    const Divider(height: 32),
-                    if (auth.mostrarAccionCliente('CU13'))
-                      ElevatedButton(
-                        onPressed: p.agotado ? null : () => _abrirAgregarCarrito(p.id, p.nombre),
-                        child: Text(p.agotado ? 'SIN STOCK' : 'ANADIR AL CARRITO'),
                       ),
-                    if (p.hasPhotos && auth.mostrarAccionCliente('CU09')) ...[
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: () => _abrirProbadorAr(p.id),
-                        icon: const Icon(Icons.camera_alt_outlined),
-                        label: const Text('PROBARME CON REALIDAD AUMENTADA'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          foregroundColor: AppColors.brandDark,
-                          side: const BorderSide(color: AppColors.brandDark),
-                          shape: const RoundedRectangleBorder(),
-                        ),
-                      ),
-                    ],
-                    if (!p.agotado && auth.mostrarAccionCliente('CU10')) ...[
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: () => _abrirReserva(p.id, p.nombre),
-                        icon: const Icon(Icons.calendar_today_outlined),
-                        label: const Text('RESERVAR'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          foregroundColor: AppColors.brandDark,
-                          side: const BorderSide(color: AppColors.brandDark),
-                          shape: const RoundedRectangleBorder(),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        const Text('Sucursales con stock: ', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                        Expanded(
-                          child: Text(
-                            p.sucursalesDisponibles.isEmpty ? 'Sin stock por el momento' : p.sucursalesDisponibles.join(', '),
-                            style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark),
-                          ),
-                        ),
-                      ],
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Text('Categoria: ', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                        Text(p.categoriaNombre, style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Text('Temporada: ', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                        Text(p.temporadaNombre, style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark)),
-                      ],
-                    ),
+                    _RelacionadosSection(productoId: p.id),
                   ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// "Vendido por (tienda) · Ver su catalogo": lleva a la pagina de la boutique
+/// que vende la prenda (`producto-info__vendedor` en la web).
+class _VendidoPor extends StatelessWidget {
+  const _VendidoPor({required this.producto, required this.marca});
+
+  final ProductoPublico producto;
+  final Color marca;
+
+  @override
+  Widget build(BuildContext context) {
+    if (producto.tienda.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: marca.withValues(alpha: 0.06),
+      child: InkWell(
+        onTap: () => context.push('/tienda/${producto.tienda}'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: marca.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.storefront_outlined, size: 20, color: marca),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    text: 'Vendido por ',
+                    children: [
+                      TextSpan(
+                        text: producto.tiendaNombre,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  style: TextStyle(fontSize: 13, color: marca),
                 ),
               ),
-              _RelacionadosSection(productoId: p.id),
+              Text(
+                'Ver su catálogo →',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: marca,
+                ),
+              ),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -260,7 +517,8 @@ class _RelacionadosSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final relacionados = ref.watch(relacionadosProvider(productoId)).valueOrNull ?? [];
+    final relacionados =
+        ref.watch(relacionadosProvider(productoId)).valueOrNull ?? [];
     if (relacionados.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -272,12 +530,21 @@ class _RelacionadosSection extends ConsumerWidget {
           const SizedBox(height: 24),
           const Text(
             'TAMBIEN TE PUEDE INTERESAR',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, fontStyle: FontStyle.italic, color: AppColors.brandDark),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              fontStyle: FontStyle.italic,
+              color: AppColors.brandDark,
+            ),
           ),
           const SizedBox(height: 4),
           const Text(
             'Elegido segun lo que estas viendo -- con ayuda de IA.',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.grayText),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.grayText,
+            ),
           ),
           const SizedBox(height: 16),
           GridView.builder(
