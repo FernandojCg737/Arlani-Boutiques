@@ -82,7 +82,7 @@ class _AtelierAranierAppState extends ConsumerState<AtelierAranierApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Atelier Aranier',
+      title: 'Arlani Boutiques',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: router,
@@ -96,15 +96,19 @@ class _BootstrapSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Arlani Boutiques: el logo completo (bolsito + letras) sobre azul noche.
     return Scaffold(
-      backgroundColor: AppColors.brandDark,
+      backgroundColor: const Color(0xFF1F2A44),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset('assets/logo.png', width: 220),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Image.asset('assets/arlani_logo_completo.png', width: 300, semanticLabel: 'Arlani Boutiques'),
+            ),
             const SizedBox(height: 40),
-            const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+            const CircularProgressIndicator(color: Color(0xFFF2B8A6), strokeWidth: 3),
           ],
         ),
       ),
