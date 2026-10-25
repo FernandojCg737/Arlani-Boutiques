@@ -6,9 +6,9 @@ import 'features/auth/auth_provider.dart';
 import 'features/storefront/cart_provider.dart';
 import 'widgets/whatsapp_float_button.dart';
 
-/// Shell con barra inferior para las paginas de compra (Catalogos, Carrito,
-/// Cuenta). "Inicio" vuelve a la portada de la plataforma, que va fuera del
-/// shell con su propio encabezado y menu hamburguesa.
+/// Shell con barra inferior para el carrito y la cuenta. "Inicio" y
+/// "Catalogos" llevan a la portada y al catalogo universal, que van fuera del
+/// shell con el encabezado de la plataforma y su menu hamburguesa.
 class RootShell extends ConsumerWidget {
   const RootShell({super.key, required this.navigationShell});
 
@@ -39,14 +39,15 @@ class RootShell extends ConsumerWidget {
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       bottomNavigationBar: BottomNavigationBar(
-        // El indice 0 es "Inicio" (la portada, fuera del shell).
-        currentIndex: navigationShell.currentIndex + 1,
+        // "Inicio" (la portada) y "Catalogos" (el catalogo universal) van fuera
+        // del shell, con el encabezado de la plataforma; Carrito y Cuenta, adentro.
+        currentIndex: navigationShell.currentIndex + 2,
         onTap: (index) {
-          if (index == 0) {
-            context.go('/');
+          if (index < 2) {
+            context.go(index == 0 ? '/' : '/catalogo');
             return;
           }
-          final rama = index - 1;
+          final rama = index - 2;
           navigationShell.goBranch(rama, initialLocation: rama == navigationShell.currentIndex);
         },
         items: [
