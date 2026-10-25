@@ -14,7 +14,21 @@ class ProductoPublico {
     required this.imagenes,
     required this.sucursalesDisponibles,
     required this.hasPhotos,
+    this.tienda = '',
+    this.tiendaNombre = '',
+    this.tiendaLogo,
+    this.tiendaColor,
+    this.publico,
   });
+
+  // Tienda que vende el producto (catalogo universal con todas las tiendas).
+  final String tienda;
+  final String tiendaNombre;
+  final String? tiendaLogo;
+  final String? tiendaColor;
+
+  // Para quien es la prenda: mujer, hombre, ninos, bebes o unisex.
+  final String? publico;
 
   final int id;
   final String nombre;
@@ -59,9 +73,14 @@ class ProductoPublico {
       precio: double.parse(json['precio'].toString()),
       precioOriginal:
           json['precio_original'] == null ? null : double.parse(json['precio_original'].toString()),
-      marcaNombre: json['marca_nombre'] as String,
-      categoriaNombre: json['categoria_nombre'] as String,
-      temporadaNombre: json['temporada_nombre'] as String,
+      marcaNombre: json['marca_nombre'] as String? ?? '',
+      categoriaNombre: json['categoria_nombre'] as String? ?? '',
+      temporadaNombre: json['temporada_nombre'] as String? ?? '',
+      tienda: json['tienda'] as String? ?? '',
+      tiendaNombre: json['tienda_nombre'] as String? ?? '',
+      tiendaLogo: json['tienda_logo'] as String?,
+      tiendaColor: json['tienda_color'] as String?,
+      publico: json['publico'] as String?,
       imagenes: imagenesRaw.map(resolveImageUrl).toList(),
       sucursalesDisponibles:
           (json['sucursales_disponibles'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),

@@ -89,6 +89,7 @@ dependencies:
   permission_handler: ^11.3.1
   # CU01: obtener lat/lng del dispositivo al marcar asistencia.
   geolocator: ^13.0.1
+  visibility_detector: ^0.4.0+2
 
 dev_dependencies:
   flutter_test:
@@ -146,6 +147,7 @@ flutter:
     - assets/whatsapp.svg
     - assets/video/hero.mp4
     - assets/video/tienda-hero.mp4
+    - assets/portada/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -27,10 +27,10 @@ import 'features/auth/perfil_screen.dart';
 import 'features/auth/recuperar_password_screen.dart';
 import 'features/auth/registro_screen.dart';
 import 'features/chatbot/chatbot_screen.dart';
+import 'features/portada/portada_screen.dart';
 import 'features/storefront/carrito_screen.dart';
 import 'features/storefront/checkout_screen.dart';
 import 'features/storefront/cotizaciones_screen.dart';
-import 'features/storefront/home_screen.dart';
 import 'features/storefront/producto_detalle_screen.dart';
 import 'features/storefront/tienda_screen.dart';
 import 'root_shell.dart';
@@ -84,11 +84,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // Portada de la plataforma (encabezado propio con menu hamburguesa).
+      GoRoute(path: '/', builder: (context, state) => const PortadaScreen()),
+      GoRoute(path: '/tienda', redirect: (context, state) => '/catalogo'),
+      GoRoute(path: '/asistente', builder: (context, state) => const ChatbotScreen(universal: true)),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RootShell(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/', builder: (context, state) => const HomeScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/tienda', builder: (context, state) => const TiendaScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/catalogo', builder: (context, state) => const TiendaScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/carrito', builder: (context, state) => const CarritoScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/cuenta', builder: (context, state) => const CuentaTabRedirect())]),
         ],
