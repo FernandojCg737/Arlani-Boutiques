@@ -6,8 +6,8 @@ import 'dart:io' show Platform;
 /// el Postgres local de docker) para todo -- catalogo, login, etc.
 const bool usarBackendProduccion = true;
 
-const String _backendProduccionUrl = 'https://arlani-boutiques-backend.onrender.com';
-const String _frontendProduccionUrl = 'https://arlani-boutiques-frontend.onrender.com';
+const String _backendProduccionUrl = 'https://arlani-boutiques-backend-30l6.onrender.com';
+const String _frontendProduccionUrl = 'https://arlani-boutiques.vercel.app';
 
 /// URL base de la API de FastAPI según la plataforma de ejecución.
 ///
