@@ -12,7 +12,11 @@ import 'chatbot_provider.dart';
 /// hablado) son el equivalente nativo del Web Speech API que usa la web
 /// (`speech_to_text` / `flutter_tts`, ya que ese API no existe en Flutter).
 class ChatbotScreen extends ConsumerStatefulWidget {
-  const ChatbotScreen({super.key});
+  const ChatbotScreen({super.key, this.universal = false});
+
+  /// El asistente de Arlani Boutiques (portada): todas las tiendas, planes y
+  /// como crear una boutique; lo puede usar cualquiera, con o sin sesion.
+  final bool universal;
 
   @override
   ConsumerState<ChatbotScreen> createState() => _ChatbotScreenState();
@@ -29,10 +33,13 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   bool _escuchando = false;
   bool _speechDisponible = false;
 
+  StateNotifierProvider<ChatbotNotifier, ChatbotState> get _chat =>
+      widget.universal ? chatbotUniversalProvider : chatbotProvider;
+
   @override
   void initState() {
     super.initState();
-    ref.read(chatbotProvider.notifier).cargar().whenComplete(() {
+    ref.read(_chat.notifier).cargar().whenComplete(() {
       if (mounted) {
         setState(() => _cargando = false);
         _scrollAlFinal();
@@ -83,10 +90,10 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
   Future<void> _enviar() async {
     final texto = _textoCtrl.text;
-    if (texto.trim().isEmpty || ref.read(chatbotProvider).enviando) return;
+    if (texto.trim().isEmpty || ref.read(_chat).enviando) return;
     _textoCtrl.clear();
 
-    final respuesta = await ref.read(chatbotProvider.notifier).enviar(texto);
+    final respuesta = await ref.read(_chat.notifier).enviar(texto);
     _scrollAlFinal();
     if (respuesta != null && _vozActiva) {
       await _tts.speak(respuesta.mensaje);
@@ -95,11 +102,11 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(chatbotProvider);
+    final state = ref.watch(_chat);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ASISTENTE VIRTUAL'),
+        title: Text(widget.universal ? 'ASISTENTE ARLANI' : 'ASISTENTE VIRTUAL'),
         actions: [
           IconButton(
             icon: Icon(_vozActiva ? Icons.volume_up_outlined : Icons.volume_off_outlined),
@@ -115,13 +122,15 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
               child: _cargando
                   ? const Center(child: CircularProgressIndicator())
                   : state.mensajes.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Padding(
-                            padding: EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(24),
                             child: Text(
-                              'Hola! Preguntame sobre el stock de un producto, precios, sucursales o metodos de pago.',
+                              widget.universal
+                                  ? 'Hola! Preguntame por prendas de todas las tiendas, los planes o cómo crear tu boutique.'
+                                  : 'Hola! Preguntame sobre el stock de un producto, precios, sucursales o metodos de pago.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: AppColors.grayText),
+                              style: const TextStyle(color: AppColors.grayText),
                             ),
                           ),
                         )
