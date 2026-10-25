@@ -26,6 +26,32 @@ final temporadasPublicasProvider = FutureProvider<List<Temporada>>((ref) {
   return ref.watch(catalogoRepositoryProvider).listTemporadas();
 });
 
+/// Sucursales y temporadas de una boutique (null = las de todas), para los
+/// filtros del catalogo universal.
+final sucursalesDeTiendaProvider = FutureProvider.family<List<SucursalPublica>, String?>((ref, tienda) {
+  return ref.watch(catalogoRepositoryProvider).listSucursales(tienda: tienda);
+});
+
+final temporadasDeTiendaProvider = FutureProvider.family<List<Temporada>, String?>((ref, tienda) {
+  return ref.watch(catalogoRepositoryProvider).listTemporadas(tienda: tienda);
+});
+
+/// Para quien es una prenda (`data/publicos.ts`).
+const publicos = [
+  ('mujer', 'Mujer'),
+  ('hombre', 'Hombre'),
+  ('unisex', 'Unisex'),
+  ('nina', 'Niña'),
+  ('nino', 'Niño'),
+  ('bebe', 'Bebé'),
+];
+
+/// Una prenda unisex tambien aparece al filtrar Mujer u Hombre.
+bool coincidePublico(String? prenda, String? filtro) {
+  if (filtro == null) return true;
+  return prenda == filtro || (prenda == 'unisex' && (filtro == 'mujer' || filtro == 'hombre'));
+}
+
 /// Categorias reales derivadas de los productos cargados (no una lista fija).
 final categoriasDisponiblesProvider = Provider<List<String>>((ref) {
   final productos = ref.watch(productosPublicosProvider).valueOrNull ?? [];
@@ -59,9 +85,18 @@ class TiendaFiltrosState {
     this.temporada,
     this.precioMin,
     this.precioMax,
+    this.tienda,
+    this.publico,
   });
 
   final String busqueda;
+
+  /// Catalogo universal: subdominio de la boutique elegida (null = todas).
+  final String? tienda;
+
+  /// Para quien: mujer, hombre, nina, nino o bebe (null = todos).
+  final String? publico;
+
   final String? categoria;
   final Set<String> marcas;
   final String? sucursal;
@@ -82,6 +117,10 @@ class TiendaFiltrosState {
     bool clearPrecioMin = false,
     double? precioMax,
     bool clearPrecioMax = false,
+    String? tienda,
+    bool clearTienda = false,
+    String? publico,
+    bool clearPublico = false,
   }) {
     return TiendaFiltrosState(
       busqueda: busqueda ?? this.busqueda,
@@ -91,6 +130,8 @@ class TiendaFiltrosState {
       temporada: clearTemporada ? null : (temporada ?? this.temporada),
       precioMin: clearPrecioMin ? null : (precioMin ?? this.precioMin),
       precioMax: clearPrecioMax ? null : (precioMax ?? this.precioMax),
+      tienda: clearTienda ? null : (tienda ?? this.tienda),
+      publico: clearPublico ? null : (publico ?? this.publico),
     );
   }
 }
@@ -129,6 +170,16 @@ class TiendaFiltrosNotifier extends StateNotifier<TiendaFiltrosState> {
     );
   }
 
+  /// Al cambiar de boutique, la sucursal y la temporada elegidas pueden no ser
+  /// suyas: se limpian (igual que `seleccionarTienda` en tienda-filtros.ts).
+  void setTienda(String? tienda) {
+    state = state.copyWith(tienda: tienda, clearTienda: tienda == null, clearSucursal: true, clearTemporada: true);
+  }
+
+  void setPublico(String? publico) {
+    state = publico == null ? state.copyWith(clearPublico: true) : state.copyWith(publico: publico);
+  }
+
   void limpiarTodo() => state = const TiendaFiltrosState();
 }
 
@@ -143,16 +194,21 @@ final productosFiltradosProvider = Provider<List<ProductoPublico>>((ref) {
   final termino = filtros.busqueda.trim().toLowerCase();
 
   return productos.where((p) {
+    final coincideTienda = filtros.tienda == null || p.tienda == filtros.tienda;
     final coincideBusqueda = termino.isEmpty ||
         p.nombre.toLowerCase().contains(termino) ||
-        p.marcaNombre.toLowerCase().contains(termino);
+        p.marcaNombre.toLowerCase().contains(termino) ||
+        p.tiendaNombre.toLowerCase().contains(termino);
+    final paraQuien = coincidePublico(p.publico, filtros.publico);
     final coincideCategoria = filtros.categoria == null || p.categoriaNombre == filtros.categoria;
     final coincideMarca = filtros.marcas.isEmpty || filtros.marcas.contains(p.marcaNombre);
     final coincideSucursal = filtros.sucursal == null || p.sucursalesDisponibles.contains(filtros.sucursal);
     final coincideTemporada = filtros.temporada == null || p.temporadaNombre == filtros.temporada;
     final coincidePrecioMin = filtros.precioMin == null || p.precio >= filtros.precioMin!;
     final coincidePrecioMax = filtros.precioMax == null || p.precio <= filtros.precioMax!;
-    return coincideBusqueda &&
+    return coincideTienda &&
+        coincideBusqueda &&
+        paraQuien &&
         coincideCategoria &&
         coincideMarca &&
         coincideSucursal &&

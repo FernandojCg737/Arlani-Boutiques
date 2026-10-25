@@ -26,13 +26,13 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/perfil_screen.dart';
 import 'features/auth/recuperar_password_screen.dart';
 import 'features/auth/registro_screen.dart';
+import 'features/catalogo/catalogo_universal_screen.dart';
 import 'features/chatbot/chatbot_screen.dart';
 import 'features/portada/portada_screen.dart';
 import 'features/storefront/carrito_screen.dart';
 import 'features/storefront/checkout_screen.dart';
 import 'features/storefront/cotizaciones_screen.dart';
 import 'features/storefront/producto_detalle_screen.dart';
-import 'features/storefront/tienda_screen.dart';
 import 'root_shell.dart';
 
 /// Mapa ruta admin -> codigo CU requerido, derivado de `admin_menu.dart`
@@ -85,13 +85,17 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       // Portada de la plataforma (encabezado propio con menu hamburguesa).
-      GoRoute(path: '/', builder: (context, state) => const PortadaScreen()),
+      GoRoute(
+        path: '/',
+        builder: (context, state) => PortadaScreen(seccionInicial: state.uri.queryParameters['seccion']),
+      ),
+      // Catalogo universal: todas las boutiques, con el encabezado de la plataforma.
+      GoRoute(path: '/catalogo', builder: (context, state) => const CatalogoUniversalScreen()),
       GoRoute(path: '/tienda', redirect: (context, state) => '/catalogo'),
       GoRoute(path: '/asistente', builder: (context, state) => const ChatbotScreen(universal: true)),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RootShell(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/catalogo', builder: (context, state) => const TiendaScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/carrito', builder: (context, state) => const CarritoScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/cuenta', builder: (context, state) => const CuentaTabRedirect())]),
         ],

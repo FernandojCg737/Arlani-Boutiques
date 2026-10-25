@@ -4,13 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../widgets/whatsapp_float_button.dart';
 import '../auth/auth_provider.dart';
-import '../chatbot/chatbot_panel.dart';
 import '../storefront/cart_provider.dart';
 import '../storefront/catalogo_provider.dart';
 import 'encabezado_plataforma.dart';
 import 'estilo_plataforma.dart';
+import 'flotantes_plataforma.dart';
 import 'hero_plataforma.dart';
 import 'plataforma_data.dart';
 import 'seccion_por_que.dart';
@@ -24,7 +23,11 @@ import 'secciones_vitrina.dart';
 /// por que Arlani, precios, llamado final, cinta de logos y pie, mas los
 /// botones flotantes del asistente universal y de WhatsApp.
 class PortadaScreen extends ConsumerStatefulWidget {
-  const PortadaScreen({super.key});
+  const PortadaScreen({super.key, this.seccionInicial});
+
+  /// Seccion a la que bajar al abrir (desde el menu de otra pagina, ej.
+  /// "Precios" en el catalogo): el nombre de un valor de [SeccionPortada].
+  final String? seccionInicial;
 
   @override
   ConsumerState<PortadaScreen> createState() => _PortadaScreenState();
@@ -35,7 +38,6 @@ class _PortadaScreenState extends ConsumerState<PortadaScreen> {
   final _claves = {for (final s in SeccionPortada.values) s: GlobalKey()};
   bool _solido = false;
   bool _pasoElHero = false;
-  bool _chatAbierto = false;
 
   @override
   void initState() {
@@ -46,6 +48,8 @@ class _PortadaScreenState extends ConsumerState<PortadaScreen> {
       if (ref.read(authProvider).usuario?.isCliente ?? false) {
         ref.read(cartProvider.notifier).cargar();
       }
+      final inicial = SeccionPortada.values.where((s) => s.name == widget.seccionInicial).firstOrNull;
+      if (inicial != null) _irA(inicial);
     });
   }
 
@@ -195,92 +199,8 @@ class _PortadaScreenState extends ConsumerState<PortadaScreen> {
                 onBuscar: _buscar,
               ),
             ),
-            // Panel del asistente universal, sobre la burbuja (`.chatbot-panel`).
-            if (_chatAbierto)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 84 + MediaQuery.paddingOf(context).bottom,
-                height: (MediaQuery.sizeOf(context).height * 0.7).clamp(0.0, 520.0),
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: const ChatbotPanel(),
-                  ),
-                ),
-              ),
-            // Asistente universal (izquierda) y WhatsApp (derecha), como en la web.
-            Positioned(
-              left: 20,
-              bottom: 20 + MediaQuery.paddingOf(context).bottom,
-              child: _Flotante(
-                visible: _pasoElHero || _chatAbierto,
-                child: _BotonAsistente(
-                  abierto: _chatAbierto,
-                  onTap: () => setState(() => _chatAbierto = !_chatAbierto),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 16,
-              bottom: 16 + MediaQuery.paddingOf(context).bottom,
-              child: _Flotante(
-                visible: _pasoElHero,
-                child: const WhatsappFloatButton(),
-              ),
-            ),
+            FlotantesPlataforma(visible: _pasoElHero),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Flotante extends StatelessWidget {
-  const _Flotante({required this.visible, required this.child});
-
-  final bool visible;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
-        duration: const Duration(milliseconds: 200),
-        child: child,
-      ),
-    );
-  }
-}
-
-/// Burbuja del asistente universal: coral oscuro (`.chatbot--universal`).
-class _BotonAsistente extends StatelessWidget {
-  const _BotonAsistente({required this.onTap, required this.abierto});
-
-  final VoidCallback onTap;
-  final bool abierto;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Plataforma.coralOscuro,
-      shape: const CircleBorder(),
-      elevation: 6,
-      shadowColor: Colors.black.withValues(alpha: 0.5),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 54,
-          height: 54,
-          child: Icon(
-            abierto ? Icons.close : Icons.chat_bubble_outline,
-            color: Colors.white,
-            semanticLabel: abierto ? 'Cerrar asistente' : 'Asistente Arlani Boutiques',
-          ),
         ),
       ),
     );
