@@ -17,6 +17,11 @@ export interface DetalleCarrito {
   cantidad: number;
   precio_unitario: number;
   subtotal: number;
+  // Boutique que vende la prenda (el carrito se agrupa por tienda).
+  tienda?: string | null;
+  tienda_nombre?: string | null;
+  tienda_logo?: string | null;
+  tienda_color?: string | null;
 }
 
 interface DetalleCarritoApi {
@@ -33,6 +38,10 @@ interface DetalleCarritoApi {
   cantidad: number;
   precio_unitario: string;
   subtotal: string;
+  tienda?: string | null;
+  tienda_nombre?: string | null;
+  tienda_logo?: string | null;
+  tienda_color?: string | null;
 }
 
 interface CarritoApi {

@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, Location } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
@@ -7,6 +7,7 @@ import { environment } from '../../../environments/environment';
 import { BOUTIQUES, Boutique } from '../../data/boutiques';
 import { Auth } from '../../services/auth';
 import { Cart, DetalleCarrito } from '../../services/cart';
+import { rutaTienda } from '../../services/plataforma';
 
 interface GrupoBoutique {
   boutique: Boutique;
@@ -33,14 +34,40 @@ export class Carrito implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   protected readonly auth = inject(Auth);
+  private readonly location = inject(Location);
+
+  // "Seguir comprando" vuelve a la pagina anterior (la tienda o el producto
+  // desde donde se llego). Si se entro directo al carrito, va al catalogo.
+  protected volver(): void {
+    const navegacion = (history.state as { navigationId?: number } | null)?.navigationId ?? 1;
+    if (navegacion > 1) this.location.back();
+    else void this.router.navigateByUrl('/catalogo');
+  }
 
   // Carrito de la plataforma: las prendas se agrupan por la boutique que las
-  // vende. TODO: cuando el detalle del carrito traiga la empresa (módulo
-  // multiempresa), agrupar por ese dato; hoy todas son de la única boutique.
+  // vende (el backend manda la tienda de cada prenda, con su nombre y logo).
   protected readonly grupos = computed<GrupoBoutique[]>(() => {
-    const items = this.cart.items();
-    if (items.length === 0) return [];
-    return [{ boutique: BOUTIQUES[0], items, subtotal: items.reduce((suma, i) => suma + i.subtotal, 0) }];
+    const grupos = new Map<string, GrupoBoutique>();
+    for (const item of this.cart.items()) {
+      const id = item.tienda ?? BOUTIQUES[0].id;
+      let grupo = grupos.get(id);
+      if (!grupo) {
+        const boutique: Boutique = item.tienda
+          ? {
+              id: item.tienda,
+              nombre: item.tienda_nombre ?? item.tienda,
+              logo: item.tienda_logo ?? BOUTIQUES[0].logo,
+              ciudad: '',
+              ruta: rutaTienda(item.tienda),
+            }
+          : BOUTIQUES[0];
+        grupo = { boutique, items: [], subtotal: 0 };
+        grupos.set(id, grupo);
+      }
+      grupo.items.push(item);
+      grupo.subtotal += item.subtotal;
+    }
+    return [...grupos.values()];
   });
 
   // Reservar el carrito entero: en vez de pagar ahora, retiene el stock y le

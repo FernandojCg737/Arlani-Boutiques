@@ -23,6 +23,7 @@ def _get_cliente_o_403(db: Session, usuario: Usuario) -> Cliente:
 def _query_con_detalles(db: Session):
     return db.query(Carrito).options(
         joinedload(Carrito.detalles).joinedload(DetalleCarrito.producto).joinedload(Producto.imagenes),
+        joinedload(Carrito.detalles).joinedload(DetalleCarrito.producto).joinedload(Producto.empresa),
         joinedload(Carrito.detalles).joinedload(DetalleCarrito.talla),
         joinedload(Carrito.detalles).joinedload(DetalleCarrito.color),
         joinedload(Carrito.detalles).joinedload(DetalleCarrito.sucursal),
@@ -44,6 +45,7 @@ def _to_detalle_out(d: DetalleCarrito) -> DetalleCarritoOut:
     # cobrar, asi que el total que ve el cliente es el que se le cobra.
     precio = d.producto.precio
     subtotal = precio * d.cantidad
+    empresa = d.producto.empresa
     return DetalleCarritoOut(
         id=d.id,
         producto_id=d.producto_id,
@@ -58,6 +60,10 @@ def _to_detalle_out(d: DetalleCarrito) -> DetalleCarritoOut:
         cantidad=d.cantidad,
         precio_unitario=precio,
         subtotal=subtotal,
+        tienda=empresa.subdominio if empresa else None,
+        tienda_nombre=empresa.nombre if empresa else None,
+        tienda_logo=empresa.logo_url if empresa else None,
+        tienda_color=empresa.color_marca if empresa else None,
     )
 
 

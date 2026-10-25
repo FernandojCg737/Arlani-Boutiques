@@ -137,7 +137,10 @@ class TiendaFiltrosState {
 }
 
 class TiendaFiltrosNotifier extends StateNotifier<TiendaFiltrosState> {
-  TiendaFiltrosNotifier() : super(const TiendaFiltrosState());
+  TiendaFiltrosNotifier([this._fija]) : super(TiendaFiltrosState(tienda: _fija));
+
+  /// Boutique del catalogo propio (null en el universal): "Limpiar" no la quita.
+  final String? _fija;
 
   void setBusqueda(String value) => state = state.copyWith(busqueda: value);
 
@@ -180,17 +183,26 @@ class TiendaFiltrosNotifier extends StateNotifier<TiendaFiltrosState> {
     state = publico == null ? state.copyWith(clearPublico: true) : state.copyWith(publico: publico);
   }
 
-  void limpiarTodo() => state = const TiendaFiltrosState();
+  void limpiarTodo() => state = TiendaFiltrosState(tienda: _fija);
+
+  /// Al entrar a un catalogo los filtros empiezan limpios; la busqueda
+  /// escrita (ej. desde el menu de la portada) se conserva.
+  void entrarCatalogo() => state = TiendaFiltrosState(busqueda: state.busqueda, tienda: _fija);
 }
 
-final tiendaFiltrosProvider = StateNotifierProvider<TiendaFiltrosNotifier, TiendaFiltrosState>(
-  (ref) => TiendaFiltrosNotifier(),
+/// Filtros de cada catalogo: null = el catalogo universal; un subdominio = el
+/// catalogo propio de esa boutique (fijo a ella). Cada uno guarda los suyos.
+final filtrosCatalogoProvider = StateNotifierProvider.family<TiendaFiltrosNotifier, TiendaFiltrosState, String?>(
+  (ref, tienda) => TiendaFiltrosNotifier(tienda),
 );
 
-/// Lista filtrada final que consume la grilla de la tienda.
-final productosFiltradosProvider = Provider<List<ProductoPublico>>((ref) {
+/// Los filtros del catalogo universal.
+final tiendaFiltrosProvider = filtrosCatalogoProvider(null);
+
+/// Lista filtrada final que consume la grilla de cada catalogo.
+final productosDeCatalogoProvider = Provider.family<List<ProductoPublico>, String?>((ref, catalogo) {
   final productos = ref.watch(productosPublicosProvider).valueOrNull ?? [];
-  final filtros = ref.watch(tiendaFiltrosProvider);
+  final filtros = ref.watch(filtrosCatalogoProvider(catalogo));
   final termino = filtros.busqueda.trim().toLowerCase();
 
   return productos.where((p) {
@@ -217,6 +229,9 @@ final productosFiltradosProvider = Provider<List<ProductoPublico>>((ref) {
         coincidePrecioMax;
   }).toList();
 });
+
+/// La grilla del catalogo universal.
+final productosFiltradosProvider = productosDeCatalogoProvider(null);
 
 /// "Novedades": los 4 productos con id mas alto (no hay fecha de alta propia
 /// en el catalogo, igual criterio que se uso en la web).

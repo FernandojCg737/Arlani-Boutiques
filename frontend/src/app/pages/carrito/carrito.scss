@@ -49,6 +49,11 @@
 }
 
 .carrito__volver {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;

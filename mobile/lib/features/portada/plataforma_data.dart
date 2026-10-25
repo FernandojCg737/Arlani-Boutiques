@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +39,86 @@ class TiendaResumen {
       );
 }
 
+/// Sucursal publica de una tienda (en GET /tiendas/{subdominio}).
+class SucursalTienda {
+  const SucursalTienda({required this.nombre, required this.direccion, required this.ciudad, this.horario, this.telefono});
+
+  final String nombre;
+  final String direccion;
+  final String ciudad;
+  final String? horario;
+  final String? telefono;
+
+  factory SucursalTienda.fromJson(Map<String, dynamic> json) => SucursalTienda(
+        nombre: json['nombre'] as String,
+        direccion: json['direccion'] as String? ?? '',
+        ciudad: json['ciudad'] as String? ?? '',
+        horario: json['horario_atencion'] as String?,
+        telefono: json['telefono'] as String?,
+      );
+}
+
+/// Datos publicos de una tienda (GET /tiendas/{subdominio}): su marca (color
+/// y logo, los que la tienda guardo al crearse o al editar su perfil), su
+/// estado y sus sucursales. Es lo que pinta su pagina, sus productos y su
+/// grupo en el carrito: una tienda nueva sale con su marca sin tocar la app.
+class TiendaPublica {
+  const TiendaPublica({
+    required this.resumen,
+    required this.estado,
+    required this.tieneCatalogo,
+    required this.sucursales,
+  });
+
+  final TiendaResumen resumen;
+
+  /// 'activa', 'suspendida' o 'vencida' (estas dos no venden).
+  final String estado;
+  final bool tieneCatalogo;
+  final List<SucursalTienda> sucursales;
+
+  factory TiendaPublica.fromJson(Map<String, dynamic> json) => TiendaPublica(
+        resumen: TiendaResumen.fromJson(json),
+        estado: json['estado'] as String? ?? 'activa',
+        tieneCatalogo: json['tiene_catalogo'] as bool? ?? true,
+        sucursales: (json['sucursales'] as List<dynamic>? ?? [])
+            .map((e) => SucursalTienda.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+/// null = la tienda no existe (404).
+final tiendaPublicaProvider = FutureProvider.family<TiendaPublica?, String>((ref, subdominio) async {
+  try {
+    final res = await ref.watch(apiClientProvider).dio.get('/tiendas/$subdominio');
+    return TiendaPublica.fromJson(res.data as Map<String, dynamic>);
+  } on DioException catch (e) {
+    if (e.response?.statusCode == 404) return null;
+    rethrow;
+  }
+});
+
+/// Texto blanco legible sobre el color de una marca: contraste >= 4.5 (WCAG
+/// AA). Un color claro se oscurece lo justo (`colorParaTextoBlanco` en la web).
+Color colorParaTextoBlanco(Color color) {
+  double canal(int c) {
+    final s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : math.pow((s + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  var r = (color.r * 255).round(), g = (color.g * 255).round(), b = (color.b * 255).round();
+  double lum() => 0.2126 * canal(r) + 0.7152 * canal(g) + 0.0722 * canal(b);
+  for (var i = 0; i < 20 && 1.05 / (lum() + 0.05) < 4.5; i++) {
+    r = (r * 0.88).round();
+    g = (g * 0.88).round();
+    b = (b * 0.88).round();
+  }
+  return Color.fromARGB(255, r, g, b);
+}
+
+/// Color de marca de una tienda listo para fondos con texto blanco.
+Color colorMarca(String? hex) => colorParaTextoBlanco(colorDesdeHex(hex));
+
 /// La tienda original (Atelier Aranier): en la vitrina lleva sus tres fotos.
 const tiendaOriginal = 'atelier-aranier';
 
@@ -58,9 +141,8 @@ String enlaceTiendaCorto(String subdominio) {
   return '$host/tienda-$subdominio';
 }
 
-/// Abre la tienda de una boutique. La pagina propia de cada tienda llega en
-/// el siguiente paso de la Fase 1; mientras tanto se abre el catalogo.
-void abrirTienda(BuildContext context, String subdominio) => context.go('/catalogo');
+/// Abre la pagina de una boutique (su marca, su catalogo y sus sucursales).
+void abrirTienda(BuildContext context, String subdominio) => context.push('/tienda/$subdominio');
 
 /// Alta de boutiques (/empezar): por ahora en la web publicada, con el plan y
 /// el periodo elegidos ya cargados.

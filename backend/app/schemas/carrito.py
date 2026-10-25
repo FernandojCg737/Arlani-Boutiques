@@ -30,6 +30,12 @@ class DetalleCarritoOut(BaseModel):
     cantidad: int
     precio_unitario: Decimal
     subtotal: Decimal
+    # Boutique que vende la prenda: el carrito las agrupa por tienda, cada una
+    # con su logo y su color (los que la tienda tiene guardados en la base).
+    tienda: str | None = None
+    tienda_nombre: str | None = None
+    tienda_logo: str | None = None
+    tienda_color: str | None = None
 
 
 class CarritoOut(BaseModel):
