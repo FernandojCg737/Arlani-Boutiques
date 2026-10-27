@@ -120,13 +120,15 @@
             </div>
             <div class="ml__resultado" [class.is-duda]="p.intencion === 'no_entendido'">
               <span>6 · Predicción</span>
-              <strong>{{ etiqueta(p.intencion) }}</strong>
-              <small>confianza {{ p.confianza | percent: '1.0-0' }}</small>
-              <ol>
-                @for (a of p.alternativas; track a.intencion) {
-                  <li>{{ etiqueta(a.intencion) }} · {{ a.probabilidad | percent: '1.0-0' }}</li>
-                }
-              </ol>
+              <div>
+                <strong>{{ etiqueta(p.intencion) }}</strong>
+                <small>confianza {{ p.confianza | percent: '1.0-0' }}</small>
+                <ol>
+                  @for (a of p.alternativas; track a.intencion) {
+                    <li>{{ etiqueta(a.intencion) }} · {{ a.probabilidad | percent: '1.0-0' }}</li>
+                  }
+                </ol>
+              </div>
             </div>
           </div>
         }

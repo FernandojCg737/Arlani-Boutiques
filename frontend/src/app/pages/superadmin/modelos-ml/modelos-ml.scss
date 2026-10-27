@@ -2,17 +2,30 @@
 
 :host {
   display: block;
-  max-width: 1200px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 20px 14px 48px;
+  padding: 20px 16px 48px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 
   @media (min-width: 700px) {
+    max-width: 1200px;
     padding: 28px 32px 64px;
   }
 }
 
+.admin-content {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .admin-content__header {
   margin-bottom: 20px;
+  width: 100%;
+  max-width: 100%;
 
   h1 {
     margin: 4px 0 8px;
@@ -21,6 +34,7 @@
     text-transform: uppercase;
     color: #1f2a44;
     line-height: 1.2;
+    word-break: break-word;
   }
 
   p {
@@ -39,6 +53,10 @@
   margin: 0 0 18px;
   padding: 0;
   list-style: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   @media (max-width: 480px) {
     grid-template-columns: 1fr 1fr;
@@ -53,6 +71,9 @@
     background: #fff;
     border: 1px solid #e5e5e5;
     border-top: 3px solid #1f2a44;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   span {
@@ -64,6 +85,7 @@
   strong {
     font-size: 13.5px;
     color: #1f2a44;
+    word-break: break-word;
   }
 
   small {
@@ -79,9 +101,28 @@
   gap: 2px;
   margin-bottom: 16px;
   border-bottom: 1px solid #e5e5e5;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
-  @media (max-width: 600px) {
-    gap: 4px;
+  @media (max-width: 640px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    button {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      padding: 9px 12px;
+      font-size: 11.5px;
+    }
   }
 
   button {
@@ -96,11 +137,7 @@
     text-transform: uppercase;
     color: #888;
     cursor: pointer;
-
-    @media (max-width: 600px) {
-      padding: 8px 10px;
-      font-size: 11px;
-    }
+    white-space: nowrap;
 
     &.is-activa {
       color: #1f2a44;
@@ -114,6 +151,11 @@
   padding: 20px;
   background: #fff;
   border: 1px solid #e5e5e5;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 
   @media (max-width: 600px) {
     padding: 14px;
@@ -126,6 +168,7 @@
     font-weight: 800;
     text-transform: uppercase;
     color: #1f2a44;
+    word-break: break-word;
   }
 }
 
@@ -134,6 +177,15 @@
   grid-template-columns: 1fr auto;
   gap: 12px 20px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+
+  > div {
+    min-width: 0;
+    max-width: 100%;
+  }
 
   @media (max-width: 640px) {
     grid-template-columns: 1fr;
@@ -163,6 +215,8 @@
   font-size: 13px;
   color: #777;
   line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .ml__boton {
@@ -176,6 +230,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
+  white-space: nowrap;
 
   &:disabled {
     opacity: 0.5;
@@ -186,6 +241,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   @media (max-width: 480px) {
     grid-template-columns: 1fr 1fr;
@@ -198,6 +257,8 @@
     gap: 2px;
     padding: 10px 12px;
     background: #f7f7f5;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   span {
@@ -223,14 +284,20 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   input,
   select {
     flex: 1;
     min-width: 220px;
+    max-width: 100%;
     padding: 10px 12px;
     border: 1px solid #ddd;
     font: inherit;
+    box-sizing: border-box;
   }
 
   @media (max-width: 520px) {
@@ -254,6 +321,8 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 14px;
+  width: 100%;
+  max-width: 100%;
 
   button {
     border: 1px solid #ddd;
@@ -269,6 +338,10 @@
 .ml__pasos {
   display: grid;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   > div {
     display: grid;
@@ -277,6 +350,9 @@
     align-items: start;
     padding-bottom: 10px;
     border-bottom: 1px solid #f0f0f0;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 
     @media (max-width: 640px) {
       grid-template-columns: 1fr;
@@ -287,6 +363,12 @@
       font-size: 12px;
       font-weight: 700;
       color: #555;
+    }
+
+    > div {
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
     }
   }
 
@@ -320,6 +402,9 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 
   li {
     display: grid;
@@ -327,6 +412,8 @@
     gap: 8px;
     align-items: center;
     font-size: 12px;
+    min-width: 0;
+    max-width: 100%;
 
     @media (max-width: 640px) {
       grid-template-columns: 100px 1fr 45px;
@@ -365,10 +452,11 @@
   small {
     margin-left: 8px;
     color: #777;
+    font-size: 12px;
   }
 
   ol {
-    margin: 6px 0 0;
+    margin: 8px 0 0;
     padding-left: 18px;
     font-size: 12px;
     color: #666;
@@ -379,15 +467,20 @@
   }
 }
 
-.ml__tabla-wrap {
+.ml__tabla-wrap,
+.ml__matriz-wrap {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin-bottom: 8px;
+  box-sizing: border-box;
 }
 
 .ml__tabla {
   width: 100%;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 13px;
   white-space: nowrap;
@@ -416,19 +509,23 @@
 .ml__dos {
   display: grid;
   gap: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   @media (min-width: 1000px) {
     grid-template-columns: 1fr 1fr;
   }
 
+  > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .ml__bloque {
     margin: 0 0 18px;
   }
-}
-
-.ml__matriz-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .ml__matriz {
@@ -475,6 +572,8 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
+  width: 100%;
+  max-width: 100%;
 
   span {
     padding: 4px 10px;
@@ -492,6 +591,8 @@
   padding: 0;
   list-style: none;
   font-size: 13px;
+  width: 100%;
+  max-width: 100%;
 
   li {
     display: flex;
@@ -516,6 +617,8 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
+  width: 100%;
+  max-width: 100%;
 
   button {
     display: flex;
@@ -530,6 +633,7 @@
     color: #1f2a44;
     text-align: left;
     cursor: pointer;
+    max-width: 100%;
 
     &.is-activa {
       border-color: #1f2a44;
@@ -549,6 +653,8 @@
   font-size: 13px;
   color: #666;
   line-height: 1.45;
+  width: 100%;
+  max-width: 100%;
 }
 
 .ml__lenguaje {
@@ -559,6 +665,11 @@
   font-size: 13px;
   color: #555;
   line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
   &.is-activo {
     border-left-color: #c4503d;
