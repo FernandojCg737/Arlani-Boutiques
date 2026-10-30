@@ -23,3 +23,12 @@
     font-size: 12px;
   }
 }
+
+// Prenda de una compra con PayPal guardado que no se cobró.
+.offline-no-pagado {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #b3261e;
+}

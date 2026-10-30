@@ -160,7 +160,9 @@
   &--pendiente,
   &--enviando,
   &--error,
-  &--por_pagar {
+  &--por_pagar,
+  &--por_cobrar,
+  &--pago_parcial {
     background: #fff4e0;
     color: #b26a00;
   }
@@ -173,7 +175,8 @@
   }
 
   &--conflicto,
-  &--sin_stock {
+  &--sin_stock,
+  &--no_pagada {
     background: #fdecea;
     color: #b3261e;
   }

@@ -184,7 +184,25 @@
                     <small>{{ entrega() === 'envio' ? 'al recibirla' : 'al recogerla' }}</small>
                   </button>
                 }
+                @if (tienda()?.acepta_paypal && paypalGuardado() !== null) {
+                  <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'paypal_guardado'"
+                          (click)="formaPago.set('paypal_guardado')">
+                    Mi PayPal guardado
+                    <small>{{ paypalGuardado() || 'se cobra al sincronizar' }}</small>
+                  </button>
+                }
               </div>
+              @if (formaPago() === 'paypal_guardado') {
+                <p class="offline-sub">
+                  Verás «Pago enviado». Al volver internet se cobra solo lo que siga con stock y al mismo precio (o menor);
+                  lo demás no se te cobra.
+                </p>
+              } @else if (tienda()?.acepta_paypal && paypalGuardado() === null) {
+                <p class="offline-sub">
+                  ¿Quieres que se cobre sola? <a routerLink="/perfil" [queryParams]="{ tab: 'pagos' }">Guarda tu PayPal en Mi cuenta</a>
+                  (con conexión) y descarga el catálogo de nuevo.
+                </p>
+              }
             }
             @if (faltaParaComprar().length && items().length) {
               <ul class="ventas-falta">
@@ -228,9 +246,14 @@
               }
             </td>
             <td>
-              <span class="offline-chip offline-chip--{{ o.estado }}">{{ estadoLabel[o.estado] }}</span>
+              <span class="offline-chip offline-chip--{{ o.estado }}">{{ estadoDe(o) }}</span>
               @if (o.mensaje) {
                 <small class="offline-sub offline-mensaje">{{ o.mensaje }}</small>
+              }
+              @for (n of o.no_pagados ?? []; track $index) {
+                <small class="offline-no-pagado">
+                  <strong>{{ n.producto }} ({{ n.talla }}, {{ n.color }})</strong> · {{ n.motivo }}
+                </small>
               }
               @if (o.tipo === 'pedido' && (o.estado === 'por_pagar' || o.estado === 'sin_stock')) {
                 <a class="offline-link" routerLink="/pagar-compras">{{ o.estado === 'por_pagar' ? 'Pagar ahora' : 'Ver' }}</a>

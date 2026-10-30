@@ -1047,3 +1047,42 @@
     opacity: 0.9;
   }
 }
+
+// PayPal guardado para compras sin conexión (pestaña Métodos de pago).
+.paypal-guardado {
+  align-items: center;
+  margin-bottom: 20px;
+
+  .dash-card__info {
+    flex: 1 1 280px;
+    max-width: 560px;
+  }
+
+  .perfil-alert {
+    margin: 8px 0 0;
+  }
+
+  &__btn {
+    border: none;
+    background: var(--brand-dark);
+    color: #fff;
+    padding: 11px 18px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &.is-secundario {
+      background: #fff;
+      color: var(--brand-dark);
+      border: 1px solid #ddd;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+}

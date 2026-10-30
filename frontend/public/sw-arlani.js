@@ -111,13 +111,15 @@ async function enviarPendientes(db) {
       if (r.estado === 'confirmada') cuenta.confirmadas++;
       else if (r.estado === 'conflicto') cuenta.conflictos++;
       else if (r.estado === 'rechazada') cuenta.rechazadas++;
-      else cuenta.errores++;
+      else if (r.estado === 'error') cuenta.errores++;
       await guardar(db, 'operaciones', {
         ...op,
         estado: r.estado,
         mensaje: r.mensaje,
         venta_id: r.venta_id ?? op.venta_id,
         reserva_id: r.reserva_id ?? op.reserva_id,
+        no_pagados: r.no_pagados ?? null,
+        total_cobrado: r.total_cobrado ?? null,
         intentos: op.intentos + 1,
         ultimo_intento: ahora,
       });

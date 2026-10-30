@@ -71,6 +71,8 @@ class TiendaOfflineOut(BaseModel):
     productos: list[ProductoOfflineOut]
     # La tienda habilito "contra entrega" (compras sin conexion).
     acepta_contra_entrega: bool = False
+    # Recibe pagos con PayPal: se puede comprar con el PayPal guardado.
+    acepta_paypal: bool = False
 
 
 class DireccionOfflineOut(BaseModel):
@@ -86,6 +88,8 @@ class CatalogoClienteOfflineOut(BaseModel):
     tiendas: list[TiendaOfflineOut]
     # Sus direcciones, para elegir envio a domicilio sin conexion.
     direcciones: list[DireccionOfflineOut] = []
+    # Correo del PayPal que guardo para comprar sin conexion (None: no tiene).
+    paypal_guardado: str | None = None
 
     @field_serializer("descargado_en")
     def _fecha(self, value: datetime) -> str | None:
@@ -117,7 +121,9 @@ class OperacionOfflineIn(BaseModel):
     horario_atencion: datetime | None = None
     entrega: str = Field(default="retiro", pattern="^(retiro|envio)$")
     direccion_id: int | None = None
-    forma_pago: str | None = Field(default=None, pattern="^(en_linea|contra_entrega)$")
+    # paypal_guardado: se cobra solo al sincronizar con el PayPal que el
+    # cliente vinculo antes (ver paypal_guardado.py).
+    forma_pago: str | None = Field(default=None, pattern="^(en_linea|contra_entrega|paypal_guardado)$")
     items: list[ItemOfflineIn] = Field(min_length=1, max_length=30)
 
     @field_validator("items")
@@ -138,6 +144,10 @@ class ResultadoOperacionOut(BaseModel):
     mensaje: str | None
     venta_id: int | None = None
     reserva_id: int | None = None
+    # Compras con PayPal guardado: lo que NO se cobro y por que (producto,
+    # talla, color, motivo), y lo que si se cobro.
+    no_pagados: list[dict] | None = None
+    total_cobrado: Decimal | None = None
 
 
 class EstadoOperacionesIn(BaseModel):

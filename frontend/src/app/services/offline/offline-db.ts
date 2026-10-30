@@ -44,12 +44,15 @@ export interface TiendaLocal {
   sucursales: { id: number; nombre: string }[];
   productos: ProductoLocal[];
   acepta_contra_entrega?: boolean;
+  acepta_paypal?: boolean;
 }
 
 export interface CatalogoCliente {
   descargado_en: string;
   tiendas: TiendaLocal[];
   direcciones?: { id: number; alias: string; direccion: string }[];
+  // Correo del PayPal guardado ('' si PayPal no lo dio); null: no tiene.
+  paypal_guardado?: string | null;
 }
 
 export interface PaqueteGuardado {
@@ -72,7 +75,21 @@ export type EstadoOperacion =
   | 'por_pagar'
   | 'sin_stock'
   | 'pagada'
-  | 'cancelada';
+  | 'cancelada'
+  // Compra con el PayPal guardado: "Pago enviado" hasta que se cobra.
+  | 'por_cobrar'
+  | 'pago_parcial'
+  | 'no_pagada';
+
+// Prenda de una compra con PayPal guardado que no se cobró, y por qué.
+export interface NoPagado {
+  producto: string;
+  talla: string;
+  color: string;
+  pedido: number;
+  disponible: number;
+  motivo: string;
+}
 
 export interface ItemLocal {
   producto_id: number;
@@ -101,7 +118,7 @@ export interface OperacionLocal {
   // Compra del cliente: retiro o envío, y si paga en línea o contra entrega.
   entrega?: 'retiro' | 'envio';
   direccion_id?: number | null;
-  forma_pago?: 'en_linea' | 'contra_entrega' | null;
+  forma_pago?: 'en_linea' | 'contra_entrega' | 'paypal_guardado' | null;
   items: ItemLocal[];
   total: number;
   estado: EstadoOperacion;
@@ -110,6 +127,10 @@ export interface OperacionLocal {
   reserva_id: number | null;
   intentos: number;
   ultimo_intento: string | null;
+  // Resultado del cobro con el PayPal guardado.
+  no_pagados?: NoPagado[] | null;
+  total_cobrado?: string | null;
+  cobro_visto?: boolean;
 }
 
 export interface RegistroSync {
