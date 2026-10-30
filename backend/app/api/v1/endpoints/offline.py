@@ -222,15 +222,66 @@ def paquete_sucursal(
     )
 
 
+def _solo_cliente(usuario: Usuario) -> None:
+    if usuario.tipo != "cliente" or cliente_sin_permiso(usuario, "CU10"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "El catálogo sin conexión es para clientes con sesión.")
+
+
+# Huella de todo lo que trae /catalogo-cliente: si no cambio, la app no lo
+# vuelve a descargar (la consulta cada pocos segundos con el perfil abierto).
+_SQL_VERSION_CATALOGO = """
+    WITH tiendas AS (SELECT id, nombre, logo_url FROM empresa WHERE estado = 'activa' AND fn_empresa_con_offline(id)),
+    sucursales AS (SELECT s.id, s.nombre FROM sucursal s JOIN tiendas t ON t.id = s.empresa_id WHERE s.estado = 'activa')
+    SELECT md5(coalesce(string_agg(x, '|' ORDER BY x), '')) FROM (
+        SELECT 't' || id || nombre || coalesce(logo_url, '') AS x FROM tiendas
+        UNION ALL SELECT 's' || id || nombre FROM sucursales
+        UNION ALL
+        SELECT 'i' || i.producto_id || '-' || i.talla_id || '-' || i.color_id || '-' || i.sucursal_id || ':' || i.cantidad
+               || ':' || p.precio || p.nombre || coalesce(p.categoria_id::text, '')
+        FROM inventario i JOIN producto p ON p.id = i.producto_id JOIN sucursales s ON s.id = i.sucursal_id
+        WHERE p.estado = 'activo' AND i.cantidad > 0
+        UNION ALL
+        SELECT 'f' || pi.producto_id || pi.orden || pi.url FROM producto_imagen pi
+        JOIN producto p ON p.id = pi.producto_id JOIN tiendas t ON t.id = p.empresa_id
+        UNION ALL
+        SELECT 'm' || m.id || m.tipo || m.activo || coalesce(m.paypal_email, '') FROM metodo_pago_empresa m
+        JOIN tiendas t ON t.id = m.empresa_id
+        UNION ALL
+        SELECT 'd' || id || alias || direccion || predeterminada FROM direccion_cliente WHERE cliente_id = :c
+        UNION ALL
+        SELECT 'p' || estado || coalesce(correo, '') FROM cliente_paypal_guardado WHERE cliente_id = :c
+    ) partes
+"""
+
+
+@router.get("/catalogo-cliente/version")
+def version_catalogo_cliente(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+) -> dict:
+    """Huella del catalogo sin conexion del cliente (stock, precios, tiendas,
+    direcciones): unos pocos bytes para saber si hay que volver a descargarlo."""
+    _solo_cliente(usuario)
+    return {"version": db.execute(text(_SQL_VERSION_CATALOGO), {"c": usuario.id}).scalar()}
+
+
 @router.get("/catalogo-cliente", response_model=CatalogoClienteOfflineOut)
 def catalogo_cliente(
+    # La app lo descarga sola con el perfil abierto: esas no llenan el seguimiento.
+    automatica: bool = Query(default=False),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ) -> CatalogoClienteOfflineOut:
     """Catalogo de las tiendas que trabajan sin conexion (con stock por
     sucursal), para que el cliente lo consulte y reserve sin internet."""
-    if usuario.tipo != "cliente" or cliente_sin_permiso(usuario, "CU10"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "El catálogo sin conexión es para clientes con sesión.")
+    _solo_cliente(usuario)
+    reciente = automatica and db.execute(
+        text(
+            "SELECT 1 FROM descarga_offline WHERE usuario_id = :u AND tipo = 'cliente' "
+            "AND fecha > now() - interval '30 minutes'"
+        ),
+        {"u": usuario.id},
+    ).first()
     tiendas = db.execute(
         text(
             "SELECT id, nombre, logo_url FROM empresa WHERE estado = 'activa' AND fn_empresa_con_offline(id) ORDER BY nombre"
@@ -250,7 +301,8 @@ def catalogo_cliente(
             ),
             {"e": t["id"]},
         ).mappings().all()
-        _registrar_descarga(db, t["id"], None, usuario.id, "cliente", len({f["id"] for f in filas}), 0)
+        if not reciente:
+            _registrar_descarga(db, t["id"], None, usuario.id, "cliente", len({f["id"] for f in filas}), 0)
         salida.append(
             TiendaOfflineOut(
                 empresa_id=t["id"], nombre=t["nombre"], logo_url=t["logo_url"],

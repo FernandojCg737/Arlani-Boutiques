@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../../services/auth';
 import { Notificaciones } from '../../services/notificaciones';
+import { CatalogoClienteAuto } from '../../services/offline/catalogo-cliente-auto';
 import { checkPassword, isPasswordValid } from '../../utils/password';
 import { MisCambios } from './mis-cambios/mis-cambios';
 import { MisDirecciones } from './mis-direcciones/mis-direcciones';
@@ -143,6 +144,7 @@ export class Perfil implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   protected readonly notificaciones = inject(Notificaciones);
+  private readonly catalogoSinConexion = inject(CatalogoClienteAuto);
 
   protected readonly isCliente = computed(() => this.auth.currentUser()?.tipo === 'cliente');
   protected readonly metodoLabel = METODO_LABEL;
@@ -208,6 +210,8 @@ export class Perfil implements OnInit {
       void this.cargarCompras();
       void this.cargarCambios();
       void this.notificaciones.cargar();
+      // El catálogo sin conexión se descarga ya y se mantiene al día solo.
+      this.catalogoSinConexion.iniciar();
     }
 
     const tabParam = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
