@@ -1,10 +1,8 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { Auth } from '../../services/auth';
+import { CatalogoClienteAuto } from '../../services/offline/catalogo-cliente-auto';
 import { CatalogoCliente, ItemLocal, OfflineDb, ProductoLocal, TiendaLocal, VarianteLocal } from '../../services/offline/offline-db';
 import { ImagenesOffline } from '../../services/offline/imagenes-offline';
 import { Sincronizacion } from '../../services/offline/sincronizacion';
@@ -25,18 +23,18 @@ import { ESTADO_OPERACION } from '../admin/sin-conexion/sin-conexion';
   styleUrls: ['../admin/ventas/ventas.scss', '../admin/sin-conexion/sin-conexion.scss', './sin-conexion-cliente.scss'],
 })
 export class SinConexionCliente implements OnInit {
-  private readonly http = inject(HttpClient);
   private readonly auth = inject(Auth);
   protected readonly db = inject(OfflineDb);
+  protected readonly auto = inject(CatalogoClienteAuto);
   protected readonly sync = inject(Sincronizacion);
   protected readonly imagenes = inject(ImagenesOffline);
 
   protected readonly estadoLabel = ESTADO_OPERACION;
-  protected readonly catalogo = signal<CatalogoCliente | null>(null);
+  // Se descarga y se mantiene al día solo (catalogo-cliente-auto.ts).
+  protected readonly catalogo = this.auto.catalogo;
   protected readonly tiendaId = signal<number | null>(null);
   protected readonly sucursalId = signal<number | null>(null);
   protected readonly buscar = signal('');
-  protected readonly descargando = signal(false);
   protected readonly error = signal('');
   protected readonly aviso = signal('');
 
@@ -92,39 +90,33 @@ export class SinConexionCliente implements OnInit {
 
   protected readonly misOperaciones = computed(() => this.sync.operaciones());
 
-  async ngOnInit(): Promise<void> {
-    const guardado = await this.db.paquete(this.clave);
-    if (guardado) this.usar(guardado.datos as CatalogoCliente);
+  constructor() {
+    // Cada actualización automática: el catálogo nuevo, sin perder la tienda,
+    // la sucursal ni las prendas que el cliente ya eligió.
+    effect(() => {
+      const c = this.catalogo();
+      if (c) untracked(() => this.usar(c));
+    });
   }
 
-  private get clave(): string {
-    return `cliente:${this.auth.currentUser()!.id}`;
-  }
-
-  private urls(c: CatalogoCliente): (string | null)[] {
-    return c.tiendas.flatMap((t) => t.productos.map((p) => p.imagen_url));
+  ngOnInit(): void {
+    this.auto.iniciar();
   }
 
   private usar(c: CatalogoCliente): void {
-    this.catalogo.set(c);
-    void this.imagenes.cargar(this.urls(c));
-    const t = c.tiendas.find((x) => x.empresa_id === this.tiendaId()) ?? c.tiendas[0] ?? null;
+    void this.imagenes.cargar(this.auto.urls(c));
+    if (c.tiendas.some((x) => x.empresa_id === this.tiendaId())) return;
+    const t = c.tiendas[0] ?? null;
     if (t) this.elegirTienda(t.empresa_id);
   }
 
   protected async descargar(): Promise<void> {
-    this.descargando.set(true);
     this.error.set('');
     try {
-      const c = await firstValueFrom(this.http.get<CatalogoCliente>(`${environment.apiUrl}/offline/catalogo-cliente`));
-      await this.db.guardarPaquete({ clave: this.clave, usuario_id: this.auth.currentUser()!.id, descargado_en: c.descargado_en, datos: c });
-      const fotos = await this.imagenes.descargar(this.urls(c));
-      this.usar(c);
-      this.aviso.set(`Catálogo guardado en este dispositivo (con ${fotos} fotos): puedes verlo, reservar y comprar sin internet.`);
+      await this.auto.revisar(true);
+      this.aviso.set('Catálogo actualizado: puedes verlo, reservar y comprar sin internet.');
     } catch (err) {
       this.error.set(mensajeError(err, 'No se pudo descargar: necesitas conexión.'));
-    } finally {
-      this.descargando.set(false);
     }
   }
 

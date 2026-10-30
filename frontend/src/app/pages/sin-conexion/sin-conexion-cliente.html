@@ -9,8 +9,8 @@
         contra entrega).
       </p>
     </div>
-    <button type="button" class="ventas-nueva-btn" [disabled]="!sync.enLinea() || descargando()" (click)="descargar()">
-      {{ descargando() ? 'Descargando…' : catalogo() ? 'Actualizar catálogo' : 'Descargar catálogo' }}
+    <button type="button" class="ventas-nueva-btn" [disabled]="!sync.enLinea() || auto.descargando()" (click)="descargar()">
+      {{ auto.descargando() && !catalogo() ? 'Descargando…' : catalogo() ? 'Actualizar catálogo' : 'Descargar catálogo' }}
     </button>
   </div>
 
@@ -40,6 +40,9 @@
   @if (catalogo(); as c) {
     <p class="offline-sub cliente-offline__fecha">
       Catálogo guardado {{ hace(c.descargado_en) }} ({{ c.descargado_en | date: 'dd/MM/yyyy HH:mm' }}).
+      @if (sync.enLinea()) {
+        Se mantiene al día solo mientras tengas internet.
+      }
       @if (desactualizado() || !sync.enLinea()) {
         <span class="offline-viejo">El stock puede haber cambiado: la tienda lo confirma al recibir tu reserva.</span>
       }
@@ -220,7 +223,9 @@
       }
     }
   } @else {
-    <p class="offline-vacio">Descarga el catálogo mientras tienes internet para poder usarlo sin conexión.</p>
+    <p class="offline-vacio">
+      {{ sync.enLinea() ? 'Descargando el catálogo…' : 'Conéctate a internet una vez para descargar el catálogo y usarlo sin conexión.' }}
+    </p>
   }
 
   <h2 class="offline-titulo">Mis reservas y compras sin conexión</h2>
