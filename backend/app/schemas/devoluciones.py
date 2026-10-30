@@ -33,6 +33,11 @@ class DevolucionCreate(BaseModel):
         return value
 
 
+class DevolucionRechazoIn(BaseModel):
+    # Por que se rechaza: va en la notificacion y en el correo al cliente.
+    motivo: str | None = Field(default=None, max_length=500)
+
+
 class DetalleDevolucionOut(BaseModel):
     id: int
     item_linea_id: int
@@ -55,6 +60,7 @@ class DevolucionOut(BaseModel):
     fecha_solicitud: datetime
     fecha_resolucion: datetime | None
     observaciones: str | None
+    motivo_rechazo: str | None = None
     detalles: list[DetalleDevolucionOut]
 
     @field_serializer("fecha_solicitud", "fecha_resolucion")
