@@ -41,14 +41,19 @@ def _base_url(cuenta: CuentaPaypal) -> str:
     return PAYPAL_BASE_URLS.get(cuenta.modo, PAYPAL_BASE_URLS["sandbox"])
 
 
-def _obtener_token_acceso(cuenta: CuentaPaypal) -> str:
-    """Token OAuth2 de PayPal (client_credentials). Se pide uno nuevo en cada
+def _obtener_token_acceso(cuenta: CuentaPaypal, nuevo: bool = False) -> str:
+    """Token OAuth2 de PayPal (client_credentials). Se pide uno en cada
     llamada por simplicidad -- el volumen de este proyecto no justifica
-    cachearlo hasta que expire (~9 horas)."""
+    cachearlo hasta que expire (~9 horas). PayPal igual devuelve el mismo
+    mientras no vence; `nuevo` lo obliga a emitir otro (p. ej. despues de
+    activar una funcion en la app, cuyo permiso el token viejo no trae)."""
+    datos = {"grant_type": "client_credentials"}
+    if nuevo:
+        datos["ignoreCache"] = "true"
     resp = requests.post(
         f"{_base_url(cuenta)}/v1/oauth2/token",
         auth=(cuenta.client_id, cuenta.secret),
-        data={"grant_type": "client_credentials"},
+        data=datos,
         timeout=15,
     )
     if not resp.ok:
@@ -56,8 +61,17 @@ def _obtener_token_acceso(cuenta: CuentaPaypal) -> str:
     return resp.json()["access_token"]
 
 
-def _cabeceras(cuenta: CuentaPaypal) -> dict:
-    return {"Authorization": f"Bearer {_obtener_token_acceso(cuenta)}", "Content-Type": "application/json"}
+def _cabeceras(cuenta: CuentaPaypal, nuevo: bool = False) -> dict:
+    return {"Authorization": f"Bearer {_obtener_token_acceso(cuenta, nuevo)}", "Content-Type": "application/json"}
+
+
+def _vault(metodo: str, cuenta: CuentaPaypal, ruta: str, **kwargs) -> requests.Response:
+    """Llamada a Vault; si PayPal dice "sin permisos" se reintenta una vez con
+    un token recien emitido (el anterior puede ser de antes de activar Vault)."""
+    resp = requests.request(metodo, f"{_base_url(cuenta)}{ruta}", headers=_cabeceras(cuenta), **kwargs)
+    if resp.status_code == 403:
+        resp = requests.request(metodo, f"{_base_url(cuenta)}{ruta}", headers=_cabeceras(cuenta, nuevo=True), **kwargs)
+    return resp
 
 
 def verificar_credenciales(cuenta: CuentaPaypal) -> bool:
@@ -241,7 +255,7 @@ def crear_setup_token(return_url: str, cancel_url: str) -> dict:
             }
         }
     }
-    resp = requests.post(f"{_base_url(c)}/v3/vault/setup-tokens", headers=_cabeceras(c), json=body, timeout=20)
+    resp = _vault("POST", c, "/v3/vault/setup-tokens", json=body, timeout=20)
     if not resp.ok:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"PayPal no permitió vincular la cuenta: {_detalle_error(resp)}")
     return resp.json()
@@ -252,7 +266,7 @@ def crear_payment_token(setup_token_id: str) -> dict:
     cobro permanente (id) y dice el correo de la cuenta vinculada."""
     c = _cuenta(None)
     body = {"payment_source": {"token": {"id": setup_token_id, "type": "SETUP_TOKEN"}}}
-    resp = requests.post(f"{_base_url(c)}/v3/vault/payment-tokens", headers=_cabeceras(c), json=body, timeout=20)
+    resp = _vault("POST", c, "/v3/vault/payment-tokens", json=body, timeout=20)
     if not resp.ok:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -265,7 +279,7 @@ def borrar_payment_token(token_id: str) -> bool:
     """Desvincula el PayPal del cliente en PayPal (best effort)."""
     try:
         c = _cuenta(None)
-        resp = requests.delete(f"{_base_url(c)}/v3/vault/payment-tokens/{token_id}", headers=_cabeceras(c), timeout=15)
+        resp = _vault("DELETE", c, f"/v3/vault/payment-tokens/{token_id}", timeout=15)
         return resp.ok or resp.status_code == 404
     except Exception:
         return False
