@@ -28,17 +28,30 @@ def nombre_marca(db: Session, empresa_id: int | None) -> str:
 Adjunto = tuple[str, bytes, str]
 
 
-def send_email(to: str, subject: str, html_body: str, adjuntos: list[Adjunto] | None = None) -> None:
+def send_email(
+    to: str,
+    subject: str,
+    html_body: str,
+    adjuntos: list[Adjunto] | None = None,
+    remitente: str | None = None,
+    responder_a: str | None = None,
+) -> None:
+    """remitente: el nombre que ve el cliente como "De" (ej. la tienda que le
+    escribe); por defecto, la plataforma. responder_a: a donde llega si el
+    cliente responde (ej. el correo de contacto de la tienda)."""
     # Render (plan gratis) bloquea la salida por SMTP (puertos 25/465/587):
     # en produccion el correo sale de la cuenta de Gmail a traves de un Google
     # Apps Script (HTTPS). Sin script configurado (desarrollo local), SMTP.
+    nombre = (remitente or FROM_NAME).strip() or FROM_NAME
     if settings.GMAIL_SCRIPT_URL:
-        _enviar_por_apps_script(to, subject, html_body, adjuntos or [])
+        _enviar_por_apps_script(to, subject, html_body, adjuntos or [], nombre, responder_a)
     else:
-        _enviar_por_smtp(to, subject, html_body, adjuntos or [])
+        _enviar_por_smtp(to, subject, html_body, adjuntos or [], nombre, responder_a)
 
 
-def _enviar_por_apps_script(to: str, subject: str, html_body: str, adjuntos: list[Adjunto]) -> None:
+def _enviar_por_apps_script(
+    to: str, subject: str, html_body: str, adjuntos: list[Adjunto], nombre: str = FROM_NAME, responder_a: str | None = None
+) -> None:
     resp = requests.post(
         settings.GMAIL_SCRIPT_URL,
         json={
@@ -47,7 +60,9 @@ def _enviar_por_apps_script(to: str, subject: str, html_body: str, adjuntos: lis
             "subject": subject,
             "html": html_body,
             "texto": TEXTO_PLANO,
-            "nombre": FROM_NAME,
+            "nombre": nombre,
+            # GmailApp.sendEmail(..., {replyTo}) en el script.
+            "responderA": responder_a or "",
             # El script los convierte en adjuntos (Utilities.newBlob).
             "adjuntos": [
                 {"nombre": n, "mime": m, "base64": base64.b64encode(c).decode("ascii")} for n, c, m in adjuntos
@@ -73,11 +88,15 @@ def _enviar_por_apps_script(to: str, subject: str, html_body: str, adjuntos: lis
         )
 
 
-def _enviar_por_smtp(to: str, subject: str, html_body: str, adjuntos: list[Adjunto]) -> None:
+def _enviar_por_smtp(
+    to: str, subject: str, html_body: str, adjuntos: list[Adjunto], nombre: str = FROM_NAME, responder_a: str | None = None
+) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = formataddr((FROM_NAME, settings.SMTP_FROM))
+    msg["From"] = formataddr((nombre, settings.SMTP_FROM))
     msg["To"] = to
+    if responder_a:
+        msg["Reply-To"] = responder_a
     msg.set_content(TEXTO_PLANO)
     msg.add_alternative(html_body, subtype="html")
     for nombre, contenido, mime in adjuntos:

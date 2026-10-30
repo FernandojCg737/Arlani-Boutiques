@@ -17,6 +17,7 @@ from app.api.deps import (
     verificar_acceso_sucursal,
 )
 from app.core.audit import log_bitacora
+from app.core.aviso_cliente import programar_correo
 from app.db.session import get_db
 from app.models import (
     Cliente,
@@ -38,6 +39,7 @@ from app.schemas.devoluciones import (
     DevolucionClienteOut,
     DevolucionCreate,
     DevolucionOut,
+    DevolucionRechazoIn,
 )
 
 router = APIRouter()
@@ -245,7 +247,24 @@ def _registrar_movimiento(db: Session, inventario_id: int, empleado_id: int, tip
     )
 
 
+# Avisos que ademas llegan por correo (la resolucion de la tienda).
+_TITULOS_CORREO = {
+    "devolucion_completada": "Tu devolución fue aprobada",
+    "devolucion_rechazada": "Tu devolución fue rechazada",
+}
+
+
 def _notificar(db: Session, cliente_id: int, tipo_evento: str, mensaje: str, devolucion_id: int) -> None:
+    titulo = _TITULOS_CORREO.get(tipo_evento)
+    if titulo:
+        empresa_id = db.execute(
+            text(
+                "SELECT s.empresa_id FROM devolucion d JOIN venta v ON v.id = d.venta_id "
+                "JOIN sucursal s ON s.id = v.sucursal_id WHERE d.id = :id"
+            ),
+            {"id": devolucion_id},
+        ).scalar()
+        programar_correo(db, cliente_id, empresa_id, titulo, mensaje)
     db.add(
         Notificacion(
             cliente_id=cliente_id,
@@ -286,6 +305,7 @@ def _to_out(dev: Devolucion, db: Session) -> DevolucionOut:
         fecha_solicitud=dev.fecha_solicitud,
         fecha_resolucion=dev.fecha_resolucion,
         observaciones=dev.observaciones,
+        motivo_rechazo=dev.motivo_rechazo,
         detalles=[_to_detalle_out(d, db) for d in dev.detalles],
     )
 
@@ -565,6 +585,7 @@ def completar_devolucion(
 def rechazar_devolucion(
     devolucion_id: int,
     request: Request,
+    payload: DevolucionRechazoIn | None = None,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso("CU11")),
 ) -> DevolucionAdminOut:
@@ -577,14 +598,18 @@ def rechazar_devolucion(
     if dev.estado != "solicitada":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta devolucion ya fue procesada.")
 
+    motivo = (payload.motivo or "").strip() if payload else ""
     dev.empleado_id = empleado.id
     dev.estado = "rechazada"
     dev.fecha_resolucion = datetime.utcnow()
+    dev.motivo_rechazo = motivo or None
     _notificar(
         db,
         dev.venta.cliente_id,
         "devolucion_rechazada",
-        f"Tu solicitud de devolucion para la compra #{dev.venta_id} fue rechazada.",
+        f"Tu solicitud de devolución para la compra #{dev.venta_id} fue rechazada"
+        + (f": {motivo}" if motivo else ".")
+        + " Si tienes dudas, comunícate con la tienda.",
         dev.id,
     )
     db.commit()

@@ -950,16 +950,46 @@ export class AdminVentas implements OnInit {
     }
   }
 
-  protected async rechazarDevolucion(dev: DevolucionItem): Promise<void> {
-    if (!confirm(`Rechazar la devolucion #${dev.id}?`)) return;
+  // Rechazar una devolucion pide el motivo: el cliente lo ve en su
+  // notificacion y en el correo que le llega.
+  protected readonly devolucionRechazando = signal<DevolucionItem | null>(null);
+  protected readonly motivoDevolucion = signal('');
+  protected readonly errorRechazoDevolucion = signal('');
+  protected readonly motivosDevolucion = [
+    'La prenda tiene señales de uso',
+    'Ya pasó el plazo para devolverla',
+    'La prenda no tiene sus etiquetas',
+    'No coincide con la compra',
+  ];
+
+  protected rechazarDevolucion(dev: DevolucionItem): void {
+    this.devolucionVerModal.set(null);
+    this.motivoDevolucion.set('');
+    this.errorRechazoDevolucion.set('');
+    this.devolucionRechazando.set(dev);
+  }
+
+  protected cerrarRechazoDevolucion(): void {
+    this.devolucionRechazando.set(null);
+  }
+
+  protected async confirmarRechazoDevolucion(): Promise<void> {
+    const dev = this.devolucionRechazando();
+    const motivo = this.motivoDevolucion().trim();
+    if (!dev) return;
+    if (motivo.length < 3) {
+      this.errorRechazoDevolucion.set('Escribe el motivo: el cliente lo verá.');
+      return;
+    }
     this.procesando.set(dev.id);
-    this.error.set('');
+    this.errorRechazoDevolucion.set('');
     try {
-      await firstValueFrom(this.http.post(`${environment.apiUrl}/devoluciones/${dev.id}/rechazar`, {}));
+      await firstValueFrom(this.http.post(`${environment.apiUrl}/devoluciones/${dev.id}/rechazar`, { motivo }));
+      this.devolucionRechazando.set(null);
       await this.cargarDevoluciones();
       await this.load();
     } catch (err) {
-      this.error.set(this.extraerError(err));
+      this.errorRechazoDevolucion.set(this.extraerError(err));
     } finally {
       this.procesando.set(null);
     }

@@ -30,6 +30,7 @@ from app.api.v1.endpoints.ventas import (
     _paypal_de_tienda,
 )
 from app.core.audit import log_bitacora
+from app.core.aviso_cliente import programar_correo
 from app.core.paypal import captura_de, capturar_orden, crear_orden, obtener_orden, reembolsar_captura
 from app.core.storage import upload_comprobante_pago
 from app.db.session import get_db
@@ -116,7 +117,23 @@ def _cambio(db: Session, cambio_id: int, cliente_id: int | None = None):
     return fila
 
 
+# Avisos que ademas llegan por correo (lo que resuelve la tienda).
+_TITULOS_CORREO = {
+    "cambio_aprobado": "Tu cambio de prenda fue aprobado",
+    "cambio_rechazado": "Tu cambio de prenda fue rechazado",
+    "cambio_completado": "Tu cambio de prenda está completo",
+    "cambio_pago_rechazado": "Revisamos el pago de tu cambio",
+}
+
+
 def _notificar(db: Session, cliente_id: int, evento: str, mensaje: str, cambio_id: int) -> None:
+    titulo = _TITULOS_CORREO.get(evento)
+    if titulo:
+        empresa_id = db.execute(
+            text("SELECT s.empresa_id FROM cambio_prenda c JOIN sucursal s ON s.id = c.sucursal_id WHERE c.id = :id"),
+            {"id": cambio_id},
+        ).scalar()
+        programar_correo(db, cliente_id, empresa_id, titulo, mensaje)
     db.add(
         Notificacion(
             cliente_id=cliente_id,

@@ -269,6 +269,8 @@ class Devolucion(Base):
     fecha_solicitud: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     fecha_resolucion: Mapped[datetime | None] = mapped_column(DateTime)
     observaciones: Mapped[str | None] = mapped_column(Text)
+    # Por que la tienda la rechazo (lo ve el cliente en su aviso).
+    motivo_rechazo: Mapped[str | None] = mapped_column(Text)
 
     venta: Mapped["Venta"] = relationship(back_populates="devoluciones")
     empleado: Mapped["Empleado | None"] = relationship()

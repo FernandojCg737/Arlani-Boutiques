@@ -760,6 +760,45 @@
     </div>
   }
 
+  @if (devolucionRechazando(); as d) {
+    <div class="ventas-overlay" (click)="cerrarRechazoDevolucion()">
+      <div class="ventas-modal" (click)="$event.stopPropagation()">
+        <h2>Rechazar la devolución #{{ d.id }}</h2>
+        <p class="ventas-modal__subtitulo">
+          Compra #{{ d.venta_id }} · {{ d.cliente_nombre }}. El cliente recibe el motivo en sus notificaciones y por correo.
+        </p>
+        <div class="ventas-motivos-rapidos">
+          @for (m of motivosDevolucion; track m) {
+            <button type="button" (click)="motivoDevolucion.set(m)">{{ m }}</button>
+          }
+        </div>
+        <label class="ventas-campo">
+          <span>Motivo del rechazo</span>
+          <textarea
+            rows="3"
+            maxlength="500"
+            [value]="motivoDevolucion()"
+            (input)="motivoDevolucion.set($any($event.target).value)"
+          ></textarea>
+        </label>
+        @if (errorRechazoDevolucion()) {
+          <div class="admin-error">{{ errorRechazoDevolucion() }}</div>
+        }
+        <div class="ventas-modal__acciones">
+          <button type="button" class="is-secondary" (click)="cerrarRechazoDevolucion()">Cancelar</button>
+          <button
+            type="button"
+            class="is-danger-solid"
+            [disabled]="procesando() === d.id"
+            (click)="confirmarRechazoDevolucion()"
+          >
+            Rechazar devolución
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
   @if (devolucionVerModal(); as dev) {
     <div class="ventas-overlay" (click)="cerrarVerDevolucion()">
       <div class="ventas-modal devolucion-ver-modal" (click)="$event.stopPropagation()">
