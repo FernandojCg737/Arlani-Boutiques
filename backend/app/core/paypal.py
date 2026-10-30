@@ -199,3 +199,103 @@ def capturar_orden(order_id: str, cuenta: CuentaPaypal | None = None) -> dict:
     if not resp.ok:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "No se pudo confirmar el pago con PayPal.")
     return resp.json()
+
+
+# ---------------------------------------------------- PayPal guardado (Vault)
+# El cliente vincula su PayPal una vez en la cuenta de Arlani (Vault v3): queda
+# un token de cobro que solo sirve a Arlani. Con el, las compras que hizo sin
+# conexion se cobran solas al sincronizar, sin que el cliente apruebe de nuevo.
+# En sandbox la app de PayPal necesita la opcion "Vaulting" habilitada.
+
+
+def _detalle_error(resp: requests.Response) -> str:
+    try:
+        datos = resp.json()
+        detalles = datos.get("details") or []
+        if detalles:
+            return detalles[0].get("description") or detalles[0].get("issue") or datos.get("message", "")
+        return datos.get("message") or resp.text[:200]
+    except ValueError:
+        return resp.text[:200]
+
+
+def crear_setup_token(return_url: str, cancel_url: str) -> dict:
+    """Primer paso de vincular: PayPal devuelve el enlace "approve" donde el
+    cliente inicia sesion y autoriza a Arlani a cobrarle despues."""
+    c = _cuenta(None)
+    body = {
+        "payment_source": {
+            "paypal": {
+                "description": "Compras sin conexión en Arlani Boutiques",
+                "usage_pattern": "IMMEDIATE",
+                "usage_type": "MERCHANT",
+                "customer_type": "CONSUMER",
+                "permit_multiple_payment_tokens": False,
+                "experience_context": {
+                    "brand_name": "Arlani Boutiques",
+                    "locale": "es-ES",
+                    "shipping_preference": "NO_SHIPPING",
+                    "return_url": return_url,
+                    "cancel_url": cancel_url,
+                },
+            }
+        }
+    }
+    resp = requests.post(f"{_base_url(c)}/v3/vault/setup-tokens", headers=_cabeceras(c), json=body, timeout=20)
+    if not resp.ok:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"PayPal no permitió vincular la cuenta: {_detalle_error(resp)}")
+    return resp.json()
+
+
+def crear_payment_token(setup_token_id: str) -> dict:
+    """Segundo paso: con el setup token ya aprobado, PayPal crea el token de
+    cobro permanente (id) y dice el correo de la cuenta vinculada."""
+    c = _cuenta(None)
+    body = {"payment_source": {"token": {"id": setup_token_id, "type": "SETUP_TOKEN"}}}
+    resp = requests.post(f"{_base_url(c)}/v3/vault/payment-tokens", headers=_cabeceras(c), json=body, timeout=20)
+    if not resp.ok:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "PayPal todavía no confirma la vinculación. Aprueba en PayPal y vuelve a intentarlo.",
+        )
+    return resp.json()
+
+
+def borrar_payment_token(token_id: str) -> bool:
+    """Desvincula el PayPal del cliente en PayPal (best effort)."""
+    try:
+        c = _cuenta(None)
+        resp = requests.delete(f"{_base_url(c)}/v3/vault/payment-tokens/{token_id}", headers=_cabeceras(c), timeout=15)
+        return resp.ok or resp.status_code == 404
+    except Exception:
+        return False
+
+
+class CobroRechazado(Exception):
+    """PayPal no cobro con el PayPal guardado (sin fondos, desvinculado...)."""
+
+
+def cobrar_con_token(token_id: str, total: Decimal, referencia: str, idempotencia: str) -> dict:
+    """Cobra `total` (US$) con el PayPal guardado, en la cuenta de Arlani, sin
+    que el cliente intervenga. La orden se crea y se captura en el mismo paso.
+    `idempotencia` (PayPal-Request-Id) evita cobrar dos veces lo mismo si el
+    pedido se reintenta."""
+    c = _cuenta(None)
+    body = {
+        "intent": "CAPTURE",
+        "purchase_units": [
+            {"reference_id": referencia, "amount": {"currency_code": PAYPAL_CURRENCY, "value": f"{total:.2f}"}}
+        ],
+        "payment_source": {"paypal": {"vault_id": token_id}},
+    }
+    cabeceras = {**_cabeceras(c), "PayPal-Request-Id": idempotencia, "Prefer": "return=representation"}
+    resp = requests.post(f"{_base_url(c)}/v2/checkout/orders", headers=cabeceras, json=body, timeout=30)
+    if not resp.ok:
+        raise CobroRechazado(_detalle_error(resp) or "PayPal rechazó el cobro.")
+    orden = resp.json()
+    # Si PayPal la dejo aprobada pero sin capturar, se captura ahora.
+    if orden.get("status") == "APPROVED":
+        orden = capturar_orden(orden["id"])
+    if orden.get("status") != "COMPLETED" or captura_de(orden) is None:
+        raise CobroRechazado("PayPal no completó el cobro.")
+    return orden

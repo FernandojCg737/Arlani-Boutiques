@@ -1,16 +1,53 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComprasPorPagar } from '../../services/offline/compras-por-pagar';
+import { Sincronizacion } from '../../services/offline/sincronizacion';
 
 // Aviso con prioridad: al volver la conexión, si el cliente tiene compras
 // hechas sin conexión por pagar (o que se quedaron sin stock), se le muestra
 // encima de cualquier página para que las revise y pague.
+// Antes que eso, el resultado de las compras pagadas con el PayPal guardado:
+// "Pago finalizado con éxito" o "Pago no finalizado" con cada prenda que no
+// se cobró y por qué.
 @Component({
   selector: 'app-aviso-compras',
   imports: [DecimalPipe],
   template: `
-    @if (servicio.mostrarAviso() && !enPagina()) {
+    @if (sync.cobros().length) {
+      <div class="aviso-fondo" role="dialog" aria-modal="true" aria-labelledby="aviso-cobro-titulo">
+        <div class="aviso" [class.is-exito]="todoCobrado()">
+          <span class="aviso__eyebrow">Tu PayPal guardado</span>
+          <h2 id="aviso-cobro-titulo">{{ todoCobrado() ? 'Pago finalizado con éxito' : 'Pago no finalizado' }}</h2>
+          <ul>
+            @for (c of sync.cobros(); track c.uuid) {
+              <li>
+                <strong>{{ c.empresa_nombre }} · {{ c.sucursal_nombre }}</strong>
+                <span>{{ c.total_cobrado ? 'Bs ' + (c.total_cobrado | number: '1.2-2') : 'Bs 0,00' }}</span>
+                @if (c.estado === 'pagada') {
+                  <small>Se cobró todo{{ c.venta_id ? ' · Venta #' + c.venta_id : '' }}</small>
+                } @else {
+                  <small class="is-mal">
+                    {{ c.estado === 'pago_parcial' ? 'Se cobró solo lo disponible. No se pudo pagar:' : 'No se te cobró nada:' }}
+                  </small>
+                  @for (n of c.no_pagados ?? []; track $index) {
+                    <small class="is-detalle"><b>{{ n.producto }} ({{ n.talla }}, {{ n.color }})</b> · {{ n.motivo }}</small>
+                  } @empty {
+                    <small class="is-detalle">{{ c.mensaje }}</small>
+                  }
+                }
+              </li>
+            }
+          </ul>
+          @if (!todoCobrado()) {
+            <p>Lo que no se pudo pagar no se te cobró. Puedes volver a comprarlo cuando haya stock.</p>
+          }
+          <div class="aviso__acciones">
+            <button type="button" (click)="sync.marcarCobrosVistos()">Entendido</button>
+          </div>
+        </div>
+      </div>
+    } @else if (servicio.mostrarAviso() && !enPagina()) {
       <div class="aviso-fondo" role="dialog" aria-modal="true" aria-labelledby="aviso-compras-titulo">
         <div class="aviso">
           <span class="aviso__eyebrow">Volviste a tener conexión</span>
@@ -95,6 +132,13 @@ import { ComprasPorPagar } from '../../services/offline/compras-por-pagar';
     li small.is-ojo {
       color: #b26a00;
     }
+    li small.is-detalle {
+      color: #444;
+      line-height: 1.4;
+    }
+    .aviso.is-exito {
+      border-top-color: #2e7d32;
+    }
     p {
       margin: 0 0 16px;
       font-size: 13px;
@@ -126,6 +170,8 @@ import { ComprasPorPagar } from '../../services/offline/compras-por-pagar';
 })
 export class AvisoCompras {
   protected readonly servicio = inject(ComprasPorPagar);
+  protected readonly sync = inject(Sincronizacion);
+  protected readonly todoCobrado = computed(() => this.sync.cobros().every((c) => c.estado === 'pagada'));
   private readonly router = inject(Router);
 
   protected enPagina(): boolean {

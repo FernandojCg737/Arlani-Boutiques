@@ -31,6 +31,9 @@ export const ESTADO_OPERACION: Record<string, string> = {
   sin_stock: 'Sin stock',
   pagada: 'Pagada',
   cancelada: 'Cancelada',
+  por_cobrar: 'Pago enviado',
+  pago_parcial: 'Pago no finalizado',
+  no_pagada: 'Pago no finalizado',
 };
 
 // Pasadas estas horas, se avisa que el stock descargado puede estar viejo.

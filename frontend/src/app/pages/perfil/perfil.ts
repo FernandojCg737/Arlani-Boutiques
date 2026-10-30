@@ -71,6 +71,12 @@ interface ItemDevolucionSeleccion {
   seleccionado: boolean;
 }
 
+interface PaypalGuardado {
+  vinculado: boolean;
+  correo: string | null;
+  desde: string | null;
+}
+
 type Tab =
   | 'resumen'
   | 'reservas'
@@ -190,6 +196,12 @@ export class Perfil implements OnInit {
   protected readonly passwordSuccess = signal('');
   protected readonly passwordSaving = signal(false);
 
+  // ---------- PayPal guardado (compras sin conexión que se cobran solas) ----------
+  protected readonly paypal = signal<PaypalGuardado | null>(null);
+  protected readonly paypalProcesando = signal(false);
+  protected readonly paypalError = signal('');
+  protected readonly paypalAviso = signal('');
+
   ngOnInit(): void {
     if (this.isCliente()) {
       void this.cargarReservas();
@@ -200,12 +212,84 @@ export class Perfil implements OnInit {
 
     const tabParam = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
     if (tabParam) this.setTab(tabParam);
+    // Vuelta desde PayPal después de vincular (o cancelar).
+    const vuelta = this.route.snapshot.queryParamMap.get('paypal');
+    if (vuelta && this.isCliente()) {
+      history.replaceState(history.state, '', '/perfil?tab=pagos');
+      if (vuelta === 'vinculado') void this.confirmarPaypal();
+      else this.paypalError.set('No se vinculó tu PayPal: cancelaste en PayPal.');
+    }
+  }
+
+  private get apiPaypal(): string {
+    return `${environment.apiUrl}/pagos-guardados/paypal`;
+  }
+
+  protected async cargarPaypal(): Promise<void> {
+    try {
+      this.paypal.set(await firstValueFrom(this.http.get<PaypalGuardado>(this.apiPaypal)));
+    } catch {
+      this.paypal.set(null);
+    }
+  }
+
+  protected async vincularPaypal(): Promise<void> {
+    this.paypalProcesando.set(true);
+    this.paypalError.set('');
+    const base = `${location.origin}/perfil?tab=pagos&paypal=`;
+    try {
+      const r = await firstValueFrom(
+        this.http.post<{ approve_url: string }>(`${this.apiPaypal}/vincular`, {
+          retorno: base + 'vinculado',
+          cancelado: base + 'cancelado',
+        }),
+      );
+      location.href = r.approve_url;
+    } catch (err) {
+      this.paypalError.set(this.detalle(err, 'No se pudo abrir PayPal. Intenta de nuevo.'));
+      this.paypalProcesando.set(false);
+    }
+  }
+
+  private async confirmarPaypal(): Promise<void> {
+    this.paypalProcesando.set(true);
+    try {
+      this.paypal.set(await firstValueFrom(this.http.post<PaypalGuardado>(`${this.apiPaypal}/confirmar`, {})));
+      this.paypalAviso.set(
+        'Listo: tu PayPal quedó guardado. Descarga de nuevo el catálogo en «Sin conexión» para poder pagar con él sin internet.',
+      );
+    } catch (err) {
+      this.paypalError.set(this.detalle(err, 'No se pudo guardar tu PayPal. Intenta vincularlo de nuevo.'));
+    } finally {
+      this.paypalProcesando.set(false);
+    }
+  }
+
+  protected async desvincularPaypal(): Promise<void> {
+    if (!confirm('¿Quitar tu PayPal guardado? Las compras sin conexión que aún no se enviaron no se podrán cobrar.')) return;
+    this.paypalProcesando.set(true);
+    this.paypalError.set('');
+    this.paypalAviso.set('');
+    try {
+      this.paypal.set(await firstValueFrom(this.http.delete<PaypalGuardado>(this.apiPaypal)));
+      this.paypalAviso.set('Quitaste tu PayPal guardado.');
+    } catch (err) {
+      this.paypalError.set(this.detalle(err, 'No se pudo quitar. Intenta de nuevo.'));
+    } finally {
+      this.paypalProcesando.set(false);
+    }
+  }
+
+  private detalle(err: unknown, porDefecto: string): string {
+    const d = err instanceof HttpErrorResponse ? (err.error as { detail?: unknown } | null)?.detail : null;
+    return typeof d === 'string' ? d : porDefecto;
   }
 
   protected setTab(t: Tab): void {
     this.tab.set(t);
     if (t === 'devoluciones') void this.cargarDevoluciones();
     if (t === 'compras') void this.cargarCambios();
+    if (t === 'pagos') void this.cargarPaypal();
   }
 
   private async cargarReservas(): Promise<void> {

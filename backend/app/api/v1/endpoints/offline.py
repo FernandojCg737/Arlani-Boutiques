@@ -33,6 +33,7 @@ from app.api.deps import (
     verificar_acceso_sucursal,
 )
 from app.api.v1.endpoints.metodos_pago import _publico
+from app.api.v1.endpoints.paypal_guardado import token_activo
 from app.api.v1.endpoints.reservas import _mover_stock_reserva
 from app.api.v1.endpoints.ventas import (
     _a_usd,
@@ -44,7 +45,17 @@ from app.api.v1.endpoints.ventas import (
 )
 from app.core.audit import client_ip, client_platform, log_bitacora
 from app.core.errores_db import http_desde_pg
-from app.core.paypal import captura_de, capturar_orden, crear_orden, obtener_orden, reembolsar_captura
+from app.core.aviso_cliente import programar_correo
+from app.core.liquidaciones import enviar_liquidaciones
+from app.core.paypal import (
+    CobroRechazado,
+    captura_de,
+    capturar_orden,
+    cobrar_con_token,
+    crear_orden,
+    obtener_orden,
+    reembolsar_captura,
+)
 from app.core.storage import upload_comprobante_pago
 from app.db.session import get_db
 from app.models import Bitacora, DetalleReserva, MetodoPagoEmpresa, Notificacion, Reserva, Usuario
@@ -245,15 +256,21 @@ def catalogo_cliente(
                 empresa_id=t["id"], nombre=t["nombre"], logo_url=t["logo_url"],
                 sucursales=[SucursalOfflineOut(**s) for s in sucursales], productos=_productos_de(filas),
                 acepta_contra_entrega=_metodo_contra_entrega(db, t["id"]) is not None,
+                acepta_paypal=_metodo_paypal(db, t["id"]) is not None,
             )
         )
     direcciones = db.execute(
         text("SELECT id, alias, direccion FROM direccion_cliente WHERE cliente_id = :c ORDER BY predeterminada DESC, id"),
         {"c": usuario.id},
     ).mappings().all()
+    paypal = db.execute(
+        text("SELECT coalesce(correo, '') FROM cliente_paypal_guardado WHERE cliente_id = :c AND estado = 'activo'"),
+        {"c": usuario.id},
+    ).scalar()
     db.commit()
     return CatalogoClienteOfflineOut(
-        descargado_en=_ahora(), tiendas=salida, direcciones=[DireccionOfflineOut(**d) for d in direcciones]
+        descargado_en=_ahora(), tiendas=salida, direcciones=[DireccionOfflineOut(**d) for d in direcciones],
+        paypal_guardado=paypal,
     )
 
 
@@ -313,6 +330,20 @@ def _metodo_contra_entrega(db: Session, empresa_id: int) -> MetodoPagoEmpresa | 
     )
 
 
+def _metodo_paypal(db: Session, empresa_id: int) -> MetodoPagoEmpresa | None:
+    # PayPal con correo: a la tienda se le paga su parte por la liquidacion.
+    return (
+        db.query(MetodoPagoEmpresa)
+        .filter(
+            MetodoPagoEmpresa.empresa_id == empresa_id,
+            MetodoPagoEmpresa.tipo == "paypal",
+            MetodoPagoEmpresa.activo.is_(True),
+            MetodoPagoEmpresa.paypal_email.isnot(None),
+        )
+        .first()
+    )
+
+
 def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empresa_id: int) -> str | None:
     if op.forma_pago is None:
         return "Elige cómo vas a pagar la compra."
@@ -325,6 +356,10 @@ def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empre
         return "Elige una de tus direcciones para el envío."
     if op.forma_pago == "contra_entrega" and _metodo_contra_entrega(db, empresa_id) is None:
         return "Esta tienda no acepta pago contra entrega."
+    if op.forma_pago == "paypal_guardado" and not token_activo(db, cliente_id):
+        return "No tienes un PayPal guardado: vincúlalo en tu perfil y vuelve a comprar."
+    if op.forma_pago == "paypal_guardado" and _metodo_paypal(db, empresa_id) is None:
+        return "Esta tienda no recibe pagos con PayPal."
     return None
 
 
@@ -376,6 +411,8 @@ def _resultado(fila) -> ResultadoOperacionOut:
     return ResultadoOperacionOut(
         uuid=fila["uuid"], estado=fila["estado"], mensaje=fila["mensaje"],
         venta_id=fila["venta_id"], reserva_id=fila["reserva_id"],
+        # Compra con PayPal guardado: lo que no se cobro y por que.
+        no_pagados=fila["conflicto"] if fila["estado"] in ("pago_parcial", "no_pagada") and fila["conflicto"] else None,
     )
 
 
@@ -418,6 +455,10 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
         or db.execute(text("SELECT 1 FROM cliente WHERE id = :c"), {"c": cliente_reserva}).scalar() is None
     ):
         estado, mensaje = "rechazada", "La reserva necesita un cliente registrado."
+    elif op.tipo == "pedido" and op.forma_pago == "paypal_guardado":
+        # "Pago enviado": se cobra con el PayPal guardado apenas termina la
+        # sincronizacion (_cobrar_pendientes), prenda por prenda.
+        estado, mensaje = "por_cobrar", "Pago enviado: se cobra con tu PayPal guardado."
     else:
         faltan = _faltantes(db, op.sucursal_id, op.items)
         if faltan:
@@ -512,22 +553,30 @@ def sincronizar(
                 )
             )
     db.commit()
+    if usuario.tipo == "cliente":
+        cobradas = _cobrar_pendientes(db, usuario, request)
+        resultados = [cobradas.get(str(r.uuid), r) for r in resultados]
     return resultados
 
 
 @router.post("/estado", response_model=list[ResultadoOperacionOut])
 def estado_operaciones(
     payload: EstadoOperacionesIn,
+    request: Request,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ) -> list[ResultadoOperacionOut]:
     """Estado actual de operaciones ya enviadas (p. ej. un conflicto que el
     encargado resolvio despues)."""
+    if usuario.tipo == "cliente":
+        # Compras con PayPal guardado que quedaron sin cobrar (p. ej. se corto
+        # la conexion justo al sincronizar): se cobran ahora.
+        _cobrar_pendientes(db, usuario, request)
     filas = db.execute(
         text("SELECT * FROM operacion_offline WHERE uuid = ANY(CAST(:u AS UUID[])) AND usuario_id = :usr"),
         {"u": [str(u) for u in payload.uuids], "usr": usuario.id},
     ).mappings().all()
-    return [_resultado(f) for f in filas]
+    return [_con_total(db, f) for f in filas]
 
 
 # ============================================================= CU13 / CU14
@@ -1110,3 +1159,224 @@ def pedido_cancelar(
     )
     log_bitacora(db, usuario, "ACTUALIZAR", "operacion_offline", fila["id"], "Compra sin conexión cancelada por el cliente", request)
     return _revisar(db, _cliente_pedido(db, usuario, uuid))
+
+
+# ================================== compras sin conexion con PayPal guardado
+# El cliente compro sin internet con "Pagar con mi PayPal guardado" (vio "Pago
+# enviado"). Al sincronizar se revisa cada prenda contra el stock y el precio de
+# AHORA y se cobra solo lo que se puede comprar: lo demas no se cobra nunca (no
+# hay nada que devolver) y queda dicho por que.
+
+
+def _con_total(db: Session, fila) -> ResultadoOperacionOut:
+    r = _resultado(fila)
+    if fila["venta_id"] and fila["estado"] in ("pagada", "pago_parcial") and fila["tipo"] == "pedido":
+        r.total_cobrado = db.execute(text("SELECT total FROM venta WHERE id = :v"), {"v": fila["venta_id"]}).scalar()
+    return r
+
+
+def _cerrar_cobro(db: Session, fila, estado: str, mensaje: str, no_pagados: list[dict], venta_id: int | None) -> None:
+    db.execute(
+        text(
+            """UPDATE operacion_offline SET estado = :e, mensaje = :m, conflicto = CAST(:c AS JSONB), venta_id = :v,
+                      actualizada_en = now()
+               WHERE id = :i AND estado = 'por_cobrar'"""
+        ),
+        {"e": estado, "m": mensaje, "c": json.dumps(no_pagados, default=str) if no_pagados else None, "v": venta_id,
+         "i": fila["id"]},
+    )
+
+
+def _avisar_cobro(db: Session, fila, titulo: str, mensaje: str) -> None:
+    """Notificacion al cliente y copia por correo de parte de la tienda."""
+    db.add(
+        Notificacion(
+            cliente_id=fila["usuario_id"], canal="app", tipo_evento="compra_offline", mensaje=mensaje,
+            estado="enviada", entidad_tipo="operacion_offline", entidad_id=fila["id"],
+        )
+    )
+    programar_correo(db, fila["usuario_id"], fila["empresa_id"], titulo, mensaje)
+
+
+def _revisar_items(db: Session, datos: OperacionOfflineIn) -> tuple[list[tuple[ItemOfflineIn, dict]], list[dict]]:
+    """Separa las prendas que se pueden cobrar (stock y precio vigentes) de las
+    que no, con su motivo. Bloquea el stock de las que se cobran."""
+    validos, no_pagados = [], []
+    sucursal = db.execute(text("SELECT nombre FROM sucursal WHERE id = :s"), {"s": datos.sucursal_id}).scalar()
+    for it in datos.items:
+        f = db.execute(
+            text(
+                """SELECT p.nombre, p.precio, p.estado, t.codigo AS talla, c.nombre AS color,
+                          (SELECT i.cantidad FROM inventario i WHERE i.producto_id = p.id AND i.talla_id = t.id
+                             AND i.color_id = c.id AND i.sucursal_id = :s FOR UPDATE) AS stock
+                   FROM producto p, talla t, color c WHERE p.id = :p AND t.id = :t AND c.id = :c"""
+            ),
+            {"s": datos.sucursal_id, "p": it.producto_id, "t": it.talla_id, "c": it.color_id},
+        ).mappings().first()
+        stock = (f["stock"] or 0) if f else 0
+        base = dict(
+            producto_id=it.producto_id, talla_id=it.talla_id, color_id=it.color_id, pedido=it.cantidad,
+            disponible=stock, producto=f["nombre"] if f else "Prenda que ya no existe",
+            talla=f["talla"] if f else "-", color=f["color"] if f else "-",
+        )
+        actual = Decimal(f["precio"]) if f else Decimal(0)
+        guardado = it.precio if it.precio is not None else actual
+        if f is None or f["estado"] != "activo":
+            no_pagados.append({**base, "motivo": "La prenda ya no está a la venta."})
+        elif stock < it.cantidad:
+            no_pagados.append(
+                {**base, "motivo": f"Sin stock suficiente en {sucursal}: pediste {it.cantidad} y hay {stock}."}
+            )
+        elif actual > guardado:
+            # No se cobra mas de lo que el cliente acepto al comprar.
+            no_pagados.append(
+                {**base, "motivo": f"Subió de precio (de Bs {guardado:.2f} a Bs {actual:.2f}): no se cobró sin tu permiso."}
+            )
+        else:
+            validos.append((it, base))
+    return validos, no_pagados
+
+
+def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) -> None:
+    """Cobra una compra sin conexion con el PayPal guardado del cliente (cuenta
+    de Arlani, como "Pagar todo") y la deja en 'pagada', 'pago_parcial' o
+    'no_pagada'. A la tienda le llega lo suyo por la liquidacion."""
+    fila = db.execute(
+        text("SELECT * FROM operacion_offline WHERE id = :i AND estado = 'por_cobrar' FOR UPDATE SKIP LOCKED"),
+        {"i": operacion_id},
+    ).mappings().first()
+    if fila is None:
+        db.rollback()
+        return
+    datos = OperacionOfflineIn.model_validate(fila["datos"])
+    tienda = db.execute(text("SELECT nombre FROM empresa WHERE id = :e"), {"e": fila["empresa_id"]}).scalar()
+
+    def no_pagada(motivo: str, detalle: list[dict]) -> None:
+        _cerrar_cobro(db, fila, "no_pagada", f"Pago no finalizado: {motivo} No se te cobró nada.", detalle, None)
+        _avisar_cobro(
+            db, fila, "Pago no finalizado", f"Tu compra sin conexión en {tienda} no se cobró: {motivo} No se te cobró nada."
+        )
+        db.commit()
+
+    validos, no_pagados = _revisar_items(db, datos)
+    todos = no_pagados + [b for _, b in validos]
+    token = token_activo(db, fila["usuario_id"])
+    metodo = _metodo_paypal(db, fila["empresa_id"])
+    if not token:
+        motivo = "Ya no tienes un PayPal guardado: vincúlalo en tu perfil y vuelve a comprar."
+        return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
+    if metodo is None:
+        motivo = "La tienda ya no recibe pagos con PayPal."
+        return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
+    if not validos:
+        return no_pagada("ninguna prenda se pudo comprar.", no_pagados)
+
+    # 1) La venta con lo que si se puede comprar (aparta el stock, sin confirmar).
+    referencia = f"pedido-offline-{fila['id']}"
+    items = json.dumps(
+        [{"producto_id": i.producto_id, "talla_id": i.talla_id, "color_id": i.color_id, "cantidad": i.cantidad}
+         for i, _ in validos]
+    )
+    try:
+        venta_id = db.execute(
+            text("SELECT sp_crear_venta_tienda(:c, :s, NULL, CAST(:items AS JSONB), CAST(:d AS INTEGER[]), :m, :r, NULL)"),
+            {"c": fila["usuario_id"], "s": datos.sucursal_id, "items": items, "d": [], "m": metodo.id, "r": referencia},
+        ).scalar_one()
+    except DBAPIError as exc:
+        db.rollback()
+        logger.warning("Compra sin conexion %s: no se pudo registrar la venta: %s", fila["uuid"], exc)
+        motivo = "La tienda no pudo registrar la compra."
+        return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
+    total = Decimal(db.execute(text("SELECT total FROM venta WHERE id = :v"), {"v": venta_id}).scalar())
+    total_usd, tc = _a_usd(db, total)
+
+    # 2) El cobro con el PayPal guardado. El uuid evita cobrar dos veces.
+    try:
+        orden = cobrar_con_token(token, total_usd, referencia, f"arlani-offline-{fila['uuid']}")
+    except (CobroRechazado, HTTPException) as exc:
+        db.rollback()
+        motivo = f"PayPal rechazó el cobro ({exc.detail if isinstance(exc, HTTPException) else exc})."
+        return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
+    captura = captura_de(orden)
+
+    # 3) Se confirma todo; si algo falla aca, se devuelve el cobro.
+    try:
+        if not _monto_coincide(captura.get("amount"), total_usd):
+            raise ValueError("monto cobrado distinto")
+        db.execute(
+            text("UPDATE transaccion SET referencia_externa = :o WHERE pago_id IN (SELECT id FROM pago WHERE venta_id = :v)"),
+            {"o": orden["id"], "v": venta_id},
+        )
+        _guardar_captura(db, [venta_id], captura["id"])
+        db.execute(text("UPDATE venta SET origen = 'offline', sincronizado_en = now() WHERE id = :v"), {"v": venta_id})
+        if datos.entrega == "envio":
+            _guardar_envio(db, [venta_id], fila["usuario_id"], datos.direccion_id)
+        liquidacion = db.execute(
+            text("SELECT sp_registrar_liquidacion(:e, :o, :c, :v, :tc)"),
+            {"e": fila["empresa_id"], "o": orden["id"], "c": captura["id"], "v": [venta_id], "tc": tc},
+        ).scalar_one()
+        if no_pagados:
+            _cerrar_cobro(
+                db, fila, "pago_parcial",
+                f"Pago no finalizado: se cobraron Bs {total:.2f} por lo que sí había; "
+                f"{len(no_pagados)} prenda(s) no se cobraron · Venta #{venta_id}",
+                no_pagados, venta_id,
+            )
+            _avisar_cobro(
+                db, fila, "Pago no finalizado",
+                f"De tu compra sin conexión en {tienda} se cobraron Bs {total:.2f} con tu PayPal. No se pudo pagar: "
+                + "; ".join(f"{n['producto']} ({n['talla']}, {n['color']}): {n['motivo']}" for n in no_pagados)
+                + " Eso no se te cobró.",
+            )
+        else:
+            _cerrar_cobro(
+                db, fila, "pagada", f"Pago finalizado con éxito: Bs {total:.2f} con tu PayPal · Venta #{venta_id}",
+                [], venta_id,
+            )
+            _avisar_cobro(
+                db, fila, "Pago finalizado con éxito",
+                f"Tu compra sin conexión en {tienda} se pagó con tu PayPal guardado: Bs {total:.2f} (venta #{venta_id}).",
+            )
+        db.add(
+            Bitacora(
+                usuario_id=usuario.id, accion="CREAR", entidad_afectada="venta", entidad_id=venta_id,
+                detalle=f"Compra sin conexión cobrada con PayPal guardado (orden {orden['id']})",
+                ip_address=client_ip(request), plataforma=client_platform(request),
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Compra sin conexion %s cobrada pero no registrada: se devuelve el cobro", fila["uuid"])
+        if not reembolsar_captura(captura["id"]):
+            logger.error("No se pudo devolver la captura %s (orden %s): revisar a mano", captura["id"], orden["id"])
+        motivo = "No se pudo registrar la compra; el cobro fue devuelto a tu PayPal."
+        return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
+
+    # 4) Lo de la tienda (menos la comision) se le envia al instante; si PayPal
+    # falla queda para reintentar: la compra del cliente ya esta confirmada.
+    try:
+        enviar_liquidaciones(db, [liquidacion])
+    except Exception:
+        db.rollback()
+        logger.exception("No se pudo enviar la liquidacion %s (orden %s)", liquidacion, orden["id"])
+
+
+def _cobrar_pendientes(db: Session, usuario: Usuario, request: Request) -> dict[str, ResultadoOperacionOut]:
+    """Cobra las compras con PayPal guardado del cliente que esperan su cobro y
+    devuelve el resultado de cada una por uuid."""
+    ids = db.execute(
+        text("SELECT id FROM operacion_offline WHERE usuario_id = :u AND estado = 'por_cobrar' ORDER BY registrada_en"),
+        {"u": usuario.id},
+    ).scalars().all()
+    resultados: dict[str, ResultadoOperacionOut] = {}
+    for operacion_id in ids:
+        try:
+            _cobrar(db, usuario, operacion_id, request)
+        except Exception:
+            # Queda 'por_cobrar' y se reintenta en la proxima sincronizacion.
+            db.rollback()
+            logger.exception("Fallo el cobro de la compra sin conexion %s", operacion_id)
+        fila = db.execute(text("SELECT * FROM operacion_offline WHERE id = :i"), {"i": operacion_id}).mappings().first()
+        resultados[str(fila["uuid"])] = _con_total(db, fila)
+    return resultados

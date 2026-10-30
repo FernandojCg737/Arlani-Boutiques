@@ -3,7 +3,7 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Auth } from '../auth';
-import { EstadoOperacion, OfflineDb, OperacionLocal, RegistroSync } from './offline-db';
+import { EstadoOperacion, NoPagado, OfflineDb, OperacionLocal, RegistroSync } from './offline-db';
 
 interface ResultadoServidor {
   uuid: string;
@@ -11,13 +11,19 @@ interface ResultadoServidor {
   mensaje: string | null;
   venta_id: number | null;
   reserva_id: number | null;
+  no_pagados?: NoPagado[] | null;
+  total_cobrado?: string | null;
 }
+
+// Cobro con el PayPal guardado ya resuelto (se avisa una vez).
+export const COBRO_TERMINADO: EstadoOperacion[] = ['pagada', 'pago_parcial', 'no_pagada'];
 
 // Estados que todavía hay que mandar al servidor.
 const POR_ENVIAR: EstadoOperacion[] = ['pendiente', 'enviando', 'error'];
 // Estados que el servidor todavía puede cambiar (el encargado resuelve el conflicto).
 // (el encargado resuelve el conflicto; la compra se paga o se queda sin stock).
-const POR_CONSULTAR: EstadoOperacion[] = ['conflicto', 'por_pagar', 'sin_stock'];
+// (o la compra con PayPal guardado quedó por cobrar: se cobra al consultar).
+const POR_CONSULTAR: EstadoOperacion[] = ['conflicto', 'por_pagar', 'sin_stock', 'por_cobrar'];
 const LOTE = 50;
 // Lo pendiente tiene prioridad: se envía apenas vuelve la conexión y, si el
 // servidor no responde (p. ej. estaba dormido), se reintenta a los 3, 6, 12 y
@@ -59,6 +65,10 @@ export class Sincronizacion {
 
   readonly pendientes = computed(() => this.operaciones().filter((o) => POR_ENVIAR.includes(o.estado)).length);
   readonly conflictos = computed(() => this.operaciones().filter((o) => o.estado === 'conflicto').length);
+  // Compras con PayPal guardado ya cobradas (o no) que el cliente no vio.
+  readonly cobros = computed(() =>
+    this.operaciones().filter((o) => o.forma_pago === 'paypal_guardado' && COBRO_TERMINADO.includes(o.estado) && !o.cobro_visto),
+  );
 
   private usuarioId: number | null = null;
   private ultimoErrorAnotado = { detalle: '', en: 0 };
@@ -129,6 +139,11 @@ export class Sincronizacion {
     if (this.enLinea()) void this.sincronizar();
     else void this.pedirSyncEnFondo();
     return nueva;
+  }
+
+  async marcarCobrosVistos(): Promise<void> {
+    for (const op of this.cobros()) await this.db.guardarOperacion({ ...op, cobro_visto: true });
+    await this.cargar();
   }
 
   async sincronizar(): Promise<void> {
@@ -236,6 +251,8 @@ export class Sincronizacion {
       mensaje: r.mensaje,
       venta_id: r.venta_id ?? op.venta_id,
       reserva_id: r.reserva_id ?? op.reserva_id,
+      no_pagados: r.no_pagados ?? null,
+      total_cobrado: r.total_cobrado ?? null,
     });
   }
 

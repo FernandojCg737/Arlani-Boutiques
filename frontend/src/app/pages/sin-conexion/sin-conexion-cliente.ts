@@ -16,6 +16,8 @@ import { ESTADO_OPERACION } from '../admin/sin-conexion/sin-conexion';
 // compra; se guarda en el dispositivo y se envía sola al volver la conexión
 // (CU12). Una compra no se cobra sin internet: al volver, la app le pide
 // pagarla (en línea) o confirmarla (contra entrega), revisando precio y stock.
+// Con su PayPal guardado ve "Pago enviado" y se cobra sola al sincronizar,
+// solo por las prendas que sigan con stock y al mismo precio (o menor).
 @Component({
   selector: 'app-sin-conexion-cliente',
   imports: [DatePipe, DecimalPipe, RouterLink],
@@ -47,7 +49,9 @@ export class SinConexionCliente implements OnInit {
   protected readonly modo = signal<'reservar' | 'comprar'>('reservar');
   protected readonly entrega = signal<'retiro' | 'envio'>('retiro');
   protected readonly direccionId = signal<number | null>(null);
-  protected readonly formaPago = signal<'en_linea' | 'contra_entrega'>('en_linea');
+  protected readonly formaPago = signal<'en_linea' | 'contra_entrega' | 'paypal_guardado'>('en_linea');
+  // Correo del PayPal guardado (null: no lo vinculó).
+  protected readonly paypalGuardado = computed(() => this.catalogo()?.paypal_guardado ?? null);
 
   protected readonly direcciones = computed(() => this.catalogo()?.direcciones ?? []);
   protected readonly faltaParaComprar = computed(() => {
@@ -127,7 +131,8 @@ export class SinConexionCliente implements OnInit {
   protected elegirTienda(id: number): void {
     this.tiendaId.set(id);
     const t = this.catalogo()?.tiendas.find((x) => x.empresa_id === id);
-    if (!t?.acepta_contra_entrega) this.formaPago.set('en_linea');
+    if (!t?.acepta_contra_entrega && this.formaPago() === 'contra_entrega') this.formaPago.set('en_linea');
+    if (!t?.acepta_paypal && this.formaPago() === 'paypal_guardado') this.formaPago.set('en_linea');
     this.direccionId.set(this.catalogo()?.direcciones?.[0]?.id ?? null);
     this.elegirSucursal(t?.sucursales[0]?.id ?? null);
   }
@@ -202,7 +207,13 @@ export class SinConexionCliente implements OnInit {
         total: this.total(),
       });
       this.items.set([]);
-      if (this.sync.enLinea()) {
+      if (compra && this.formaPago() === 'paypal_guardado') {
+        this.aviso.set(
+          this.sync.enLinea()
+            ? 'Pago enviado: se está cobrando con tu PayPal guardado. Te avisamos el resultado.'
+            : 'Pago enviado. Cuando vuelvas a tener internet se cobra con tu PayPal guardado, solo por las prendas que sigan disponibles y al mismo precio; lo que no, no se te cobra.',
+        );
+      } else if (this.sync.enLinea()) {
         this.aviso.set(compra ? 'Compra enviada: revísala y págala en "Compras por pagar".' : 'Reserva enviada a la tienda.');
       } else if (compra) {
         this.aviso.set(
@@ -216,6 +227,11 @@ export class SinConexionCliente implements OnInit {
     } finally {
       this.guardando.set(false);
     }
+  }
+
+  protected estadoDe(o: { forma_pago?: string | null; estado: string }): string {
+    if (o.forma_pago === 'paypal_guardado' && o.estado === 'pagada') return 'Pago finalizado con éxito';
+    return this.estadoLabel[o.estado];
   }
 
   protected hace(fecha: string): string {

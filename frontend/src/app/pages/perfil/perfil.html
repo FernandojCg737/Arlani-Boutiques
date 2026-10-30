@@ -351,6 +351,40 @@
       }
 
       @if (tab() === 'pagos' && auth.hasPermiso('CU11')) {
+        <div class="dash-card paypal-guardado" id="paypal-guardado">
+          <div class="dash-card__info">
+            <strong>PayPal para comprar sin conexión</strong>
+            @if (paypal()?.vinculado) {
+              <span>
+                Guardado{{ paypal()?.correo ? ': ' + paypal()?.correo : '' }}
+                @if (paypal()?.desde) {
+                  · desde el {{ paypal()?.desde | date: "d MMM 'de' yyyy" }}
+                }
+              </span>
+            } @else {
+              <span>
+                Guárdalo una vez y tus compras sin internet se cobran solas al volver la conexión, solo por lo que siga
+                disponible. Arlani guarda solo la autorización de PayPal, nunca tus datos.
+              </span>
+            }
+            @if (paypalError()) {
+              <div class="perfil-alert is-error">{{ paypalError() }}</div>
+            }
+            @if (paypalAviso()) {
+              <div class="perfil-alert is-success">{{ paypalAviso() }}</div>
+            }
+          </div>
+          @if (paypal()?.vinculado) {
+            <button type="button" class="paypal-guardado__btn is-secundario" [disabled]="paypalProcesando()"
+                    (click)="desvincularPaypal()">
+              Quitar
+            </button>
+          } @else {
+            <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
+              {{ paypalProcesando() ? 'Abriendo PayPal…' : 'Guardar mi PayPal' }}
+            </button>
+          }
+        </div>
         <p class="dash-nota">
           Por tu seguridad no guardamos numeros de tarjeta -- cuando pagas con tarjeta, eso pasa directo por PayPal
           y nunca llega a nuestros servidores. Aca ves con que metodos pagaste antes.
