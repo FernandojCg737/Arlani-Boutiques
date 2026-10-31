@@ -27,6 +27,7 @@ import 'features/auth/perfil_screen.dart';
 import 'features/auth/recuperar_password_screen.dart';
 import 'features/auth/registro_screen.dart';
 import 'features/catalogo/catalogo_universal_screen.dart';
+import 'features/cuenta/comprobante_cambio_screen.dart';
 import 'features/cuenta/comprobante_screen.dart';
 import 'features/empezar/empezar_screen.dart';
 import 'features/chatbot/chatbot_screen.dart';
@@ -65,7 +66,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/registro' || loc == '/recuperar';
-      final requiresAuth = loc == '/perfil' || loc.startsWith('/mis-compras/') || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar';
+      final requiresAuth = loc == '/perfil' || loc.startsWith('/mis-compras/') || loc.startsWith('/mis-cambios/') || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar';
       final isAdminArea = loc == '/admin' || loc.startsWith('/admin/');
 
       if (requiresAuth && !auth.isAuthenticated) return '/login';
@@ -125,6 +126,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/mis-compras/:id',
         builder: (context, state) => ComprobanteScreen(ventaId: int.parse(state.pathParameters['id']!)),
+      ),
+      // Comprobante de un cambio de prenda (`/mis-cambios/:id` de la web).
+      GoRoute(
+        path: '/mis-cambios/:id',
+        builder: (context, state) => ComprobanteCambioScreen(cambioId: int.parse(state.pathParameters['id']!)),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/registro', builder: (context, state) => const RegistroScreen()),
