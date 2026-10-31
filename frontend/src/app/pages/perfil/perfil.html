@@ -357,8 +357,7 @@
               <h3>Mis cuentas PayPal</h3>
               <p>
                 Cada cuenta con la que pagas con PayPal en Arlani se registra aquí sola y queda autorizada para comprar sin
-                conexión: con «Pagar todo», en cualquier tienda; pagando en una tienda, en esa tienda. Arlani guarda solo el
-                permiso de PayPal, nunca tus datos.
+                conexión en cualquier tienda. Arlani guarda solo el permiso de PayPal, nunca tus datos.
               </p>
             </div>
             <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
@@ -394,7 +393,7 @@
                       } @else if (m.tiendas.length) {
                         Autorizada para compras sin conexión en {{ m.tiendas.join(', ') }}
                         <small class="paypal-guardado__nota">
-                          En otra tienda se autoriza sola la primera vez que pagues ahí con PayPal (o en todas con «Pagar todo»).
+                          Queda autorizada en todas las tiendas la próxima vez que pagues con PayPal en Arlani.
                         </small>
                       } @else {
                         Sin autorizar para compras sin conexión

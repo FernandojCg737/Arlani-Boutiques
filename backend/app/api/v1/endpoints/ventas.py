@@ -22,6 +22,7 @@ from app.core.cifrado import descifrar
 from app.core.errores_db import http_desde_pg
 from app.core.liquidaciones import enviar_liquidaciones
 from app.api.v1.endpoints.paypal_guardado import registrar_paypal_usado
+from app.core.config import settings
 from app.core.paypal import (
     CuentaPaypal,
     PAYPAL_CURRENCY,
@@ -719,6 +720,13 @@ def checkout_por_tienda(
 
     from app.api.v1.endpoints.metodos_pago import _publico
 
+    def publico(m: MetodoPagoEmpresa) -> MetodoPagoPublicoOut:
+        datos = _publico(m)
+        if m.tipo == "paypal" and m.paypal_email and settings.PAYPAL_CLIENT_ID:
+            # Lo cobra Arlani y le liquida a la tienda (ver _cobro_de_tienda).
+            datos["paypal_client_id"] = settings.PAYPAL_CLIENT_ID
+        return MetodoPagoPublicoOut(**datos)
+
     resultado = []
     for empresa_id, detalles in grupos.items():
         e = detalles[0].producto.empresa
@@ -749,7 +757,7 @@ def checkout_por_tienda(
                 ],
                 total=_total_de(detalles),
                 total_usd=_a_usd(db, _total_de(detalles))[0],
-                metodos=[MetodoPagoPublicoOut(**_publico(m)) for m in propios],
+                metodos=[publico(m) for m in propios],
                 acepta_pagar_todo=any(m.tipo == "paypal" and m.paypal_email for m in propios),
             )
         )
@@ -902,6 +910,26 @@ def capturar_pagar_todo(
     return [_to_out(v) for v in ventas]
 
 
+def _cobro_de_tienda(db: Session, empresa_id: int) -> tuple[MetodoPagoEmpresa, CuentaPaypal | None]:
+    """Quien cobra el PayPal de una tienda en el checkout: Arlani (cuenta
+    None) si la tienda tiene su correo PayPal para recibir la liquidacion
+    (como "Pagar todo"); asi la cuenta del cliente queda autorizada para
+    comprar sin conexion en cualquier tienda. Si no, su propia cuenta."""
+    metodo = (
+        db.query(MetodoPagoEmpresa)
+        .filter(
+            MetodoPagoEmpresa.empresa_id == empresa_id,
+            MetodoPagoEmpresa.tipo == "paypal",
+            MetodoPagoEmpresa.activo.is_(True),
+            MetodoPagoEmpresa.paypal_email.isnot(None),
+        )
+        .first()
+    )
+    if metodo is not None and settings.PAYPAL_CLIENT_ID:
+        return metodo, None
+    return _paypal_de_tienda(db, empresa_id)
+
+
 @router.post("/checkout/tienda/{empresa_id}/paypal/orden", response_model=OrdenPaypalOut)
 def crear_orden_paypal_tienda(
     empresa_id: int,
@@ -910,11 +938,12 @@ def crear_orden_paypal_tienda(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso_cliente("CU11")),
 ) -> OrdenPaypalOut:
-    """Orden de PayPal por lo de UNA tienda, en la cuenta de esa tienda."""
+    """Orden de PayPal por lo de UNA tienda (la cobra Arlani o la tienda,
+    ver _cobro_de_tienda)."""
     cliente = _get_cliente_o_403(db, usuario)
     carrito = _get_carrito_activo_no_vacio(db, cliente.id, empresa_id)
     detalles = _tienda_del_carrito(carrito, empresa_id)
-    _, cuenta = _paypal_de_tienda(db, empresa_id)
+    _, cuenta = _cobro_de_tienda(db, empresa_id)
     total_usd, _ = _a_usd(db, _total_de(detalles))
     base = str(request.base_url).rstrip("/")
     orden = crear_orden(
@@ -938,14 +967,15 @@ def capturar_orden_paypal_tienda(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso_cliente("CU11")),
 ) -> list[VentaOut]:
-    """Cobra con la cuenta de PayPal de la tienda y registra sus ventas (una
-    por sucursal). Lo de otras tiendas sigue en el carrito."""
+    """Cobra lo de la tienda y registra sus ventas (una por sucursal). Si lo
+    cobro Arlani, a la tienda se le liquida lo suyo al instante (como en
+    "Pagar todo"). Lo de otras tiendas sigue en el carrito."""
     cliente = _get_cliente_o_403(db, usuario)
     _validar_direccion(db, cliente.id, direccion_id)
     carrito = _get_carrito_activo_no_vacio(db, cliente.id, empresa_id)
     detalles = _tienda_del_carrito(carrito, empresa_id)
-    metodo, cuenta = _paypal_de_tienda(db, empresa_id)
-    total, _ = _a_usd(db, _total_de(detalles))
+    metodo, cuenta = _cobro_de_tienda(db, empresa_id)
+    total, tc = _a_usd(db, _total_de(detalles))
 
     orden = obtener_orden(order_id, cuenta)
     unidad = (orden.get("purchase_units") or [{}])[0]
@@ -974,9 +1004,15 @@ def capturar_orden_paypal_tienda(
         db.rollback()
         reembolsar_captura(captura["id"], cuenta)
         raise HTTPException(status.HTTP_409_CONFLICT, "El monto cobrado no coincide con tu carrito. Se revirtió el cobro.")
+    liquidacion = None
     try:
         _guardar_captura(db, venta_ids, captura["id"])
         _guardar_envio(db, venta_ids, cliente.id, direccion_id)
+        if cuenta is None:
+            liquidacion = db.execute(
+                text("SELECT sp_registrar_liquidacion(:e, :orden, :captura, :ventas, :tc)"),
+                {"e": empresa_id, "orden": order_id, "captura": captura["id"], "ventas": venta_ids, "tc": tc},
+            ).scalar_one()
         db.commit()
     except Exception:
         db.rollback()
@@ -986,7 +1022,14 @@ def capturar_orden_paypal_tienda(
             "No se pudo registrar tu compra. El cobro fue revertido; intenta de nuevo.",
         )
 
-    registrar_paypal_usado(db, cliente.id, resultado, empresa_id)
+    # Cobrado por Arlani: la cuenta del cliente queda autorizada en todas las tiendas.
+    registrar_paypal_usado(db, cliente.id, resultado, empresa_id if cuenta is not None else None)
+    if liquidacion is not None:
+        try:
+            enviar_liquidaciones(db, [liquidacion])
+        except Exception:
+            db.rollback()
+            logger.exception("No se pudo enviar la liquidacion %s (orden %s)", liquidacion, order_id)
     for venta_id in venta_ids:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta digital pagada con PayPal de la tienda (orden {order_id})", request)
     ventas = _query_venta_con_detalles(db).filter(Venta.id.in_(venta_ids)).all()
