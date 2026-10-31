@@ -111,6 +111,11 @@ export class MisCambios implements OnInit {
   protected readonly cambios = signal<CambioCliente[]>([]);
   protected readonly aviso = signal('');
 
+  // Mis Compras lo llama al pedir una devolucion: el aviso del cambio ya no aplica.
+  limpiarAviso(): void {
+    this.aviso.set('');
+  }
+
   // ------------------------------------------------ pedir un cambio
   protected readonly opciones = signal<Opciones | null>(null);
   protected readonly cargandoOpciones = signal(false);

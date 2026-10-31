@@ -504,6 +504,7 @@ export class Perfil implements OnInit {
   }
 
   protected abrirModalDevolucion(v: VentaItem): void {
+    this.misCambios()?.limpiarAviso();
     this.devolviendoVenta.set(v);
     this.errorDevolucion.set('');
     this.exitoDevolucion.set('');
