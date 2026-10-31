@@ -90,6 +90,8 @@ dependencies:
   # CU01: obtener lat/lng del dispositivo al marcar asistencia.
   geolocator: ^13.0.1
   visibility_detector: ^0.4.0+2
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:
