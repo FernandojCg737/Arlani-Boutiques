@@ -58,6 +58,11 @@ class OpcionesCambioOut(BaseModel):
     puede_cambiar: bool
     motivo_no: str | None
     tienda_nombre: str
+    # Color de la tienda (los botones del formulario van en su color).
+    tienda_color: str | None = None
+    # Si la prenda nueva cuesta menos, como se devuelve la diferencia:
+    # "paypal" (a la cuenta con la que pago, al aprobarse) o "en_tienda".
+    reembolso: str = "en_tienda"
     sucursal_id: int
     sucursal_nombre: str
     lineas: list[LineaCambiableOut]

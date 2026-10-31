@@ -79,6 +79,8 @@ interface Opciones {
   puede_cambiar: boolean;
   motivo_no: string | null;
   tienda_nombre: string;
+  // Si la prenda nueva cuesta menos: a su PayPal o en la tienda.
+  reembolso: 'paypal' | 'en_tienda';
   sucursal_id: number;
   sucursal_nombre: string;
   lineas: Linea[];

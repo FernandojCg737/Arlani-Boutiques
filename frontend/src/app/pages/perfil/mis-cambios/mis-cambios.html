@@ -239,7 +239,10 @@
                   <span>La prenda nueva cuesta más: pagas la diferencia</span>
                   <strong>Bs {{ diferencia() | number: '1.2-2' }}</strong>
                 } @else if (diferencia()! < 0) {
-                  <span>La prenda nueva cuesta menos: te devolvemos</span>
+                  <span>
+                    La prenda nueva cuesta menos: te devolvemos la diferencia
+                    {{ o.reembolso === 'paypal' ? 'a tu PayPal cuando la tienda apruebe el cambio' : 'en efectivo cuando recojas tu prenda en la sucursal' }}
+                  </span>
                   <strong>Bs {{ -diferencia()! | number: '1.2-2' }}</strong>
                 } @else {
                   <span>Mismo precio</span>

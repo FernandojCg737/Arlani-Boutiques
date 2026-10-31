@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api_client.dart';
 import '../../core/api_config.dart';
 import '../empezar/panel_paypal.dart';
+import '../portada/plataforma_data.dart' show colorMarca;
 import 'cuenta_repository.dart';
 import 'estilo_cuenta.dart';
 
@@ -364,9 +365,10 @@ class _BotonMetodo extends StatelessWidget {
 
 // ======================================================= pedir un cambio
 
-/// "Cambiar prenda (24h)" desde Mis compras: abre el formulario del cambio.
-/// Devuelve el cambio pedido (o null si se cerro).
-Future<CambioCliente?> pedirCambio(BuildContext context, WidgetRef ref, int ventaId) async {
+/// "Cambiar prenda (24h)" desde Mis compras: abre el formulario del cambio
+/// con el color de la tienda que vendio ([colorTienda], hex). Devuelve el
+/// cambio pedido (o null si se cerro).
+Future<CambioCliente?> pedirCambio(BuildContext context, WidgetRef ref, int ventaId, {String? colorTienda}) async {
   final OpcionesCambio opciones;
   try {
     opciones = await ref.read(cuentaRepositoryProvider).opcionesCambio(ventaId);
@@ -378,19 +380,23 @@ Future<CambioCliente?> pedirCambio(BuildContext context, WidgetRef ref, int vent
   }
   if (!context.mounted) return null;
   final h = opciones.plazoHasta;
+  final marca = colorMarca(colorTienda ?? opciones.tiendaColor);
   return abrirHojaCuenta<CambioCliente>(
     context,
     titulo: 'Cambiar una prenda',
     subtitulo:
         'Compra #${opciones.ventaId} · ${opciones.tiendaNombre} · hasta el ${h.day}/${h.month} ${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}',
-    cuerpo: (_) => _FormularioCambio(opciones: opciones),
+    cuerpo: (_) => _FormularioCambio(opciones: opciones, marca: marca),
   );
 }
 
 class _FormularioCambio extends ConsumerStatefulWidget {
-  const _FormularioCambio({required this.opciones});
+  const _FormularioCambio({required this.opciones, required this.marca});
 
   final OpcionesCambio opciones;
+
+  /// Color de la tienda dueña de la prenda.
+  final Color marca;
 
   @override
   ConsumerState<_FormularioCambio> createState() => _FormularioCambioState();
@@ -409,6 +415,7 @@ class _FormularioCambioState extends ConsumerState<_FormularioCambio> {
   String? _error;
 
   OpcionesCambio get o => widget.opciones;
+  Color get _marca => widget.marca;
   LineaCambiable? get _linea => o.lineas.where((l) => l.itemLineaId == _lineaId).firstOrNull;
   VarianteCambio? get _variante => _prenda?.variantes.where((v) => v.tallaId == _tallaId && v.colorId == _colorId).firstOrNull;
   StockSucursal? get _sucursal => _variante?.sucursales.where((s) => s.sucursalId == _sucursalId).firstOrNull;
@@ -519,8 +526,8 @@ class _FormularioCambioState extends ConsumerState<_FormularioCambio> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: activa ? tintaCuenta : Colors.white,
-            border: Border.all(color: activa ? tintaCuenta : const Color(0xFFDDDDDD)),
+            color: activa ? _marca : Colors.white,
+            border: Border.all(color: activa ? _marca : const Color(0xFFDDDDDD)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -536,6 +543,87 @@ class _FormularioCambioState extends ConsumerState<_FormularioCambio> {
     );
   }
 
+  /// Todas las prendas de la tienda con stock, en grilla (se ven todas).
+  Widget _grillaPrendas(PrendaCambio? elegida) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final columnas = c.maxWidth >= 520 ? 4 : 3;
+        final ancho = (c.maxWidth - 10 * (columnas - 1)) / columnas;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final pr in o.prendas)
+              SizedBox(
+                width: ancho,
+                child: InkWell(
+                  onTap: () => _elegirPrenda(pr),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: elegida?.productoId == pr.productoId ? _marca : bordeCuenta, width: elegida?.productoId == pr.productoId ? 2 : 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 3 / 4,
+                          child: pr.imagenUrl == null
+                              ? Container(color: const Color(0xFFF3F3F3))
+                              : CachedNetworkImage(imageUrl: resolveImageUrl(pr.imagenUrl!), fit: BoxFit.cover, width: double.infinity),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(pr.nombre,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(fontSize: 11, height: 1.25, fontWeight: FontWeight.w700, color: tintaCuenta)),
+                              const SizedBox(height: 2),
+                              Text('Bs ${bs(pr.precio)}', style: GoogleFonts.inter(fontSize: 11, color: grisOscuroCuenta)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Lo que pasa con la plata: paga la diferencia, se le devuelve (y como) o nada.
+  Widget _resumenDiferencia(double dif) {
+    final String texto;
+    if (dif > 0) {
+      texto = 'La prenda nueva cuesta más: pagas la diferencia cuando la tienda apruebe el cambio.';
+    } else if (dif < 0) {
+      texto = o.reembolso == 'paypal'
+          ? 'La prenda nueva cuesta menos: te devolvemos la diferencia a tu PayPal cuando la tienda apruebe el cambio.'
+          : 'La prenda nueva cuesta menos: te devolvemos la diferencia en efectivo cuando recojas tu prenda en la sucursal.';
+    } else {
+      texto = 'Mismo precio: no pagas ni te devolvemos nada.';
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: _marca.withValues(alpha: 0.07), border: Border(left: BorderSide(color: _marca, width: 3))),
+      child: Row(
+        children: [
+          Expanded(child: Text(texto, style: GoogleFonts.inter(fontSize: 12.5, height: 1.45, color: tintaCuenta))),
+          const SizedBox(width: 12),
+          Text(dif == 0 ? 'Sin diferencia' : '${dif > 0 ? '' : '+ '}Bs ${bs(dif.abs())}',
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: dif < 0 ? verdeCuenta : _marca)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = _linea;
@@ -545,247 +633,223 @@ class _FormularioCambioState extends ConsumerState<_FormularioCambio> {
     final dif = _diferencia;
     final tallas = <int, String>{for (final x in p?.variantes ?? <VarianteCambio>[]) x.tallaId: x.tallaCodigo};
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!o.puedeCambiar) ...[
-            const SizedBox(height: 16),
-            AvisoCuenta(o.motivoNo ?? 'Ya cambiaste todas las prendas de esta compra.', error: true),
-          ] else ...[
-            _paso('1. ¿Qué prenda quieres cambiar?'),
-            // `.devolucion-item-row`: cada prenda de la compra, la elegida resaltada.
-            for (final linea in o.lineas)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: InkWell(
-                  onTap: linea.disponibles < 1
-                      ? null
-                      : () => setState(() {
-                            _lineaId = linea.itemLineaId;
-                            _cantidad = 1;
-                          }),
-                  child: Opacity(
-                    opacity: linea.disponibles < 1 ? 0.5 : 1,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _lineaId == linea.itemLineaId ? const Color(0xFFF7F4F2) : Colors.white,
-                        border: Border.all(color: _lineaId == linea.itemLineaId ? tintaCuenta : bordeCuenta),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _lineaId == linea.itemLineaId ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                            size: 20,
-                            color: tintaCuenta,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!o.puedeCambiar) ...[
+                  const SizedBox(height: 16),
+                  AvisoCuenta(o.motivoNo ?? 'Ya cambiaste todas las prendas de esta compra.', error: true),
+                ] else ...[
+                  _paso('1. ¿Qué prenda quieres cambiar?'),
+                  for (final linea in o.lineas)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: linea.disponibles < 1
+                            ? null
+                            : () => setState(() {
+                                  _lineaId = linea.itemLineaId;
+                                  _cantidad = 1;
+                                }),
+                        child: Opacity(
+                          opacity: linea.disponibles < 1 ? 0.5 : 1,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _lineaId == linea.itemLineaId ? _marca.withValues(alpha: 0.06) : Colors.white,
+                              border: Border.all(color: _lineaId == linea.itemLineaId ? _marca : bordeCuenta),
+                            ),
+                            child: Row(
                               children: [
-                                Text(linea.productoNombre,
-                                    style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: tintaCuenta)),
-                                Text(
-                                  '${linea.tallaCodigo} · ${linea.colorNombre} · pagaste Bs ${bs(linea.precioPagado)}${linea.disponibles < 1 ? ' · ya la cambiaste' : ''}',
-                                  style: GoogleFonts.inter(fontSize: 11.5, color: grisCuenta),
+                                Icon(
+                                  _lineaId == linea.itemLineaId ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                                  size: 20,
+                                  color: _marca,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(linea.productoNombre,
+                                          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: tintaCuenta)),
+                                      Text(
+                                        '${linea.tallaCodigo} · ${linea.colorNombre} · pagaste Bs ${bs(linea.precioPagado)}${linea.disponibles < 1 ? ' · ya la cambiaste' : ''}',
+                                        style: GoogleFonts.inter(fontSize: 11.5, color: grisCuenta),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                  if (l != null) ...[
+                    if (l.disponibles > 1) ...[
+                      _paso('Cuántas'),
+                      Row(
+                        children: [
+                          IconButton(onPressed: _cantidad > 1 ? () => setState(() => _cantidad--) : null, icon: const Icon(Icons.remove)),
+                          Text('$_cantidad', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
+                          IconButton(
+                            onPressed: _cantidad < l.disponibles ? () => setState(() => _cantidad++) : null,
+                            icon: const Icon(Icons.add),
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                ),
-              ),
-            if (l != null) ...[
-              if (l.disponibles > 1) ...[
-                _paso('Cuántas'),
-                Row(
-                  children: [
-                    IconButton(onPressed: _cantidad > 1 ? () => setState(() => _cantidad--) : null, icon: const Icon(Icons.remove)),
-                    Text('$_cantidad', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700)),
-                    IconButton(
-                      onPressed: _cantidad < l.disponibles ? () => setState(() => _cantidad++) : null,
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-              ],
-              _paso('2. ¿Por cuál? (con stock en ${o.tiendaNombre})'),
-              if (o.prendas.isEmpty)
-                vacioCuenta('No hay otras prendas con stock en esta sucursal por ahora.')
-              else
-                SizedBox(
-                  height: 170,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: o.prendas.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 10),
-                    itemBuilder: (_, i) {
-                      final pr = o.prendas[i];
-                      final activa = p?.productoId == pr.productoId;
-                      return InkWell(
-                        onTap: () => _elegirPrenda(pr),
-                        child: Container(
-                          width: 118,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: activa ? tintaCuenta : bordeCuenta, width: activa ? 2 : 1),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    ],
+                    _paso('2. ¿Por cuál? (${o.prendas.length} ${o.prendas.length == 1 ? 'prenda' : 'prendas'} con stock en ${o.tiendaNombre})'),
+                    if (o.prendas.isEmpty)
+                      vacioCuenta('No hay otras prendas con stock en esta tienda por ahora.')
+                    else
+                      _grillaPrendas(p),
+                    if (p != null) ...[
+                      _paso('3. Talla'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final t in tallas.entries)
+                            _opcion(t.value, null, _tallaId == t.key, _tallaDisponible(p, t.key) ? () => _elegirTalla(t.key) : null),
+                        ],
+                      ),
+                      if (_tallaId != null) ...[
+                        _paso('4. Color'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final c in p.variantes.where((x) => x.tallaId == _tallaId))
+                              _opcion(
+                                c.colorNombre,
+                                _esLaMisma(p, c) ? 'la que tienes' : !_colorDisponible(p, c) ? 'sin stock' : 'quedan ${c.stock}',
+                                _colorId == c.colorId,
+                                _colorDisponible(p, c) ? () => _elegirColor(c) : null,
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (v != null) ...[
+                        _paso('5. ¿Dónde la recoges?'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final su in v.sucursales)
+                              _opcion(
+                                su.sucursalNombre,
+                                '${su.stock < _cantidad ? 'sin stock' : 'quedan ${su.stock}'}${su.sucursalId == o.sucursalId ? ' · donde compraste' : ''}',
+                                _sucursalId == su.sucursalId,
+                                su.stock >= _cantidad ? () => setState(() => _sucursalId = su.sucursalId) : null,
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (s != null && v != null) ...[
+                        const SizedBox(height: 14),
+                        Text.rich(
+                          TextSpan(
+                            text: 'Te llevas: ',
                             children: [
-                              Expanded(
-                                child: pr.imagenUrl == null
-                                    ? Container(color: const Color(0xFFF3F3F3))
-                                    : CachedNetworkImage(imageUrl: resolveImageUrl(pr.imagenUrl!), fit: BoxFit.cover, width: double.infinity),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(6),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(pr.nombre,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w700, color: tintaCuenta)),
-                                    Text('Bs ${bs(pr.precio)}', style: GoogleFonts.inter(fontSize: 11, color: grisOscuroCuenta)),
-                                  ],
-                                ),
-                              ),
+                              TextSpan(text: p.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              const TextSpan(text: ', talla '),
+                              TextSpan(text: v.tallaCodigo, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              const TextSpan(text: ', color '),
+                              TextSpan(text: v.colorNombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              const TextSpan(text: '. La recoges en '),
+                              TextSpan(text: s.sucursalNombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              const TextSpan(text: ' y ahí entregas la prenda que devuelves.'),
                             ],
                           ),
+                          style: GoogleFonts.inter(fontSize: 12.5, height: 1.45, color: tintaCuenta),
                         ),
-                      );
-                    },
-                  ),
-                ),
-              if (p != null) ...[
-                _paso('3. Talla'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final t in tallas.entries)
-                      _opcion(t.value, null, _tallaId == t.key, _tallaDisponible(p, t.key) ? () => _elegirTalla(t.key) : null),
-                  ],
-                ),
-                if (_tallaId != null) ...[
-                  _paso('4. Color'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final c in p.variantes.where((x) => x.tallaId == _tallaId))
-                        _opcion(
-                          c.colorNombre,
-                          _esLaMisma(p, c) ? 'la que tienes' : !_colorDisponible(p, c) ? 'sin stock' : 'quedan ${c.stock}',
-                          _colorId == c.colorId,
-                          _colorDisponible(p, c) ? () => _elegirColor(c) : null,
-                        ),
-                    ],
-                  ),
-                ],
-                if (v != null) ...[
-                  _paso('5. ¿Dónde la recoges?'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final su in v.sucursales)
-                        _opcion(
-                          su.sucursalNombre,
-                          '${su.stock < _cantidad ? 'sin stock' : 'quedan ${su.stock}'}${su.sucursalId == o.sucursalId ? ' · donde compraste' : ''}',
-                          _sucursalId == su.sucursalId,
-                          su.stock >= _cantidad ? () => setState(() => _sucursalId = su.sucursalId) : null,
-                        ),
-                    ],
-                  ),
-                ],
-                if (s != null && v != null) ...[
-                  const SizedBox(height: 14),
-                  Text.rich(
-                    TextSpan(
-                      text: 'Te llevas: ',
-                      children: [
-                        TextSpan(text: p.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const TextSpan(text: ', talla '),
-                        TextSpan(text: v.tallaCodigo, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const TextSpan(text: ', color '),
-                        TextSpan(text: v.colorNombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const TextSpan(text: '. La recoges en '),
-                        TextSpan(text: s.sucursalNombre, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const TextSpan(text: ' y ahí entregas la prenda que devuelves.'),
                       ],
+                    ],
+                    _paso('6. Motivo'),
+                    DropdownButtonFormField<String>(
+                      initialValue: _motivo,
+                      decoration: decoracionCampo(),
+                      style: GoogleFonts.inter(fontSize: 14, color: tintaCuenta),
+                      items: const [
+                        DropdownMenuItem(value: 'talla', child: Text('No me quedó la talla')),
+                        DropdownMenuItem(value: 'color', child: Text('Prefiero otro color')),
+                        DropdownMenuItem(value: 'modelo', child: Text('Prefiero otro modelo')),
+                        DropdownMenuItem(value: 'defecto', child: Text('Tiene un defecto')),
+                        DropdownMenuItem(value: 'otro', child: Text('Otro motivo')),
+                      ],
+                      onChanged: (m) => setState(() => _motivo = m ?? _motivo),
                     ),
-                    style: GoogleFonts.inter(fontSize: 12.5, height: 1.45, color: tintaCuenta),
-                  ),
+                    const SizedBox(height: 12),
+                    etiquetaCampo('Detalles (opcional)'),
+                    TextField(
+                      controller: _observaciones,
+                      maxLines: 2,
+                      maxLength: 500,
+                      style: GoogleFonts.inter(fontSize: 14, color: tintaCuenta),
+                      decoration: decoracionCampo(),
+                    ),
+                    if (dif != null) _resumenDiferencia(dif),
+                  ],
+                  if (_error != null) ...[const SizedBox(height: 12), AvisoCuenta(_error!, error: true)],
                 ],
               ],
-              _paso('6. Motivo'),
-              DropdownButtonFormField<String>(
-                initialValue: _motivo,
-                decoration: decoracionCampo(),
-                style: GoogleFonts.inter(fontSize: 14, color: tintaCuenta),
-                items: const [
-                  DropdownMenuItem(value: 'talla', child: Text('No me quedó la talla')),
-                  DropdownMenuItem(value: 'color', child: Text('Prefiero otro color')),
-                  DropdownMenuItem(value: 'modelo', child: Text('Prefiero otro modelo')),
-                  DropdownMenuItem(value: 'defecto', child: Text('Tiene un defecto')),
-                  DropdownMenuItem(value: 'otro', child: Text('Otro motivo')),
-                ],
-                onChanged: (m) => setState(() => _motivo = m ?? _motivo),
-              ),
-              const SizedBox(height: 12),
-              etiquetaCampo('Detalles (opcional)'),
-              TextField(
-                controller: _observaciones,
-                maxLines: 2,
-                maxLength: 500,
-                style: GoogleFonts.inter(fontSize: 14, color: tintaCuenta),
-                decoration: decoracionCampo(),
-              ),
-              if (dif != null)
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  color: const Color(0xFFF7F4F2),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          dif > 0
-                              ? 'La prenda nueva cuesta más: pagas la diferencia'
-                              : dif < 0
-                                  ? 'La prenda nueva cuesta menos: te devolvemos'
-                                  : 'Mismo precio',
-                          style: GoogleFonts.inter(fontSize: 12.5, color: grisOscuroCuenta),
-                        ),
-                      ),
-                      Text(dif == 0 ? 'Sin diferencia' : 'Bs ${bs(dif.abs())}',
-                          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: tintaCuenta)),
-                    ],
-                  ),
-                ),
-            ],
-            if (_error != null) ...[const SizedBox(height: 12), AvisoCuenta(_error!, error: true)],
-          ],
-          const SizedBox(height: 16),
-          Row(
+            ),
+          ),
+        ),
+        // Botones fijos abajo, por encima de los botones del celular.
+        Container(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + MediaQuery.viewPaddingOf(context).bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: bordeCuenta)),
+          ),
+          child: Row(
             children: [
-              Expanded(child: BotonCuenta('Cerrar', lleno: false, ancho: true, onTap: () => Navigator.of(context).pop())),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _marca,
+                    side: BorderSide(color: _marca),
+                    shape: const RoundedRectangleBorder(),
+                    minimumSize: const Size.fromHeight(48),
+                    textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                  ),
+                  child: const Text('CERRAR'),
+                ),
+              ),
               if (o.puedeCambiar) ...[
                 const SizedBox(width: 10),
                 Expanded(
-                  child: BotonCuenta(_enviando ? 'Enviando…' : 'Pedir el cambio', ancho: true, onTap: !_listo || _enviando ? null : _enviar),
+                  flex: 2,
+                  child: FilledButton(
+                    onPressed: !_listo || _enviando ? null : _enviar,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _marca,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: _marca.withValues(alpha: 0.4),
+                      disabledForegroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(),
+                      minimumSize: const Size.fromHeight(48),
+                      textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                    ),
+                    child: Text(_enviando ? 'ENVIANDO…' : 'PEDIR EL CAMBIO'),
+                  ),
                 ),
               ],
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

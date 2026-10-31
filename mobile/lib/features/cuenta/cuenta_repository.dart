@@ -224,6 +224,8 @@ class OpcionesCambio {
         puedeCambiar = j['puede_cambiar'] as bool,
         motivoNo = j['motivo_no'] as String?,
         tiendaNombre = j['tienda_nombre'] as String,
+        tiendaColor = j['tienda_color'] as String?,
+        reembolso = j['reembolso'] as String? ?? 'en_tienda',
         sucursalId = j['sucursal_id'] as int,
         lineas = [for (final l in (j['lineas'] as List<dynamic>).cast<Map<String, dynamic>>()) LineaCambiable.fromJson(l)],
         prendas = [for (final p in (j['prendas'] as List<dynamic>).cast<Map<String, dynamic>>()) PrendaCambio.fromJson(p)];
@@ -233,6 +235,9 @@ class OpcionesCambio {
   final bool puedeCambiar;
   final String? motivoNo;
   final String tiendaNombre;
+  final String? tiendaColor;
+  /// Si la prenda nueva cuesta menos: "paypal" (a su PayPal) o "en_tienda".
+  final String reembolso;
   final int sucursalId;
   final List<LineaCambiable> lineas;
   final List<PrendaCambio> prendas;

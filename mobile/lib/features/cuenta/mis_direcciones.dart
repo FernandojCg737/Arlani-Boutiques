@@ -350,7 +350,8 @@ class _FormularioDireccionState extends ConsumerState<FormularioDireccion> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      // Por encima de los botones del celular.
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + MediaQuery.viewPaddingOf(context).bottom),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

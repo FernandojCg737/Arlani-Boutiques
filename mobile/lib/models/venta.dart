@@ -45,6 +45,7 @@ class Venta {
     this.montoDevolucion,
     this.puedeDevolver = false,
     this.puedeCambiar = false,
+    this.tiendaColor,
     this.horasRestantesDevolucion,
   });
 
@@ -64,6 +65,8 @@ class Venta {
   final bool puedeDevolver;
   /// Puede cambiar una prenda (hasta 24 h despues de comprar).
   final bool puedeCambiar;
+  /// Color de la tienda que vendio (sus botones en cambios y devoluciones).
+  final String? tiendaColor;
   final double? horasRestantesDevolucion;
 
   bool get completada => estadoPago == 'completado';
@@ -99,6 +102,7 @@ class Venta {
       montoDevolucion: json['monto_devolucion'] != null ? num.parse(json['monto_devolucion'].toString()).toDouble() : null,
       puedeDevolver: json['puede_devolver'] as bool? ?? false,
       puedeCambiar: json['puede_cambiar'] as bool? ?? false,
+      tiendaColor: (json['tienda'] as Map<String, dynamic>?)?['color_marca'] as String?,
       horasRestantesDevolucion: json['horas_restantes_devolucion'] != null ? num.parse(json['horas_restantes_devolucion'].toString()).toDouble() : null,
     );
   }
