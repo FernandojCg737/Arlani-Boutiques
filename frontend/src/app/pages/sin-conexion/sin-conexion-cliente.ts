@@ -110,7 +110,7 @@ export class SinConexionCliente implements OnInit {
   protected estadoPaypal(pp: PaypalLocal): string {
     if (pp.autorizada) return 'autorizada en todas las tiendas';
     if (this.paypalSirve(pp)) return 'autorizada en esta tienda';
-    if (pp.tiendas?.length) return 'autorizada en otras tiendas: se autoriza aquí la primera vez que pagues con PayPal en esta tienda';
+    if (pp.tiendas?.length) return 'autorizada en otras tiendas: queda autorizada en todas la próxima vez que pagues con PayPal en Arlani';
     return 'sin autorizar: autorízala en Métodos de pago';
   }
 
