@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -227,6 +228,7 @@ class _MisCambiosState extends ConsumerState<MisCambios> {
               ),
             ),
           ],
+          if (c.estado == 'completado') EnlaceCuenta('Ver comprobante', onTap: () => context.push('/mis-cambios/${c.id}')),
           if (c.estado == 'solicitado' || c.estado == 'por_pagar')
             EnlaceCuenta('Cancelar cambio', peligro: true, onTap: _procesando ? null : () => _cancelar(c)),
           if (c.estado == 'por_pagar') _pago(c),
