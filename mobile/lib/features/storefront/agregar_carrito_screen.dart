@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api_client.dart';
-import '../../core/theme.dart';
 import 'cart_provider.dart';
 import 'reservas_repository.dart';
 
@@ -27,15 +27,33 @@ class _TallaSucursal {
   String get key => '$tallaId:$sucursalId';
 }
 
+/// Abre la ventanita de "Agregar al carrito" (el modal `agregar-carrito` de
+/// la web) sobre la pagina del producto. [envolver] le pone el tema con el
+/// color de la tienda dueña del producto.
+Future<void> mostrarAgregarCarrito(
+  BuildContext context, {
+  required int productoId,
+  required String productoNombre,
+  Widget Function(Widget)? envolver,
+}) {
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.black54,
+    builder: (_) {
+      final dialogo = AgregarCarritoScreen(productoId: productoId, productoNombre: productoNombre);
+      return envolver == null ? dialogo : envolver(dialogo);
+    },
+  );
+}
+
 /// CU11, lado cliente: elegir talla/color/cantidad antes de agregar al
 /// carrito -- el backend lo exige (no se puede agregar un producto "en
 /// general", tiene que ser una combinacion con stock real). Reusa el mismo
 /// endpoint de disponibilidad que ya usa Reservar (CU10).
 ///
-/// Pedido explicito del usuario: la sucursal de retiro se elige ACA, por
-/// producto -- ya no en el checkout. La talla viene "atada" a una sucursal
-/// (ej. "XL -- Sucursal Norte, Stock 10"): elegirla fija ambas cosas de una,
-/// y el color se filtra a los que esa sucursal tiene en esa talla.
+/// La sucursal de retiro se elige ACA, por producto: la talla viene "atada"
+/// a una sucursal (ej. "XL -- Sucursal Norte (Stock 10)"), y el color se
+/// filtra a los que esa sucursal tiene en esa talla.
 class AgregarCarritoScreen extends ConsumerStatefulWidget {
   const AgregarCarritoScreen({super.key, required this.productoId, required this.productoNombre});
 
@@ -51,8 +69,10 @@ class _AgregarCarritoScreenState extends ConsumerState<AgregarCarritoScreen> {
   List<DisponibilidadItem> _variantes = [];
   String? _tallaSucursalKey;
   int? _colorId;
-  int _cantidad = 1;
+  final _cantidadCtrl = TextEditingController(text: '1');
   String _error = '';
+
+  int get _cantidad => int.tryParse(_cantidadCtrl.text.trim()) ?? 0;
 
   List<_TallaSucursal> get _tallasSucursal {
     final vistos = <String>{};
@@ -90,6 +110,18 @@ class _AgregarCarritoScreenState extends ConsumerState<AgregarCarritoScreen> {
     return null;
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  @override
+  void dispose() {
+    _cantidadCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _cargar() async {
     try {
       final opciones = await ref.read(reservasRepositoryProvider).disponibilidad(widget.productoId);
@@ -110,16 +142,13 @@ class _AgregarCarritoScreenState extends ConsumerState<AgregarCarritoScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _cargar();
-  }
-
   Future<void> _enviar() async {
     final variante = _varianteActual;
     if (variante == null) return;
-
+    if (_cantidad < 1 || _cantidad > variante.cantidad) {
+      setState(() => _error = 'Elige una cantidad entre 1 y ${variante.cantidad}.');
+      return;
+    }
     setState(() {
       _estado = _Estado.enviando;
       _error = '';
@@ -145,164 +174,229 @@ class _AgregarCarritoScreenState extends ConsumerState<AgregarCarritoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('AGREGAR AL CARRITO')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: _contenido(),
+    // El color de la tienda dueña del producto (tema de la pagina del producto).
+    final marca = Theme.of(context).colorScheme.primary;
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      shape: const RoundedRectangleBorder(),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(28, 30, 28, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 28),
+                    child: Text('AGREGAR AL CARRITO',
+                        style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.4, color: marca)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(widget.productoNombre, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF777777))),
+                  const SizedBox(height: 22),
+                  _contenido(marca),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                tooltip: 'Cerrar',
+                icon: Icon(Icons.close, color: marca),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _contenido() {
+  Widget _mensaje(String texto) =>
+      Text(texto, style: GoogleFonts.inter(fontSize: 14, height: 1.5, color: const Color(0xFF555555)));
+
+  Widget _contenido(Color marca) {
     switch (_estado) {
       case _Estado.cargando:
-        return const Center(child: CircularProgressIndicator());
-      case _Estado.sinStock:
-        return const Center(
-          child: Text(
-            'Este producto no tiene stock disponible en ninguna sucursal por ahora.',
-            textAlign: TextAlign.center,
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            children: [
+              SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: marca)),
+              const SizedBox(width: 12),
+              _mensaje('Cargando disponibilidad...'),
+            ],
           ),
         );
+      case _Estado.sinStock:
+        return _mensaje('Este producto no tiene stock disponible en ninguna sucursal por ahora.');
       case _Estado.error:
-        return const Center(
-          child: Text('No pudimos cargar la disponibilidad. Intenta de nuevo en unos segundos.'),
-        );
+        return _mensaje('No pudimos cargar la disponibilidad. Intenta de nuevo en unos segundos.');
       case _Estado.formulario:
       case _Estado.enviando:
-        return _formulario();
+        return _formulario(marca);
       case _Estado.listo:
-        return _exito();
+        return _exito(marca);
     }
   }
 
-  Widget _formulario() {
-    return ListView(
-      children: [
-        Text(widget.productoNombre, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-        const SizedBox(height: 20),
+  Widget _etiqueta(String texto) => Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Text(texto,
+            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: const Color(0xFF999999))),
+      );
 
+  InputDecoration _subrayado(Color marca) => InputDecoration(
+        isDense: true,
+        filled: false,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        border: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFDDDDDD))),
+        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFDDDDDD))),
+        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: marca)),
+      );
+
+  Widget _formulario(Color marca) {
+    final estilo = GoogleFonts.inter(fontSize: 15, color: const Color(0xFF333333));
+    final variante = _varianteActual;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         if (_error.isNotEmpty) ...[
           Container(
             padding: const EdgeInsets.all(12),
             color: const Color(0xFFFDECEA),
-            child: Text(_error, style: const TextStyle(color: Color(0xFFB3261E), fontSize: 13)),
+            child: Text(_error, style: GoogleFonts.inter(color: const Color(0xFFB3261E), fontSize: 13)),
           ),
           const SizedBox(height: 16),
         ],
-
-        const Text('TALLA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 6),
+        _etiqueta('TALLA'),
         DropdownButtonFormField<String>(
           initialValue: _tallaSucursalKey,
           isExpanded: true,
-          items: _tallasSucursal
-              .map((t) => DropdownMenuItem(
-                    value: t.key,
-                    child: Text(
-                      '${t.tallaCodigo} -- ${t.sucursalNombre} (Stock ${t.total})',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ))
-              .toList(),
+          style: estilo,
+          decoration: _subrayado(marca),
+          items: [
+            for (final t in _tallasSucursal)
+              DropdownMenuItem(
+                value: t.key,
+                child: Text('${t.tallaCodigo} -- ${t.sucursalNombre} (Stock ${t.total})', overflow: TextOverflow.ellipsis),
+              ),
+          ],
           onChanged: (key) {
             if (key == null) return;
             setState(() {
               _tallaSucursalKey = key;
-              // La talla/sucursal nueva puede no tener el mismo color que
-              // estaba elegido -- se cae al primero que si tenga stock ahi.
+              // La talla/sucursal nueva puede no tener el mismo color: se
+              // pasa al primero que si tenga stock ahi.
               final partes = key.split(':');
               final tallaId = int.parse(partes[0]);
               final sucursalId = int.parse(partes[1]);
-              _colorId = _variantes
-                  .firstWhere((v) => v.tallaId == tallaId && v.sucursalId == sucursalId)
-                  .colorId;
-              _cantidad = 1;
+              _colorId = _variantes.firstWhere((v) => v.tallaId == tallaId && v.sucursalId == sucursalId).colorId;
+              _cantidadCtrl.text = '1';
             });
           },
         ),
-        const SizedBox(height: 20),
-
-        const Text('COLOR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 22),
+        _etiqueta('COLOR'),
         DropdownButtonFormField<int>(
+          key: ValueKey(_tallaSucursalKey),
           initialValue: _colorId,
           isExpanded: true,
-          items: _coloresParaTallaActual
-              .map((v) => DropdownMenuItem(value: v.colorId, child: Text('${v.colorNombre} (${v.cantidad} disponibles)', overflow: TextOverflow.ellipsis)))
-              .toList(),
+          style: estilo,
+          decoration: _subrayado(marca),
+          items: [
+            for (final v in _coloresParaTallaActual)
+              DropdownMenuItem(
+                value: v.colorId,
+                child: Text('${v.colorNombre} (${v.cantidad} disponibles)', overflow: TextOverflow.ellipsis),
+              ),
+          ],
           onChanged: (colorId) {
             if (colorId == null) return;
             setState(() {
               _colorId = colorId;
-              _cantidad = 1;
+              _cantidadCtrl.text = '1';
             });
           },
         ),
-        const SizedBox(height: 20),
-
-        const Text('CANTIDAD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            IconButton(
-              onPressed: _cantidad > 1 ? () => setState(() => _cantidad--) : null,
-              icon: const Icon(Icons.remove_circle_outline),
-            ),
-            Text('$_cantidad', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            IconButton(
-              onPressed: (_varianteActual != null && _cantidad < _varianteActual!.cantidad)
-                  ? () => setState(() => _cantidad++)
-                  : null,
-              icon: const Icon(Icons.add_circle_outline),
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
-
-        ElevatedButton(
-          onPressed: _estado == _Estado.enviando ? null : _enviar,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.brandDark,
-            minimumSize: const Size.fromHeight(48),
-            shape: const RoundedRectangleBorder(),
+        const SizedBox(height: 22),
+        _etiqueta('CANTIDAD'),
+        TextField(
+          controller: _cantidadCtrl,
+          keyboardType: TextInputType.number,
+          style: estilo,
+          decoration: _subrayado(marca).copyWith(
+            helperText: variante == null ? null : 'Hasta ${variante.cantidad}',
+            helperStyle: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF999999)),
           ),
-          child: Text(_estado == _Estado.enviando ? 'AGREGANDO...' : 'AGREGAR AL CARRITO'),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 48,
+          child: FilledButton(
+            onPressed: _estado == _Estado.enviando ? null : _enviar,
+            style: FilledButton.styleFrom(
+              backgroundColor: marca,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: marca.withValues(alpha: 0.6),
+              disabledForegroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(),
+              textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+            ),
+            child: Text(_estado == _Estado.enviando ? 'AGREGANDO...' : 'AGREGAR AL CARRITO'),
+          ),
         ),
       ],
     );
   }
 
-  Widget _exito() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle_outline, size: 48, color: AppColors.brandDark),
-          const SizedBox(height: 16),
-          const Text('Se agrego a tu carrito.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder()),
-                child: const Text('SEGUIR COMPRANDO'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () => context.push('/carrito'),
-                style: ElevatedButton.styleFrom(shape: const RoundedRectangleBorder()),
-                child: const Text('IR AL CARRITO'),
-              ),
-            ],
+  Widget _exito(Color marca) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Icon(Icons.check_circle_outline, size: 44, color: marca),
+        const SizedBox(height: 12),
+        Text('Se agregó a tu carrito.',
+            textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF333333))),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 48,
+          child: FilledButton(
+            onPressed: () {
+              final router = GoRouter.of(context);
+              Navigator.of(context).pop();
+              router.push('/carrito');
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: marca,
+              foregroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(),
+              textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+            ),
+            child: const Text('IR AL CARRITO'),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: marca,
+              side: BorderSide(color: marca),
+              shape: const RoundedRectangleBorder(),
+              textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.6),
+            ),
+            child: const Text('SEGUIR COMPRANDO'),
+          ),
+        ),
+      ],
     );
   }
 }
