@@ -27,6 +27,7 @@ import 'features/auth/perfil_screen.dart';
 import 'features/auth/recuperar_password_screen.dart';
 import 'features/auth/registro_screen.dart';
 import 'features/catalogo/catalogo_universal_screen.dart';
+import 'features/empezar/empezar_screen.dart';
 import 'features/chatbot/chatbot_screen.dart';
 import 'features/portada/portada_screen.dart';
 import 'features/tienda/tienda_empresa_screen.dart';
@@ -63,7 +64,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/registro' || loc == '/recuperar';
-      final requiresAuth = loc == '/perfil' || loc == '/checkout' || loc == '/chatbot';
+      final requiresAuth = loc == '/perfil' || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar';
       final isAdminArea = loc == '/admin' || loc.startsWith('/admin/');
 
       if (requiresAuth && !auth.isAuthenticated) return '/login';
@@ -110,6 +111,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/producto/:id',
         builder: (context, state) => ProductoDetalleScreen(productoId: int.parse(state.pathParameters['id']!)),
+      ),
+      // Crear mi boutique (`/empezar` de la web): plan, datos y pago con PayPal.
+      GoRoute(
+        path: '/empezar',
+        builder: (context, state) => EmpezarScreen(
+          planInicial: state.uri.queryParameters['plan'],
+          periodoInicial: state.uri.queryParameters['periodo'],
+        ),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/registro', builder: (context, state) => const RegistroScreen()),
