@@ -170,6 +170,7 @@ def opciones_de_cambio(
     venta = db.execute(
         text(
             "SELECT v.id, v.fecha, v.estado, v.sucursal_id, s.nombre AS sucursal, s.empresa_id, e.nombre AS tienda, "
+            "e.color_marca, "
             "fn_empresa_operativa(e.id) AS operativa, now() AT TIME ZONE 'UTC' AS ahora "
             "FROM venta v JOIN sucursal s ON s.id = v.sucursal_id JOIN empresa e ON e.id = s.empresa_id "
             "WHERE v.id = :v AND v.cliente_id = :c"
@@ -265,6 +266,8 @@ def opciones_de_cambio(
         puede_cambiar=motivo_no is None and any(l["disponibles"] > 0 for l in lineas),
         motivo_no=motivo_no,
         tienda_nombre=venta["tienda"],
+        tienda_color=venta["color_marca"],
+        reembolso=_reembolso_de(db, venta_id)[0],
         sucursal_id=venta["sucursal_id"],
         sucursal_nombre=venta["sucursal"],
         lineas=[LineaCambiableOut(**l) for l in lineas],

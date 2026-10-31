@@ -152,7 +152,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
 
   // "Cambiar prenda (24h)": el formulario del cambio; al pedirlo se sigue en Mis Cambios.
   Future<void> _abrirCambio(Venta v) async {
-    final nuevo = await pedirCambio(context, ref, v.id);
+    final nuevo = await pedirCambio(context, ref, v.id, colorTienda: v.tiendaColor);
     if (nuevo == null || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -170,6 +170,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _SolicitarDevolucionSheet(
         venta: v,
+        marca: colorMarca(v.tiendaColor),
         onSuccess: _cargarCompras,
       ),
     );
@@ -1230,10 +1231,14 @@ class _SuccessBanner extends StatelessWidget {
 class _SolicitarDevolucionSheet extends ConsumerStatefulWidget {
   const _SolicitarDevolucionSheet({
     required this.venta,
+    required this.marca,
     required this.onSuccess,
   });
 
   final Venta venta;
+
+  /// Color de la tienda que vendio (sus botones y lo elegido).
+  final Color marca;
   final VoidCallback onSuccess;
 
   @override
@@ -1334,7 +1339,7 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.88,
@@ -1416,7 +1421,7 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _seleccionados[d.id] == true ? AppColors.brandDark : AppColors.grayBorderLight,
+                          color: _seleccionados[d.id] == true ? widget.marca : AppColors.grayBorderLight,
                         ),
                         color: _seleccionados[d.id] == true ? const Color(0xFFFAFAFA) : AppColors.brandWhite,
                       ),
@@ -1424,7 +1429,7 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
                         children: [
                           Checkbox(
                             value: _seleccionados[d.id] ?? false,
-                            activeColor: AppColors.brandDark,
+                            activeColor: widget.marca,
                             onChanged: (val) {
                               setState(() => _seleccionados[d.id] = val ?? false);
                             },
@@ -1545,45 +1550,57 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
                         ),
                         Text(
                           '${_montoTotal.toStringAsFixed(2)} Bs',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.brandDark),
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: widget.marca),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _guardando ? null : () => Navigator.of(context).pop(),
-                          style: OutlinedButton.styleFrom(
-                            shape: const RoundedRectangleBorder(),
-                            minimumSize: const Size.fromHeight(44),
-                          ),
-                          child: const Text('CANCELAR'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: (!_haySeleccionados || _guardando) ? null : _confirmar,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.brandDark,
-                            foregroundColor: AppColors.brandWhite,
-                            shape: const RoundedRectangleBorder(),
-                            minimumSize: const Size.fromHeight(44),
-                          ),
-                          child: Text(
-                            _guardando ? 'ENVIANDO...' : 'CONFIRMAR SOLICITUD',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
+            ),
+          ),
+          // Botones fijos abajo, por encima de los botones del celular, con
+          // el color de la tienda.
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + MediaQuery.viewPaddingOf(context).bottom),
+            decoration: const BoxDecoration(
+              color: AppColors.brandWhite,
+              border: Border(top: BorderSide(color: AppColors.grayBorderLight)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _guardando ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: widget.marca,
+                      side: BorderSide(color: widget.marca),
+                      shape: const RoundedRectangleBorder(),
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    child: const Text('CANCELAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: (!_haySeleccionados || _guardando) ? null : _confirmar,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.marca,
+                      foregroundColor: AppColors.brandWhite,
+                      disabledBackgroundColor: widget.marca.withValues(alpha: 0.4),
+                      disabledForegroundColor: AppColors.brandWhite,
+                      shape: const RoundedRectangleBorder(),
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    child: Text(
+                      _guardando ? 'ENVIANDO...' : 'CONFIRMAR SOLICITUD',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
