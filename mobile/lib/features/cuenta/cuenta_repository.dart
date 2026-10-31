@@ -93,6 +93,8 @@ class MetodoCobro {
         banco = j['banco'] as String?,
         numeroCuenta = j['numero_cuenta'] as String?,
         titular = j['titular'] as String?,
+        tipoCuenta = j['tipo_cuenta'] as String?,
+        documentoTitular = j['documento_titular'] as String?,
         requiereComprobante = j['requiere_comprobante'] as bool? ?? true;
 
   final int id;
@@ -103,6 +105,8 @@ class MetodoCobro {
   final String? banco;
   final String? numeroCuenta;
   final String? titular;
+  final String? tipoCuenta;
+  final String? documentoTitular;
   final bool requiereComprobante;
 }
 

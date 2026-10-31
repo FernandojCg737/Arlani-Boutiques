@@ -120,15 +120,12 @@ class _ProductoDetalleScreenState extends ConsumerState<ProductoDetalleScreen> {
       return;
     }
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _conTema(
-          AgregarCarritoScreen(
-            productoId: productoId,
-            productoNombre: productoNombre,
-          ),
-        ),
-      ),
+    // Ventanita sobre la pagina, con el color de la tienda del producto.
+    await mostrarAgregarCarrito(
+      context,
+      productoId: productoId,
+      productoNombre: productoNombre,
+      envolver: _conTema,
     );
   }
 

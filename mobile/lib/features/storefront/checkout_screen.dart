@@ -1,38 +1,50 @@
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/api_client.dart';
 import '../../core/api_config.dart';
-import '../../core/secure_storage.dart';
-import '../../core/theme.dart';
-import '../../models/carrito.dart';
+import '../../widgets/whatsapp_float_button.dart';
+import '../cuenta/cuenta_repository.dart';
+import '../cuenta/estilo_cuenta.dart';
+import '../cuenta/mis_direcciones.dart';
+import '../empezar/panel_paypal.dart';
+import '../portada/encabezado_plataforma.dart';
+import '../portada/plataforma_data.dart';
+import '../portada/secciones_cierre.dart';
 import 'cart_provider.dart';
-import 'ventas_repository.dart';
+import 'catalogo_provider.dart';
+import 'checkout_repository.dart';
 
-enum _Estado { formulario, subiendo, listo }
+// Colores de `checkout.scss`.
+const _oscuro = Color(0xFF203C40);
+const _borde = Color(0xFFE8E5E3);
+const _gris = Color(0xFF999999);
+const _texto = Color(0xFF555555);
 
-enum _Metodo { paypal, qr }
+String _bs(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
 
-/// CU11, lado cliente: checkout del carrito. Dos metodos de pago, igual que
-/// la web: PayPal/tarjeta de credito y QR por transferencia (subis la foto
-/// del comprobante, un cajero/encargado la revisa despues). PayPal se
-/// muestra INLINE con los botones reales del JS SDK (misma pagina que usa
-/// la web, embebida en un WebView chico -- ver `/paypal-embed` en el
-/// backend), en vez de un boton propio que abra algo aparte: asi el
-/// cliente ve, ahi mismo, tanto "Pagar con PayPal" como "Pagar con tarjeta
-/// de debito/credito" (el SDK agrega este segundo boton solo cuando
-/// corresponde), igual que en la web.
-///
-/// La sucursal de retiro de CADA producto se elige al agregarlo al carrito
-/// (pedido explicito del usuario), no aca -- si el carrito termina con
-/// productos de sucursales distintas, un solo pago se reparte en varias
-/// ventas, una por sucursal.
+class _Pagada {
+  const _Pagada(this.tienda, this.color, this.ventas, this.pendiente, this.metodo);
+
+  final String tienda;
+  final Color color;
+  final List<VentaCreada> ventas;
+  final bool pendiente;
+  final String metodo;
+}
+
+enum _Estado { cargando, listo, vacio, error }
+
+/// CU11 + CU21: "Finalizar compra" igual que `pages/checkout` de la web. Cada
+/// tienda se paga por separado con sus propios metodos (PayPal en un panel
+/// dentro de la pantalla, o QR/transferencia con comprobante); con varias
+/// tiendas tambien se puede pagar todo junto. Lo pagado queda arriba y el
+/// carrito se vacia de esa tienda.
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
 
@@ -41,512 +53,825 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
-  _Estado _estado = _Estado.formulario;
-  _Metodo _metodo = _Metodo.paypal;
-  _Metodo? _metodoUsado;
-  XFile? _comprobante;
-  String _error = '';
-  List<VentaCreada> _ventasCreadas = [];
-  List<StockCheckoutItem> _stockStatus = [];
-  bool _verificandoStock = false;
-  bool _stockVerificado = false;
-  WebViewController? _paypalController;
-  // Arranca chico (solo los botones) y despues la pagina misma le avisa
-  // (canal PaypalHeightChannel) cuanto mide de verdad cuando el formulario
-  // de tarjeta se despliega -- asi no hace falta scroll DENTRO del WebView
-  // (que quedaba atrapado por el scroll de la pagina de afuera y no dejaba
-  // ver el boton de pagar, reportado por el usuario) porque el WebView
-  // termina siendo tan alto como su contenido real, y es la pagina entera
-  // del checkout la unica que scrollea.
-  double _paypalWebviewHeight = 130;
+  final _scroll = ScrollController();
+  final _panelKey = GlobalKey();
 
-  List<StockCheckoutItem> get _itemsSinStock => _stockStatus.where((i) => !i.disponible).toList();
-  bool get _stockOk => !_verificandoStock && _stockVerificado && _itemsSinStock.isEmpty;
+  _Estado _estado = _Estado.cargando;
+  List<TiendaCheckout> _tiendas = [];
+  List<StockItem>? _stock;
+  final List<_Pagada> _pagadas = [];
+  Map<int, EstadoSucursal> _sucursales = {};
+
+  // Entrega: recojo en la sucursal o envio a una direccion (vale para todo).
+  List<DireccionCliente> _direcciones = [];
+  String _entrega = 'retiro';
+  int? _direccionId;
+  bool get _entregaLista => _entrega == 'retiro' || _direccionId != null;
+  int? get _direccionEnvio => _entrega == 'envio' ? _direccionId : null;
+
+  // Lo que se esta pagando ahora: una tienda con un metodo, o todo junto.
+  int? _empresaActiva;
+  MetodoCobro? _metodo;
+  bool _modoTodo = false;
+  (String, String)? _panel;
+  XFile? _archivo;
+  bool _procesando = false;
+  String? _error;
+
+  CheckoutRepository get _repo => ref.read(checkoutRepositoryProvider);
 
   @override
   void initState() {
     super.initState();
-    _iniciarPaypalWebview();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _verificarStock());
-  }
-
-  // CU11, pedido del usuario: antes esto solo se descubria recien al
-  // aprobar el pago en PayPal o subir el comprobante QR. Cada item del
-  // carrito ya trae su propia sucursal (elegida al agregarlo), asi que esto
-  // solo re-confirma que el stock siga estando -- mismo endpoint que usa el
-  // checkout web.
-  Future<void> _verificarStock() async {
-    setState(() {
-      _verificandoStock = true;
-      _stockVerificado = false;
-    });
-    try {
-      final items = await ref.read(ventasRepositoryProvider).verificarStock();
-      if (!mounted) return;
-      setState(() {
-        _stockStatus = items;
-        _stockVerificado = true;
-        _verificandoStock = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      // Si falla el chequeo no bloqueamos el pago con esto -- la validacion
-      // real y definitiva sigue estando del lado del backend al capturar.
-      setState(() {
-        _stockStatus = [];
-        _stockVerificado = true;
-        _verificandoStock = false;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {});
-        _iniciarPaypalWebview();
-      }
-    }
-  }
-
-  Future<void> _iniciarPaypalWebview() async {
-    if (_paypalController != null || !_stockOk) return;
-    final token = await SecureStorage().readToken();
-    if (token == null || !mounted) return;
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
-      // El SDK de PayPal detecta que esta corriendo dentro de un WebView
-      // embebido (no un navegador de verdad) por el user-agent por defecto
-      // de Android WebView, y por prevencion de phishing degrada la
-      // experiencia a un cartel generico "Pagar con PayPal" sin los
-      // botones reales -- confirmado comparando contra Chrome normal en el
-      // mismo emulador, donde se ve perfecto. Se le pone un user-agent de
-      // Chrome de escritorio/movil normal (sin el marcador propio de
-      // WebView) para que el SDK lo trate como un navegador real.
-      ..setUserAgent(
-        'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/133.0.6943.137 Mobile Safari/537.36',
-      )
-      ..addJavaScriptChannel('PaypalResultChannel', onMessageReceived: (msg) => _onPaypalMensaje(msg.message))
-      ..addJavaScriptChannel('PaypalHeightChannel', onMessageReceived: (msg) => _onPaypalAltura(msg.message))
-      ..setNavigationDelegate(NavigationDelegate(onPageFinished: _onPaypalNavego))
-      ..loadRequest(Uri.parse(paypalEmbedUrl(token)));
-    setState(() => _paypalController = controller);
-  }
-
-  // El boton "PayPal" (ver paypal_embed.py) navega, dentro de este mismo
-  // WebView, al checkout real de PayPal (otro dominio, fuera de nuestro
-  // control) -- esa pagina no tiene el script que le avisa a Flutter su
-  // alto real (PaypalHeightChannel es nuestro, solo esta en /paypal-embed),
-  // asi que el WebView se quedaba con el ultimo alto chico de ANTES de
-  // navegar y el campo de correo del login de PayPal quedaba fuera de vista
-  // (invisible, no realmente "no funcionaba" -- reportado por el usuario
-  // como que no se podia escribir nada ahi). Mientras la pagina cargada sea
-  // de otro dominio, se usa el alto completo de la pantalla a ciegas; al
-  // volver a nuestro dominio (retorno/cancelado) el propio script de esas
-  // paginas vuelve a reportar su alto real y se encoge de nuevo.
-  void _onPaypalNavego(String url) {
-    if (!mounted) return;
-    final esNuestroDominio = Uri.parse(url).host == Uri.parse(paypalEmbedUrl('')).host;
-    if (!esNuestroDominio) {
-      setState(() => _paypalWebviewHeight = MediaQuery.of(context).size.height);
-    }
-  }
-
-  void _onPaypalAltura(String raw) {
-    final alto = double.tryParse(raw);
-    if (alto == null || !mounted) return;
-    // Clamps: nunca mas chico que los botones solos, ni mas grande que la
-    // pantalla completa (por si algun campo de direccion la infla de mas).
-    // El 0.75 anterior le cortaba el formulario justo antes del boton de
-    // "Pagar" final (con direccion de facturacion completa, numero + venc.
-    // + CSC + nombre/direccion/ciudad/estado/zip/telefono no entraban).
-    final maxAlto = MediaQuery.of(context).size.height;
-    final nuevo = alto.clamp(130.0, maxAlto).toDouble();
-    if ((nuevo - _paypalWebviewHeight).abs() > 2) {
-      setState(() => _paypalWebviewHeight = nuevo);
-    }
-  }
-
-  void _onPaypalMensaje(String raw) {
-    Map<String, dynamic> data;
-    try {
-      data = jsonDecode(raw) as Map<String, dynamic>;
-    } catch (_) {
-      return;
-    }
-    switch (data['status']) {
-      case 'approved':
-        final orderId = data['orderId'] as String?;
-        if (orderId != null) _capturarPaypal(orderId);
-      case 'error':
-        if (mounted) setState(() => _error = (data['message'] as String?) ?? 'Ocurrio un error con PayPal.');
-    }
-  }
-
-  Future<void> _capturarPaypal(String orderId) async {
-    if (!_stockOk) return;
-
-    setState(() {
-      _estado = _Estado.subiendo;
-      _error = '';
-    });
-    try {
-      final ventas = await ref.read(ventasRepositoryProvider).capturarOrdenPaypal(orderId: orderId);
-      await ref.read(cartProvider.notifier).cargar();
-      if (mounted) {
-        setState(() {
-          _ventasCreadas = ventas;
-          _metodoUsado = _Metodo.paypal;
-          _estado = _Estado.listo;
-        });
-      }
-    } catch (err) {
-      if (mounted) {
-        setState(() {
-          _error = extractErrorMessage(err);
-          _estado = _Estado.formulario;
-        });
-      }
-    }
-  }
-
-  Future<void> _elegirFoto(ImageSource source) async {
-    try {
-      final archivo = await ImagePicker().pickImage(source: source, imageQuality: 85);
-      if (archivo != null && mounted) setState(() => _comprobante = archivo);
-    } catch (_) {
-      // El usuario cancelo el picker o no dio permiso -- no hace falta avisar.
-    }
-  }
-
-  Future<void> _confirmar() async {
-    final comprobante = _comprobante;
-    if (comprobante == null || !_stockOk) return;
-
-    setState(() {
-      _estado = _Estado.subiendo;
-      _error = '';
-    });
-    try {
-      final ventas = await ref.read(ventasRepositoryProvider).checkoutQr(
-            filePath: comprobante.path,
-            fileName: comprobante.name,
-          );
-      await ref.read(cartProvider.notifier).cargar();
-      if (mounted) {
-        setState(() {
-          _ventasCreadas = ventas;
-          _metodoUsado = _Metodo.qr;
-          _estado = _Estado.listo;
-        });
-      }
-    } catch (err) {
-      if (mounted) {
-        setState(() {
-          _error = extractErrorMessage(err);
-          _estado = _Estado.formulario;
-        });
-      }
-    }
+    _cargar();
+    _cargarDirecciones();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final cart = ref.watch(cartProvider);
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('FINALIZAR COMPRA')),
-      body: SafeArea(
-        child: _estado == _Estado.listo
-            ? _exito()
-            : cart.items.isEmpty
-                ? const Center(child: Text('Tu carrito esta vacio.'))
-                : _formulario(cart.total, cart.items),
+  Future<void> _cargar() async {
+    try {
+      final tiendas = await _repo.tiendas();
+      if (!mounted) return;
+      setState(() {
+        _tiendas = tiendas;
+        _estado = tiendas.isEmpty ? _Estado.vacio : _Estado.listo;
+      });
+      if (tiendas.isEmpty) return;
+      _verificarStock();
+      _cargarEstadoSucursales();
+    } catch (_) {
+      if (mounted) setState(() => _estado = _Estado.error);
+    }
+  }
+
+  Future<void> _verificarStock() async {
+    try {
+      final s = await _repo.verificarStock();
+      if (mounted) setState(() => _stock = s);
+    } catch (_) {
+      // La validacion definitiva la hace el backend al registrar la venta.
+      if (mounted) setState(() => _stock = []);
+    }
+  }
+
+  // CU16: sucursales sin caja abierta ahora (se avisa que se prepara al abrir).
+  Future<void> _cargarEstadoSucursales() async {
+    final ids = {for (final t in _tiendas) for (final i in t.items) i.sucursalId};
+    final estados = <int, EstadoSucursal>{};
+    await Future.wait(ids.map((id) async {
+      try {
+        estados[id] = await _repo.estadoSucursal(id);
+      } catch (_) {}
+    }));
+    if (mounted) setState(() => _sucursales = estados);
+  }
+
+  Future<void> _cargarDirecciones() async {
+    try {
+      final ds = await ref.read(cuentaRepositoryProvider).direcciones();
+      if (!mounted) return;
+      setState(() {
+        _direcciones = ds;
+        _direccionId = (ds.where((d) => d.predeterminada).firstOrNull ?? ds.firstOrNull)?.id;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _agregarDireccion() async {
+    final d = await abrirHojaCuenta<DireccionCliente>(
+      context,
+      titulo: 'Nueva dirección de envío',
+      subtitulo: 'Marca en el mapa dónde quieres recibir tu pedido.',
+      cuerpo: (_) => const FormularioDireccion(),
+    );
+    if (d == null || !mounted) return;
+    setState(() {
+      _direcciones = [..._direcciones, d];
+      _direccionId = d.id;
+      _entrega = 'envio';
+    });
+  }
+
+  List<StockItem> _faltantes(TiendaCheckout t) {
+    final ids = {for (final i in t.items) i.detalleId};
+    return [for (final s in _stock ?? <StockItem>[]) if (!s.disponible && ids.contains(s.detalleId)) s];
+  }
+
+  bool _puedePagar(TiendaCheckout t) =>
+      t.operativa && t.metodos.isNotEmpty && _stock != null && _faltantes(t).isEmpty && _entregaLista;
+
+  List<String> _cerradas(TiendaCheckout t) =>
+      {for (final i in t.items) if (_sucursales[i.sucursalId]?.abierta == false) i.sucursalNombre}.toList();
+
+  String? _horario(TiendaCheckout t) {
+    for (final i in t.items) {
+      final e = _sucursales[i.sucursalId];
+      if (e != null && !e.abierta) return e.horario;
+    }
+    return null;
+  }
+
+  void _cerrarPago() {
+    _empresaActiva = null;
+    _metodo = null;
+    _modoTodo = false;
+    _panel = null;
+    _archivo = null;
+  }
+
+  void _elegirEntrega(String e) => setState(() {
+        _entrega = e;
+        // Cambiar la entrega cierra el pago abierto (se vuelve a abrir).
+        _cerrarPago();
+      });
+
+  /// Elegir como pagar a una tienda. Con PayPal se abre el panel ahi mismo.
+  Future<void> _elegir(TiendaCheckout t, MetodoCobro m) async {
+    if (_procesando) return;
+    setState(() {
+      _error = null;
+      _cerrarPago();
+      _empresaActiva = t.empresaId;
+      _metodo = m;
+    });
+    if (m.tipo == 'paypal') await _abrirPanel(t.empresaId);
+  }
+
+  Future<void> _pagarTodo() async {
+    if (_procesando) return;
+    setState(() {
+      _error = null;
+      _cerrarPago();
+      _modoTodo = true;
+    });
+    await _abrirPanel(null);
+  }
+
+  Future<void> _abrirPanel(int? empresaId) async {
+    setState(() => _procesando = true);
+    try {
+      final (orderId, url) = await _repo.orden(empresaId);
+      if (url == null) throw StateError('sin enlace');
+      if (!mounted) return;
+      setState(() => _panel = (orderId, url));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _panelKey.currentContext;
+        if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 400), alignment: 0.05);
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = 'No se pudo iniciar el pago con PayPal. ${extractErrorMessage(e)}');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Future<void> _alTerminarPaypal(int? empresaId, String? orderId) async {
+    setState(() => _panel = null);
+    if (orderId == null) {
+      setState(() => _error = 'Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.');
+      return;
+    }
+    setState(() => _procesando = true);
+    try {
+      final ventas = await _repo.capturar(empresaId, orderId, _direccionEnvio);
+      await _registrarPago(empresaId, ventas, false, empresaId == null ? 'Pagar todo (PayPal)' : 'PayPal');
+    } catch (e) {
+      if (mounted) setState(() => _error = extractErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  Future<void> _elegirFoto() async {
+    final f = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (f == null) return;
+    if (await f.length() > 5 * 1024 * 1024) {
+      setState(() => _error = 'La foto pesa más de 5 MB. Elige una más liviana.');
+      return;
+    }
+    setState(() {
+      _archivo = f;
+      _error = null;
+    });
+  }
+
+  Future<void> _enviarComprobante(TiendaCheckout t) async {
+    final m = _metodo;
+    final f = _archivo;
+    if (m == null || f == null || _procesando) return;
+    setState(() {
+      _procesando = true;
+      _error = null;
+    });
+    try {
+      final ventas = await _repo.comprobante(t.empresaId, m.id, f.path, f.name, _direccionEnvio);
+      await _registrarPago(t.empresaId, ventas, true, m.nombre);
+    } catch (e) {
+      if (mounted) setState(() => _error = extractErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
+  /// Guarda el resultado arriba, saca lo pagado y refresca el carrito (lo de
+  /// las demas tiendas sigue para pagarlo despues).
+  Future<void> _registrarPago(int? empresaId, List<VentaCreada> ventas, bool pendiente, String metodo) async {
+    final porTienda = <String, List<VentaCreada>>{};
+    for (final v in ventas) {
+      final nombre = v.tiendaNombre ?? _tiendas.where((t) => t.empresaId == empresaId).firstOrNull?.nombre ?? 'Tienda';
+      (porTienda[nombre] ??= []).add(v);
+    }
+    setState(() {
+      for (final e in porTienda.entries) {
+        final hex = e.value.first.tiendaColor ?? _tiendas.where((t) => t.nombre == e.key).firstOrNull?.colorMarca ?? '#1f2a44';
+        _pagadas.add(_Pagada(e.key, colorDesdeHex(hex), e.value, pendiente, metodo));
+      }
+      _cerrarPago();
+    });
+    await ref.read(cartProvider.notifier).cargar();
+    try {
+      final tiendas = await _repo.tiendas();
+      if (!mounted) return;
+      setState(() {
+        _tiendas = tiendas;
+        if (tiendas.isEmpty) _estado = _Estado.vacio;
+      });
+      if (tiendas.isNotEmpty) _verificarStock();
+    } catch (_) {
+      if (mounted) setState(() => _tiendas = _tiendas.where((t) => t.empresaId != empresaId).toList());
+    }
+    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+  }
+
+  void _volver() => context.canPop() ? context.pop() : context.go('/carrito');
+
+  // ---------------------------------------------------------------- pagina
+
+  @override
+  Widget build(BuildContext context) {
+    final arriba = MediaQuery.paddingOf(context).top + EncabezadoPlataforma.alto;
+    void irA(SeccionPortada s) => context.go(s == SeccionPortada.inicio ? '/' : '/?seccion=${s.name}');
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scroll,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(padding: EdgeInsets.fromLTRB(20, arriba + 40, 20, 72), child: _contenido()),
+                  PiePlataforma(onIrA: irA),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: EncabezadoPlataforma(
+                solido: true,
+                pleno: true,
+                onIrA: irA,
+                onBuscar: (texto) {
+                  ref.read(tiendaFiltrosProvider.notifier).setBusqueda(texto.trim());
+                  context.go('/catalogo');
+                },
+              ),
+            ),
+            Positioned(right: 16, bottom: 16 + MediaQuery.paddingOf(context).bottom, child: const WhatsappFloatButton()),
+          ],
+        ),
       ),
     );
   }
 
-  Map<String, List<DetalleCarrito>> _agruparPorSucursal(List<DetalleCarrito> items) {
-    final grupos = <String, List<DetalleCarrito>>{};
-    for (final item in items) {
-      grupos.putIfAbsent(item.sucursalNombre, () => []).add(item);
-    }
-    return grupos;
-  }
-
-  Widget _formulario(double total, List<DetalleCarrito> items) {
-    final grupos = _agruparPorSucursal(items);
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
+  Widget _contenido() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('RESUMEN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 8),
-        for (final entry in grupos.entries) ...[
-          Text('RETIRAS EN ${entry.key.toUpperCase()}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 4),
-          for (final item in entry.value)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '${item.cantidad}x ${item.productoNombre} (${item.tallaCodigo}, ${item.colorNombre})',
-                style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: InkWell(
+            onTap: _volver,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.arrow_back, size: 16, color: _oscuro),
+                  const SizedBox(width: 6),
+                  Text('VOLVER AL CARRITO',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: _oscuro)),
+                ],
               ),
             ),
-          const SizedBox(height: 8),
-        ],
-        if (grupos.length > 1)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              'Tu pedido se retira en ${grupos.length} sucursales distintas -- se va a generar una compra separada por cada una, todas pagadas de una sola vez.',
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
-            ),
           ),
-        Text('${total.toStringAsFixed(2)} Bs', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.brandDark)),
-        const Divider(height: 32),
-
-        if (_error.isNotEmpty) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            color: const Color(0xFFFDECEA),
-            child: Text(_error, style: const TextStyle(color: Color(0xFFB3261E), fontSize: 13)),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        if (_verificandoStock)
-          const Text('Comprobando stock...', style: TextStyle(fontSize: 12, color: Colors.grey)),
-
-        if (!_verificandoStock && _itemsSinStock.isNotEmpty) ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            color: const Color(0xFFFDECEA),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Ya no hay stock suficiente de:', style: TextStyle(color: Color(0xFFB3261E), fontSize: 13, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                for (final item in _itemsSinStock)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      '${item.productoNombre} (${item.tallaCodigo}, ${item.colorNombre}) en ${item.sucursalNombre} -- '
-                      'pediste ${item.cantidadPedida}, hay ${item.cantidadDisponible}',
-                      style: const TextStyle(color: Color(0xFFB3261E), fontSize: 12),
-                    ),
-                  ),
-                const SizedBox(height: 6),
-                const Text('Volve al carrito y ajusta las cantidades o saca esos productos.', style: TextStyle(color: Color(0xFFB3261E), fontSize: 12)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        if (_stockOk) ...[
-        const Text('METODO DE PAGO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: _MetodoOpcion(
-                icon: Icons.account_balance_wallet_outlined,
-                label: 'PayPal / Tarjeta',
-                selected: _metodo == _Metodo.paypal,
-                onTap: () {
-                  setState(() => _metodo = _Metodo.paypal);
-                  _iniciarPaypalWebview();
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MetodoOpcion(
-                icon: Icons.qr_code_2,
-                label: 'QR (transferencia)',
-                selected: _metodo == _Metodo.qr,
-                onTap: () => setState(() => _metodo = _Metodo.qr),
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: 20),
-
-        if (_metodo == _Metodo.paypal) ...[
-          const Text(
-            'Paga con tu cuenta de PayPal o con tarjeta de credito/debito como invitado.',
-            style: TextStyle(fontSize: 12, color: AppColors.grayTextDark),
-          ),
-          const SizedBox(height: 12),
-          if (_estado == _Estado.subiendo)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 12),
-                    Text('Confirmando tu pago...', style: TextStyle(fontSize: 12, color: AppColors.grayTextDark)),
-                  ],
-                ),
-              ),
-            )
-          else if (_paypalController == null)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Center(child: CircularProgressIndicator()))
-          else
-            // Alto dinamico (ver PaypalHeightChannel/_onPaypalAltura): con
-            // un alto fijo, el boton "Debit or Credit Card" abria un
-            // formulario (numero, vencimiento, CSC, direccion) mas alto que
-            // el recuadro, y como el WebView esta anidado en esta misma
-            // lista que scrollea, no habia forma de scrollear DENTRO del
-            // WebView para llegar al boton de pagar -- quedaba atrapado.
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              height: _paypalWebviewHeight,
-              child: WebViewWidget(controller: _paypalController!),
-            ),
-        ] else ...[
-          const Text(
-            'Transferi a nuestro QR y despues subi la foto del comprobante. Un cajero lo revisa y confirma tu compra.',
-            style: TextStyle(fontSize: 12, color: AppColors.grayTextDark),
-          ),
-          const SizedBox(height: 12),
-          // El QR es de monto libre (ALTOKE/BancoSol no nos da forma de
-          // generarlo con el monto ya puesto), asi que se lo repetimos bien
-          // grande aca al lado para que no se equivoquen al escanearlo.
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            color: const Color(0xFFF7F7F5),
-            child: Column(
-              children: [
-                const Text(
-                  'MONTO EXACTO A TRANSFERIR',
-                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Colors.grey),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${total.toStringAsFixed(2)} Bs',
-                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.brandDark),
-                ),
-              ],
-            ),
-          ),
+        Text('FINALIZAR COMPRA', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: _oscuro)),
+        if (_estado == _Estado.listo && _tiendas.length > 1) ...[
           const SizedBox(height: 8),
-          Image.asset('assets/qr-transferencia.png', height: 180, errorBuilder: (_, _, _) => const SizedBox.shrink()),
-          const SizedBox(height: 6),
-          const Text(
-            'Este QR es de monto libre: escribi vos el monto de arriba al escanearlo. Si transferis un monto distinto, la revision de tu comprobante se va a demorar mas.',
-            style: TextStyle(fontSize: 11, color: Color(0xFFB3261E)),
-          ),
-          const SizedBox(height: 20),
-
-          const Text('COMPROBANTE DE TRANSFERENCIA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 6),
-          if (_comprobante != null) ...[
-            Image.file(File(_comprobante!.path), height: 160, fit: BoxFit.cover),
-            const SizedBox(height: 8),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _elegirFoto(ImageSource.camera),
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('CAMARA'),
-                  style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder()),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _elegirFoto(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('GALERIA'),
-                  style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          ElevatedButton(
-            onPressed: (_estado == _Estado.subiendo || _comprobante == null) ? null : _confirmar,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandDark, minimumSize: const Size.fromHeight(48), shape: const RoundedRectangleBorder()),
-            child: Text(_estado == _Estado.subiendo ? 'ENVIANDO...' : 'CONFIRMAR PAGO'),
+          Text(
+            'Tu carrito tiene prendas de ${_tiendas.length} tiendas. Cada tienda cobra por separado con sus propios métodos: paga una y luego la siguiente.',
+            style: GoogleFonts.inter(fontSize: 14, height: 1.5, color: const Color(0xFF666666)),
           ),
         ],
-        ],
+        const SizedBox(height: 24),
+        for (final p in _pagadas) _pagada(p),
+        switch (_estado) {
+          _Estado.cargando => cargandoCuenta(),
+          _Estado.error => Text('No pudimos cargar el checkout. Intenta de nuevo en unos segundos.',
+              style: GoogleFonts.inter(fontSize: 14, color: _texto)),
+          _Estado.vacio => _vacio(),
+          _Estado.listo => _listo(),
+        },
       ],
     );
   }
 
-  Widget _exito() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle_outline, size: 56, color: AppColors.brandDark),
-            const SizedBox(height: 16),
-            Text(
-              _ventasCreadas.length > 1 ? 'Se generaron ${_ventasCreadas.length} compras.' : 'Compra #${_ventasCreadas.firstOrNull?.id} registrada.',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            if (_ventasCreadas.length > 1) ...[
-              const SizedBox(height: 8),
-              for (final venta in _ventasCreadas)
-                Text('Compra #${venta.id} -- ${venta.sucursalNombre}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            ],
+  /// `.checkout-pagada`: lo que ya se pago en esta visita.
+  Widget _pagada(_Pagada p) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF7F1),
+        border: Border(left: BorderSide(color: p.color, width: 4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(p.tienda, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF1F5135))),
+          const SizedBox(height: 4),
+          Text(
+            p.pendiente
+                ? 'Recibimos tu comprobante (${p.metodo}). La tienda lo revisa y te avisamos cuando confirme tu pago.'
+                : 'Pagado con ${p.metodo}. Ya puedes recoger tu pedido.',
+            style: GoogleFonts.inter(fontSize: 13, height: 1.45, color: const Color(0xFF1F5135)),
+          ),
+          const SizedBox(height: 6),
+          for (final v in p.ventas)
+            Text('Compra #${v.id} · ${v.sucursalNombre}',
+                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF1F5135))),
+        ],
+      ),
+    );
+  }
+
+  Widget _vacio() {
+    final pago = _pagadas.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: BoxDecoration(border: Border.all(color: _borde)),
+      child: Column(
+        children: [
+          Text(pago ? '¡Listo! No te queda nada por pagar' : 'Tu carrito está vacío',
+              textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: _oscuro)),
+          if (pago) ...[
             const SizedBox(height: 8),
-            Text(
-              _metodoUsado == _Metodo.paypal
-                  ? 'Tu pago con PayPal quedo confirmado. Ya podes pasar a recoger tu pedido.'
-                  : 'Tu comprobante quedo en revision. Te avisamos apenas se confirme.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => context.go('/'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandDark, shape: const RoundedRectangleBorder()),
-              child: const Text('VOLVER AL INICIO'),
-            ),
+            Text('Puedes ver tus compras y sus facturas en Mi cuenta.',
+                textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF666666))),
           ],
+          const SizedBox(height: 18),
+          BotonCuenta(pago ? 'Ver mis compras' : 'Ir al catálogo', onTap: () => context.go(pago ? '/perfil' : '/catalogo')),
+        ],
+      ),
+    );
+  }
+
+  Widget _listo() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_error != null) AvisoCuenta(_error!, error: true),
+        _entregaSeccion(),
+        const SizedBox(height: 24),
+        for (final t in _tiendas) ...[_tienda(t), const SizedBox(height: 20)],
+        if (_tiendas.length > 1) _todoJunto(),
+      ],
+    );
+  }
+
+  Widget _etiqueta(String texto) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(texto.toUpperCase(), style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: _gris)),
+      );
+
+  /// `.checkout-metodo`: opcion con titulo y detalle (activa con el color de la tienda).
+  Widget _opcion(String titulo, String detalle, bool activa, VoidCallback? onTap, {Color marca = _oscuro}) {
+    return Opacity(
+      opacity: onTap == null && !activa ? 0.5 : 1,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(border: Border.all(color: activa ? marca : const Color(0xFFDDDDDD), width: activa ? 2 : 1)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(titulo, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: activa ? _oscuro : _texto)),
+              const SizedBox(height: 2),
+              Text(detalle, style: GoogleFonts.inter(fontSize: 11.5, color: _gris)),
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
-class _MetodoOpcion extends StatelessWidget {
-  const _MetodoOpcion({required this.icon, required this.label, required this.selected, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(border: Border.all(color: selected ? AppColors.brandDark : const Color(0xFFCCCCCC), width: selected ? 1.5 : 1)),
-        child: Row(
-          children: [
-            Icon(icon, color: selected ? AppColors.brandDark : Colors.grey, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.normal, fontSize: 13, color: selected ? AppColors.brandDark : Colors.black87),
+  Widget _entregaSeccion() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _borde)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _etiqueta('¿Cómo recibes tu pedido?'),
+          _opcion('Recojo en sucursal', 'Lo recoges en la sucursal de cada prenda', _entrega == 'retiro', () => _elegirEntrega('retiro')),
+          const SizedBox(height: 8),
+          _opcion('Envío a domicilio', 'La tienda te lo envía a tu dirección', _entrega == 'envio', () => _elegirEntrega('envio')),
+          if (_entrega == 'envio') ...[
+            const SizedBox(height: 14),
+            for (final d in _direcciones)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () => setState(() => _direccionId = d.id),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(border: Border.all(color: _direccionId == d.id ? _oscuro : const Color(0xFFE5E2DF))),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(_direccionId == d.id ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 18, color: _oscuro),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: '${d.alias}  ', style: const TextStyle(fontWeight: FontWeight.w700, color: _oscuro)),
+                                TextSpan(text: '${d.direccion}${d.ciudad != null ? ', ${d.ciudad}' : ''}'),
+                                if (d.referencia != null && d.referencia!.isNotEmpty)
+                                  TextSpan(text: '\n${d.referencia}', style: const TextStyle(fontSize: 12, color: Color(0xFF888888))),
+                              ],
+                            ),
+                            style: GoogleFonts.inter(fontSize: 13, height: 1.4, color: _texto),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _agregarDireccion,
+                style: TextButton.styleFrom(foregroundColor: _oscuro, padding: EdgeInsets.zero),
+                child: Text(
+                  '+ ${_direcciones.isNotEmpty ? 'Agregar otra dirección' : 'Agregar mi dirección con el mapa'}',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.underline),
+                ),
               ),
             ),
+            Text('Cada tienda coordina contigo el costo y la hora de entrega.',
+                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF888888))),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// `.checkout-tienda`: lo de una tienda, con su color arriba.
+  Widget _tienda(TiendaCheckout t) {
+    final marca = colorDesdeHex(t.colorMarca);
+    final cerradas = _cerradas(t);
+    final horario = _horario(t);
+    final faltan = _faltantes(t);
+    final activa = _empresaActiva == t.empresaId;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: marca, width: 4),
+          left: const BorderSide(color: _borde),
+          right: const BorderSide(color: _borde),
+          bottom: const BorderSide(color: _borde),
+        ),
+        boxShadow: activa ? const [BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, 6))] : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Cabecera: logo y nombre de la tienda.
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF0EEEC)))),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: t.logoUrl == null ? marca : const Color(0xFFF7F5F3)),
+                  alignment: Alignment.center,
+                  child: t.logoUrl == null
+                      ? Text(t.nombre.characters.first.toUpperCase(),
+                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white))
+                      : ImagenTienda(t.logoUrl!, width: 44, height: 44),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.nombre, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: _oscuro)),
+                      Text('Retiras en ${t.sucursales.join(', ')}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF888888))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (cerradas.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFF8EC),
+                      border: Border(left: BorderSide(color: Color(0xFFE0A040), width: 3)),
+                    ),
+                    child: Text(
+                      '${cerradas.join(', ')} ${cerradas.length == 1 ? 'está cerrada' : 'están cerradas'} en este momento. Tu compra queda registrada: '
+                      '${_entrega == 'envio' ? 'la enviamos' : 'la puedes recoger'} cuando la sucursal abra su caja${horario != null ? ' ($horario)' : ''}.',
+                      style: GoogleFonts.inter(fontSize: 13, height: 1.45, color: const Color(0xFF6B4A12)),
+                    ),
+                  ),
+                for (final i in t.items)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text('${i.cantidad}× ${i.productoNombre} (${i.tallaCodigo}, ${i.colorNombre})',
+                              style: GoogleFonts.inter(fontSize: 13, height: 1.4, color: const Color(0xFF444444))),
+                        ),
+                        const SizedBox(width: 12),
+                        Text('${_bs(i.subtotal)} Bs', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF444444))),
+                      ],
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text('Total ${t.nombre}', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: _oscuro)),
+                      ),
+                      Text('${_bs(t.total)} Bs', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: _oscuro)),
+                    ],
+                  ),
+                ),
+                if (!t.operativa)
+                  _aviso('Esta tienda no está recibiendo pedidos por ahora. Quita sus prendas del carrito para pagar lo demás.')
+                else if (t.metodos.isEmpty)
+                  _aviso('Esta tienda todavía no configuró cómo cobrar en línea. Puedes pagar en la sucursal o volver más tarde.')
+                else if (faltan.isNotEmpty)
+                  AvisoCuenta(
+                    'Ya no hay stock suficiente de: ${faltan.map((s) => '${s.productoNombre} (${s.tallaCodigo}, ${s.colorNombre}) en ${s.sucursalNombre}: '
+                        'pediste ${s.pedida}, hay ${s.disponibleCantidad}').join('; ')}. Vuelve al carrito y ajusta las cantidades o quita esas prendas.',
+                    error: true,
+                  )
+                else ...[
+                  _etiqueta('¿Cómo pagas a ${t.nombre}?'),
+                  for (final m in t.metodos) ...[
+                    _opcion(
+                      m.nombre,
+                      m.requiereComprobante ? 'Con comprobante' : 'Se confirma al instante',
+                      activa && _metodo?.id == m.id,
+                      _puedePagar(t) && !_procesando ? () => _elegir(t, m) : null,
+                      marca: marca,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (!_entregaLista)
+                    Text('Elige o agrega tu dirección de envío para poder pagar.',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF888888))),
+                  if (activa && _metodo != null) _pago(t, _metodo!),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aviso(String texto) => Container(
+        padding: const EdgeInsets.all(12),
+        color: const Color(0xFFFFF6E5),
+        child: Text(texto, style: GoogleFonts.inter(fontSize: 13, height: 1.45, color: const Color(0xFF7A5200))),
+      );
+
+  Widget _procesandoTexto(String texto) => Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          children: [
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(texto, style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF888888)))),
           ],
         ),
+      );
+
+  Widget _panelPaypal(int? empresaId) {
+    final (orderId, url) = _panel!;
+    return Padding(
+      key: _panelKey,
+      padding: const EdgeInsets.only(top: 12),
+      child: PanelPaypal(
+        url: url,
+        orderId: orderId,
+        alto: (MediaQuery.sizeOf(context).height * 0.78).clamp(480.0, 720.0),
+        alTerminar: (id) => _alTerminarPaypal(empresaId, id),
+      ),
+    );
+  }
+
+  /// `.checkout-pago`: el panel de PayPal o los datos para pagar con comprobante.
+  Widget _pago(TiendaCheckout t, MetodoCobro m) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: 14),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFE3DFDC)))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (m.tipo == 'paypal') ...[
+            Text('Pagas US\$ ${t.totalUsd.toStringAsFixed(2)} (al cambio oficial) con PayPal; inicia sesión en PayPal y aprueba el pago.',
+                style: GoogleFonts.inter(fontSize: 12, height: 1.45, color: const Color(0xFF888888))),
+            if (_procesando) _procesandoTexto(_panel == null ? 'Un momento…' : 'Confirmando tu pago…'),
+            if (_panel != null) _panelPaypal(t.empresaId),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: const Color(0xFFF7F7F5), border: Border.all(color: const Color(0xFFEEEEEE))),
+              child: Column(
+                children: [
+                  Text('MONTO EXACTO A PAGAR',
+                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: _gris)),
+                  const SizedBox(height: 4),
+                  Text('${_bs(t.total)} Bs', style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: _oscuro)),
+                ],
+              ),
+            ),
+            if (m.qrUrl != null) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  decoration: BoxDecoration(border: Border.all(color: const Color(0xFFEEEEEE))),
+                  child: CachedNetworkImage(imageUrl: resolveImageUrl(m.qrUrl!), width: 220, height: 220, fit: BoxFit.contain),
+                ),
+              ),
+            ],
+            if (m.banco != null || m.numeroCuenta != null || m.titular != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: const Color(0xFFF7F7F5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (m.banco != null) _dato('Banco', m.banco!),
+                    if (m.numeroCuenta != null) _dato('Cuenta', '${m.numeroCuenta}${m.tipoCuenta != null ? ' · ${m.tipoCuenta}' : ''}'),
+                    if (m.titular != null) _dato('Titular', '${m.titular}${m.documentoTitular != null ? ' · ${m.documentoTitular}' : ''}'),
+                  ],
+                ),
+              ),
+            ],
+            if (m.instrucciones != null) ...[
+              const SizedBox(height: 10),
+              Text(m.instrucciones!, style: GoogleFonts.inter(fontSize: 13, color: _texto)),
+            ],
+            const SizedBox(height: 10),
+            Text('Paga el monto exacto y sube la foto del comprobante. El personal de ${t.nombre} lo revisa antes de confirmar tu compra.',
+                style: GoogleFonts.inter(fontSize: 12, height: 1.45, color: const Color(0xFF888888))),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _procesando ? null : _elegirFoto,
+              icon: const Icon(Icons.photo_outlined, size: 18),
+              label: Text(_archivo == null ? 'Elegir foto del comprobante' : _archivo!.name,
+                  overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 13)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _oscuro,
+                side: const BorderSide(color: Color(0xFFDDDDDD)),
+                shape: const RoundedRectangleBorder(),
+                minimumSize: const Size.fromHeight(46),
+              ),
+            ),
+            const SizedBox(height: 10),
+            BotonCuenta(
+              _procesando ? 'Enviando…' : 'Enviar comprobante a ${t.nombre}',
+              ancho: true,
+              onTap: _archivo == null || _procesando ? null : () => _enviarComprobante(t),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _dato(String dt, String dd) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text.rich(
+          TextSpan(
+            text: '$dt  ',
+            style: const TextStyle(color: Color(0xFF888888)),
+            children: [TextSpan(text: dd, style: const TextStyle(fontWeight: FontWeight.w600, color: _oscuro))],
+          ),
+          style: GoogleFonts.inter(fontSize: 13),
+        ),
+      );
+
+  // ---------------------------------------------------------- pagar todo
+
+  List<TiendaCheckout> get _sinPagarTodo =>
+      [for (final t in _tiendas) if (!t.operativa || !t.aceptaPagarTodo || _faltantes(t).isNotEmpty) t];
+
+  String _razon(TiendaCheckout t) {
+    if (!t.operativa) return '${t.nombre} no está atendiendo por ahora';
+    if (_faltantes(t).isNotEmpty) return '${t.nombre} tiene prendas sin stock';
+    if (!t.metodos.any((m) => m.tipo == 'paypal')) return '${t.nombre} no recibe pagos con PayPal';
+    return '${t.nombre} todavía no registró el correo de su cuenta PayPal';
+  }
+
+  /// `.checkout-todo`: un solo pago con PayPal para todas las tiendas.
+  Widget _todoJunto() {
+    final total = _tiendas.fold(0.0, (s, t) => s + t.total);
+    final usd = _tiendas.fold(0.0, (s, t) => s + t.totalUsd);
+    final puede = _stock != null && _sinPagarTodo.isEmpty;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: _modoTodo ? _oscuro : _borde, width: _modoTodo ? 2 : 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFFF7F7F5),
+            child: Row(
+              children: [
+                Expanded(child: Text('Total de tu carrito', style: GoogleFonts.inter(fontSize: 15, color: _oscuro))),
+                Text('${_bs(total)} Bs', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: _oscuro)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: puede
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('¿Prefieres pagar todo junto?', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: _oscuro)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Un solo pago con PayPal (US\$ ${usd.toStringAsFixed(2)}) para las ${_tiendas.length} tiendas. Arlani Boutiques cobra y le envía a cada tienda lo suyo al instante. Recibes una factura de cada tienda.',
+                        style: GoogleFonts.inter(fontSize: 13, height: 1.5, color: const Color(0xFF666666)),
+                      ),
+                      const SizedBox(height: 12),
+                      if (!_modoTodo)
+                        BotonCuenta('Pagar todo junto', ancho: true, onTap: _procesando || !_entregaLista ? null : _pagarTodo),
+                      if (_modoTodo && _procesando) _procesandoTexto(_panel == null ? 'Un momento…' : 'Confirmando tu pago…'),
+                      if (_modoTodo && _panel != null) _panelPaypal(null),
+                    ],
+                  )
+                : Text(
+                    _stock == null
+                        ? 'Revisando el stock…'
+                        : 'Pagar todo junto no está disponible: ${_sinPagarTodo.map(_razon).join('; ')}. Paga cada tienda por separado.',
+                    style: GoogleFonts.inter(fontSize: 12, height: 1.45, color: const Color(0xFF888888)),
+                  ),
+          ),
+        ],
       ),
     );
   }
