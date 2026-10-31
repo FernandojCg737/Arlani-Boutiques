@@ -154,8 +154,14 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   Future<void> _abrirCambio(Venta v) async {
     final nuevo = await pedirCambio(context, ref, v.id, colorTienda: v.tiendaColor);
     if (nuevo == null || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
       SnackBar(
+        // Con boton "Ver" Flutter lo dejaria fijo y taparia el aviso siguiente
+        // (p. ej. el de una devolucion): se cierra solo.
+        persist: false,
+        duration: const Duration(seconds: 5),
         content: Text('Pedimos tu cambio #${nuevo.id} a ${nuevo.tiendaNombre}. Te avisamos cuando lo revisen.'),
         action: SnackBarAction(label: 'Ver', onPressed: () => setState(() => _tab = _Tab.cambios)),
       ),
@@ -1317,9 +1323,12 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
 
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Reemplaza cualquier aviso anterior (p. ej. el de un cambio pedido antes).
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
         const SnackBar(
-          content: Text('Tu solicitud de devolución fue enviada con éxito.'),
+          content: Text('Pedimos tu devolución a la tienda. Te avisamos cuando la revisen; síguela en Mis Devoluciones.'),
           backgroundColor: AppColors.success,
         ),
       );
