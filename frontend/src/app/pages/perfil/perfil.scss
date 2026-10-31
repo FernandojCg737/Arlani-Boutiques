@@ -1086,3 +1086,64 @@
     }
   }
 }
+
+.metodos-pago {
+  margin-bottom: 28px;
+
+  &__cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+
+    h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+      color: var(--brand-dark);
+    }
+
+    p {
+      margin: 0;
+      max-width: 560px;
+      font-size: 12px;
+      color: #777;
+    }
+  }
+
+  .perfil-alert {
+    margin-bottom: 12px;
+  }
+
+  .dash-nota {
+    margin-top: 10px;
+  }
+
+  &__subtitulo {
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: var(--brand-dark);
+  }
+}
+
+.paypal-guardado {
+  &__estado {
+    font-weight: 600;
+    color: #b26a00 !important;
+
+    &.is-ok {
+      color: #2e7d32 !important;
+    }
+  }
+
+  &__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .dash-card__info strong {
+    overflow-wrap: anywhere;
+  }
+}

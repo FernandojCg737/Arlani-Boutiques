@@ -75,6 +75,13 @@ class TiendaOfflineOut(BaseModel):
     acepta_paypal: bool = False
 
 
+class PaypalClienteOfflineOut(BaseModel):
+    id: int
+    cuenta: str | None
+    # Solo las autorizadas se pueden cobrar sin conexion.
+    autorizada: bool
+
+
 class DireccionOfflineOut(BaseModel):
     id: int
     alias: str
@@ -88,8 +95,8 @@ class CatalogoClienteOfflineOut(BaseModel):
     tiendas: list[TiendaOfflineOut]
     # Sus direcciones, para elegir envio a domicilio sin conexion.
     direcciones: list[DireccionOfflineOut] = []
-    # Correo del PayPal que guardo para comprar sin conexion (None: no tiene).
-    paypal_guardado: str | None = None
+    # Sus cuentas PayPal (Metodos de pago), para pagar sin conexion.
+    paypals: list[PaypalClienteOfflineOut] = []
 
     @field_serializer("descargado_en")
     def _fecha(self, value: datetime) -> str | None:
@@ -124,6 +131,9 @@ class OperacionOfflineIn(BaseModel):
     # paypal_guardado: se cobra solo al sincronizar con el PayPal que el
     # cliente vinculo antes (ver paypal_guardado.py).
     forma_pago: str | None = Field(default=None, pattern="^(en_linea|contra_entrega|paypal_guardado)$")
+    # Con "paypal_guardado": cual de sus cuentas PayPal autorizadas (Metodos de
+    # pago). Sin ella se usa la ultima autorizada.
+    metodo_pago_id: int | None = None
     items: list[ItemOfflineIn] = Field(min_length=1, max_length=30)
 
     @field_validator("items")

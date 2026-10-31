@@ -51,8 +51,14 @@ export interface CatalogoCliente {
   descargado_en: string;
   tiendas: TiendaLocal[];
   direcciones?: { id: number; alias: string; direccion: string }[];
-  // Correo del PayPal guardado ('' si PayPal no lo dio); null: no tiene.
-  paypal_guardado?: string | null;
+  // Sus cuentas PayPal (Métodos de pago); solo las autorizadas se cobran sin conexión.
+  paypals?: PaypalLocal[];
+}
+
+export interface PaypalLocal {
+  id: number;
+  cuenta: string | null;
+  autorizada: boolean;
 }
 
 export interface PaqueteGuardado {
@@ -100,6 +106,11 @@ export interface ItemLocal {
   producto_nombre: string;
   talla: string;
   color: string;
+  // Cliente: de qué tienda y sucursal es (puede elegir de varias a la vez).
+  empresa_id?: number;
+  empresa_nombre?: string;
+  sucursal_id?: number;
+  sucursal_nombre?: string;
 }
 
 export interface OperacionLocal {
@@ -119,6 +130,9 @@ export interface OperacionLocal {
   entrega?: 'retiro' | 'envio';
   direccion_id?: number | null;
   forma_pago?: 'en_linea' | 'contra_entrega' | 'paypal_guardado' | null;
+  // Con PayPal guardado: cuál de sus cuentas.
+  metodo_pago_id?: number | null;
+  paypal_cuenta?: string | null;
   items: ItemLocal[];
   total: number;
   estado: EstadoOperacion;

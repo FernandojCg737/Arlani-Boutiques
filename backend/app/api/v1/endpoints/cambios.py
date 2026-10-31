@@ -31,6 +31,7 @@ from app.api.v1.endpoints.ventas import (
 )
 from app.core.audit import log_bitacora
 from app.core.aviso_cliente import programar_correo
+from app.api.v1.endpoints.paypal_guardado import registrar_paypal_usado
 from app.core.paypal import captura_de, capturar_orden, crear_orden, obtener_orden, reembolsar_captura
 from app.core.storage import upload_comprobante_pago
 from app.db.session import get_db
@@ -388,6 +389,7 @@ def capturar_diferencia(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayPal no confirmó el pago de la diferencia.")
     db.execute(text("UPDATE cambio_prenda SET captura_id = :c WHERE id = :id"), {"c": captura["id"], "id": cambio_id})
     db.commit()
+    registrar_paypal_usado(db, cliente.id, resultado)
     log_bitacora(db, usuario, "ACTUALIZAR", "cambio_prenda", cambio_id, f"Diferencia del cambio pagada con PayPal (orden {order_id})", request)
     return _to_out(db, _cambio(db, cambio_id, cliente.id))
 

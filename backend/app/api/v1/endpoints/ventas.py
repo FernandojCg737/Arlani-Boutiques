@@ -21,6 +21,7 @@ from app.core.audit import log_bitacora
 from app.core.cifrado import descifrar
 from app.core.errores_db import http_desde_pg
 from app.core.liquidaciones import enviar_liquidaciones
+from app.api.v1.endpoints.paypal_guardado import registrar_paypal_usado
 from app.core.paypal import (
     CuentaPaypal,
     PAYPAL_CURRENCY,
@@ -516,6 +517,7 @@ def capturar_orden_paypal(
             "No se pudo registrar tu compra. El cobro fue revertido; intenta de nuevo.",
         )
 
+    registrar_paypal_usado(db, cliente.id, resultado)
     for venta_id in venta_ids:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta digital pagada con PayPal (orden {order_id})", request)
 
@@ -879,6 +881,7 @@ def capturar_pagar_todo(
             "No se pudo registrar tu compra. El cobro fue revertido; intenta de nuevo.",
         )
 
+    registrar_paypal_usado(db, cliente.id, resultado)
     for venta_id in todas:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta digital pagada con Pagar todo (orden {order_id})", request)
 
@@ -976,6 +979,7 @@ def capturar_orden_paypal_tienda(
             "No se pudo registrar tu compra. El cobro fue revertido; intenta de nuevo.",
         )
 
+    registrar_paypal_usado(db, cliente.id, resultado)
     for venta_id in venta_ids:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta digital pagada con PayPal de la tienda (orden {order_id})", request)
     ventas = _query_venta_con_detalles(db).filter(Venta.id.in_(venta_ids)).all()

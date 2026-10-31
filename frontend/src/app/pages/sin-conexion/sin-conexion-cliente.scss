@@ -22,6 +22,50 @@
     margin: -4px 0 14px;
     font-size: 12px;
   }
+
+  &__al-dia {
+    display: inline-block;
+    margin-left: 4px;
+    color: #2e7d32;
+    font-weight: 600;
+  }
+
+  // Lo elegido de cada tienda y sucursal.
+  &__grupo {
+    margin-bottom: 10px;
+  }
+
+  &__grupo-titulo {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: #666;
+
+    strong {
+      color: var(--brand-dark);
+    }
+
+    span {
+      margin-left: auto;
+      white-space: nowrap;
+    }
+  }
+
+  // Cuentas PayPal para pagar sin conexión.
+  &__paypals {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    .mostrador-opcion {
+      width: 100%;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+  }
 }
 
 // Prenda de una compra con PayPal guardado que no se cobró.

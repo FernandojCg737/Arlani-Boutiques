@@ -72,10 +72,17 @@ interface ItemDevolucionSeleccion {
   seleccionado: boolean;
 }
 
-interface PaypalGuardado {
-  vinculado: boolean;
-  correo: string | null;
-  desde: string | null;
+// Cuenta PayPal del cliente (Métodos de pago): registrada sola al pagar con
+// ella o agregada a mano; autorizada = se puede cobrar sin conexión.
+interface MetodoPagoCliente {
+  id: number;
+  tipo: string;
+  cuenta: string | null;
+  origen: 'automatico' | 'manual';
+  autorizada: boolean;
+  veces_usado: number;
+  ultimo_uso: string | null;
+  creado_en: string;
 }
 
 type Tab =
@@ -198,8 +205,8 @@ export class Perfil implements OnInit {
   protected readonly passwordSuccess = signal('');
   protected readonly passwordSaving = signal(false);
 
-  // ---------- PayPal guardado (compras sin conexión que se cobran solas) ----------
-  protected readonly paypal = signal<PaypalGuardado | null>(null);
+  // ---------- Métodos de pago: sus cuentas PayPal ----------
+  protected readonly metodosPago = signal<MetodoPagoCliente[]>([]);
   protected readonly paypalProcesando = signal(false);
   protected readonly paypalError = signal('');
   protected readonly paypalAviso = signal('');
@@ -216,24 +223,24 @@ export class Perfil implements OnInit {
 
     const tabParam = this.route.snapshot.queryParamMap.get('tab') as Tab | null;
     if (tabParam) this.setTab(tabParam);
-    // Vuelta desde PayPal después de vincular (o cancelar).
+    // Vuelta desde PayPal después de autorizar una cuenta (o cancelar).
     const vuelta = this.route.snapshot.queryParamMap.get('paypal');
     if (vuelta && this.isCliente()) {
       history.replaceState(history.state, '', '/perfil?tab=pagos');
       if (vuelta === 'vinculado') void this.confirmarPaypal();
-      else this.paypalError.set('No se vinculó tu PayPal: cancelaste en PayPal.');
+      else this.paypalError.set('No se autorizó la cuenta: cancelaste en PayPal.');
     }
   }
 
-  private get apiPaypal(): string {
-    return `${environment.apiUrl}/pagos-guardados/paypal`;
+  private get apiPagos(): string {
+    return `${environment.apiUrl}/pagos-guardados`;
   }
 
-  protected async cargarPaypal(): Promise<void> {
+  protected async cargarMetodosPago(): Promise<void> {
     try {
-      this.paypal.set(await firstValueFrom(this.http.get<PaypalGuardado>(this.apiPaypal)));
+      this.metodosPago.set(await firstValueFrom(this.http.get<MetodoPagoCliente[]>(`${this.apiPagos}/metodos`)));
     } catch {
-      this.paypal.set(null);
+      // Sin conexión: se ve lo que ya estaba cargado.
     }
   }
 
@@ -243,7 +250,7 @@ export class Perfil implements OnInit {
     const base = `${location.origin}/perfil?tab=pagos&paypal=`;
     try {
       const r = await firstValueFrom(
-        this.http.post<{ approve_url: string }>(`${this.apiPaypal}/vincular`, {
+        this.http.post<{ approve_url: string }>(`${this.apiPagos}/paypal/vincular`, {
           retorno: base + 'vinculado',
           cancelado: base + 'cancelado',
         }),
@@ -258,25 +265,24 @@ export class Perfil implements OnInit {
   private async confirmarPaypal(): Promise<void> {
     this.paypalProcesando.set(true);
     try {
-      this.paypal.set(await firstValueFrom(this.http.post<PaypalGuardado>(`${this.apiPaypal}/confirmar`, {})));
-      this.paypalAviso.set(
-        'Listo: tu PayPal quedó guardado. Descarga de nuevo el catálogo en «Sin conexión» para poder pagar con él sin internet.',
-      );
+      this.metodosPago.set(await firstValueFrom(this.http.post<MetodoPagoCliente[]>(`${this.apiPagos}/paypal/confirmar`, {})));
+      this.paypalAviso.set('Listo: la cuenta quedó autorizada. Ya puedes elegirla al comprar sin conexión.');
     } catch (err) {
-      this.paypalError.set(this.detalle(err, 'No se pudo guardar tu PayPal. Intenta vincularlo de nuevo.'));
+      this.paypalError.set(this.detalle(err, 'No se pudo autorizar la cuenta. Intenta de nuevo.'));
     } finally {
       this.paypalProcesando.set(false);
     }
   }
 
-  protected async desvincularPaypal(): Promise<void> {
-    if (!confirm('¿Quitar tu PayPal guardado? Las compras sin conexión que aún no se enviaron no se podrán cobrar.')) return;
+  protected async quitarMetodoPago(m: MetodoPagoCliente): Promise<void> {
+    const extra = m.autorizada ? ' Las compras sin conexión con esta cuenta que aún no se enviaron no se podrán cobrar.' : '';
+    if (!confirm(`¿Quitar ${m.cuenta || 'esta cuenta PayPal'} de tus métodos de pago?${extra}`)) return;
     this.paypalProcesando.set(true);
     this.paypalError.set('');
     this.paypalAviso.set('');
     try {
-      this.paypal.set(await firstValueFrom(this.http.delete<PaypalGuardado>(this.apiPaypal)));
-      this.paypalAviso.set('Quitaste tu PayPal guardado.');
+      this.metodosPago.set(await firstValueFrom(this.http.delete<MetodoPagoCliente[]>(`${this.apiPagos}/metodos/${m.id}`)));
+      this.paypalAviso.set('Quitaste la cuenta de tus métodos de pago.');
     } catch (err) {
       this.paypalError.set(this.detalle(err, 'No se pudo quitar. Intenta de nuevo.'));
     } finally {
@@ -293,7 +299,7 @@ export class Perfil implements OnInit {
     this.tab.set(t);
     if (t === 'devoluciones') void this.cargarDevoluciones();
     if (t === 'compras') void this.cargarCambios();
-    if (t === 'pagos') void this.cargarPaypal();
+    if (t === 'pagos') void this.cargarMetodosPago();
   }
 
   private async cargarReservas(): Promise<void> {
