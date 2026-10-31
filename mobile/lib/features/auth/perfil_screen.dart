@@ -18,11 +18,14 @@ import '../portada/estilo_plataforma.dart';
 import '../portada/plataforma_data.dart';
 import '../portada/secciones_cierre.dart';
 import '../storefront/catalogo_provider.dart';
+import '../cuenta/mis_cambios.dart';
+import '../cuenta/mis_devoluciones.dart';
+import '../cuenta/mis_direcciones.dart';
 import '../storefront/reservas_repository.dart';
 import '../storefront/ventas_repository.dart';
 import 'auth_provider.dart';
 
-enum _Tab { resumen, reservas, compras, pagos, notificaciones, datos, seguridad }
+enum _Tab { resumen, reservas, compras, cambios, devoluciones, direcciones, pagos, notificaciones, datos, seguridad }
 
 const _metodoLabel = {'paypal': 'PayPal / Tarjeta', 'qr': 'QR (transferencia)', 'efectivo': 'Efectivo en sucursal'};
 
@@ -145,6 +148,19 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       _comentarioCtrl.clear();
       _errorCalificacion = null;
     });
+  }
+
+  // "Cambiar prenda (24h)": el formulario del cambio; al pedirlo se sigue en Mis Cambios.
+  Future<void> _abrirCambio(Venta v) async {
+    final nuevo = await pedirCambio(context, ref, v.id);
+    if (nuevo == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Pedimos tu cambio #${nuevo.id} a ${nuevo.tiendaNombre}. Te avisamos cuando lo revisen.'),
+        action: SnackBarAction(label: 'Ver', onPressed: () => setState(() => _tab = _Tab.cambios)),
+      ),
+    );
+    await _cargarCompras();
   }
 
   void _abrirSolicitarDevolucion(Venta v) {
@@ -331,7 +347,8 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     final visibleTabs = <_Tab>[
       _Tab.resumen,
       if (auth.hasPermiso('CU10')) _Tab.reservas,
-      if (auth.hasPermiso('CU11')) ...[_Tab.compras, _Tab.pagos],
+      // Mismo orden que la web: compras, cambios, devoluciones, direcciones, pagos.
+      if (auth.hasPermiso('CU11')) ...[_Tab.compras, _Tab.cambios, _Tab.devoluciones, _Tab.direcciones, _Tab.pagos],
       if (auth.hasPermiso('CU14')) _Tab.notificaciones,
       if (auth.hasPermiso('CU15')) ...[_Tab.datos, _Tab.seguridad],
     ];
@@ -401,6 +418,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
           _Tab.resumen => _buildResumen(),
           _Tab.reservas => _buildReservas(),
           _Tab.compras => _buildCompras(),
+          _Tab.cambios => const MisCambios(),
+          _Tab.devoluciones => const MisDevoluciones(),
+          _Tab.direcciones => const MisDirecciones(),
           _Tab.pagos => _buildPagos(),
           _Tab.notificaciones => _buildNotificaciones(),
           _Tab.datos => _buildDatos(usuario),
@@ -526,6 +546,22 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                   ),
                 if (v.completada) ...[
                   const Divider(height: 24),
+                  if (v.puedeCambiar) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => _abrirCambio(v),
+                      icon: const Icon(Icons.swap_horiz, size: 16, color: _tinta),
+                      label: const Text(
+                        'CAMBIAR PRENDA (24H)',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _tinta),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFDDDDDD)),
+                        shape: const RoundedRectangleBorder(),
+                        minimumSize: const Size.fromHeight(38),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (v.tieneDevolucion) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -804,6 +840,9 @@ class _TabsBar extends StatelessWidget {
     _Tab.resumen: 'Resumen',
     _Tab.reservas: 'Mis Reservas',
     _Tab.compras: 'Mis Compras',
+    _Tab.cambios: 'Mis Cambios',
+    _Tab.devoluciones: 'Mis Devoluciones',
+    _Tab.direcciones: 'Mis Direcciones',
     _Tab.pagos: 'Metodos de Pago',
     _Tab.notificaciones: 'Notificaciones',
     _Tab.datos: 'Mis Datos',

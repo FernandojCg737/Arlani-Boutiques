@@ -343,6 +343,7 @@ def _por_pagar(db: Session, cambio_id: int, cliente_id: int):
 @router.post("/{cambio_id}/paypal/orden", response_model=OrdenPaypalOut)
 def orden_diferencia(
     cambio_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso_cliente("CU11")),
 ) -> OrdenPaypalOut:
@@ -350,8 +351,17 @@ def orden_diferencia(
     fila = _por_pagar(db, cambio_id, cliente.id)
     _, cuenta = _paypal_de_tienda(db, fila["empresa_id"])
     usd, _ = _a_usd(db, Decimal(fila["diferencia"]))
-    orden = crear_orden(usd, referencia=f"cambio-{cambio_id}", cuenta=cuenta)
-    return OrdenPaypalOut(order_id=orden["id"], total=usd, approve_url=None)
+    # return/cancel: la app movil paga en un panel incrustado y detecta la vuelta.
+    base = str(request.base_url).rstrip("/")
+    orden = crear_orden(
+        usd,
+        referencia=f"cambio-{cambio_id}",
+        return_url=f"{base}/paypal-embed/retorno",
+        cancel_url=f"{base}/paypal-embed/cancelado",
+        cuenta=cuenta,
+    )
+    approve = next((l["href"] for l in orden.get("links", []) if l.get("rel") in ("approve", "payer-action")), None)
+    return OrdenPaypalOut(order_id=orden["id"], total=usd, approve_url=approve)
 
 
 @router.post("/{cambio_id}/paypal/capturar/{order_id}", response_model=CambioOut)

@@ -44,6 +44,7 @@ class Venta {
     this.estadoDevolucion,
     this.montoDevolucion,
     this.puedeDevolver = false,
+    this.puedeCambiar = false,
     this.horasRestantesDevolucion,
   });
 
@@ -61,6 +62,8 @@ class Venta {
   final String? estadoDevolucion; // solicitada | completada | rechazada
   final double? montoDevolucion;
   final bool puedeDevolver;
+  /// Puede cambiar una prenda (hasta 24 h despues de comprar).
+  final bool puedeCambiar;
   final double? horasRestantesDevolucion;
 
   bool get completada => estadoPago == 'completado';
@@ -95,6 +98,7 @@ class Venta {
       estadoDevolucion: json['estado_devolucion'] as String?,
       montoDevolucion: json['monto_devolucion'] != null ? num.parse(json['monto_devolucion'].toString()).toDouble() : null,
       puedeDevolver: json['puede_devolver'] as bool? ?? false,
+      puedeCambiar: json['puede_cambiar'] as bool? ?? false,
       horasRestantesDevolucion: json['horas_restantes_devolucion'] != null ? num.parse(json['horas_restantes_devolucion'].toString()).toDouble() : null,
     );
   }
