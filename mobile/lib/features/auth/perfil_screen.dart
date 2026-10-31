@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
@@ -9,7 +11,13 @@ import '../../models/reserva.dart';
 import '../../models/usuario.dart';
 import '../../models/venta.dart';
 import '../../widgets/password_strength.dart';
+import '../../widgets/whatsapp_float_button.dart';
 import '../notificaciones/notificaciones_provider.dart';
+import '../portada/encabezado_plataforma.dart';
+import '../portada/estilo_plataforma.dart';
+import '../portada/plataforma_data.dart';
+import '../portada/secciones_cierre.dart';
+import '../storefront/catalogo_provider.dart';
 import '../storefront/reservas_repository.dart';
 import '../storefront/ventas_repository.dart';
 import 'auth_provider.dart';
@@ -18,6 +26,12 @@ enum _Tab { resumen, reservas, compras, pagos, notificaciones, datos, seguridad 
 
 const _metodoLabel = {'paypal': 'PayPal / Tarjeta', 'qr': 'QR (transferencia)', 'efectivo': 'Efectivo en sucursal'};
 
+// Colores de "Mi cuenta" en la web (perfil.scss): azul noche, grises y el
+// borde #eee de las tarjetas blancas sobre el fondo marfil.
+const _tinta = Color(0xFF121A2C);
+const _grisClaro = Color(0xFF999999);
+const _bordeTarjeta = Color(0xFFEEEEEE);
+
 /// "Mi Cuenta": para clientes, replica exacto el dashboard con tabs de
 /// `perfil.ts`/`perfil.html` en la web (Resumen/Mis Reservas/Mis Compras/
 /// Metodos de Pago/Notificaciones/Mis Datos/Seguridad). Para staff (sin
@@ -25,7 +39,10 @@ const _metodoLabel = {'paypal': 'PayPal / Tarjeta', 'qr': 'QR (transferencia)', 
 /// Datos personales + Cambiar contrasena, igual que la rama no-cliente
 /// de esa misma pagina en la web.
 class PerfilScreen extends ConsumerStatefulWidget {
-  const PerfilScreen({super.key});
+  const PerfilScreen({super.key, this.tabInicial});
+
+  /// Pestaña con la que abre (`/perfil?tab=notificaciones`, desde el menú).
+  final String? tabInicial;
 
   @override
   ConsumerState<PerfilScreen> createState() => _PerfilScreenState();
@@ -63,6 +80,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   void initState() {
     super.initState();
     final usuario = ref.read(authProvider).usuario;
+    _tab = _Tab.values.where((t) => t.name == widget.tabInicial).firstOrNull ?? _Tab.resumen;
     _nombreCtrl = TextEditingController(text: usuario?.nombre ?? '');
     _telefonoCtrl = TextEditingController(text: usuario?.telefono ?? '');
     _direccionCtrl = TextEditingController(text: usuario?.direccion ?? '');
@@ -219,14 +237,23 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     return conteo.entries.toList();
   }
 
+  Future<void> _recargar() async {
+    await Future.wait([
+      _cargarReservas(),
+      _cargarCompras(),
+      ref.read(notificacionesProvider.notifier).cargar(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = ref.watch(authProvider).usuario;
     final isCliente = usuario?.isCliente ?? false;
+    if (isCliente) return _buildPaginaCliente(usuario!);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isCliente ? 'MI CUENTA' : 'MI PERFIL'),
+        title: const Text('MI PERFIL'),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
@@ -239,8 +266,59 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: isCliente ? _buildDashboard(usuario!) : _buildStaff(usuario),
+      body: SafeArea(child: _buildStaff(usuario)),
+    );
+  }
+
+  // ---------------------------------------------------------- Pagina del cliente
+
+  /// "Mi cuenta" de la web en celular: el encabezado de Arlani (logo, carrito
+  /// y menú), fondo marfil, el panel con sus pestañas, el pie de la plataforma
+  /// y WhatsApp. Toda la página se desplaza junta (y se recarga tirando hacia abajo).
+  Widget _buildPaginaCliente(Usuario usuario) {
+    final arriba = MediaQuery.paddingOf(context).top + EncabezadoPlataforma.alto;
+    void irA(SeccionPortada s) => context.go(s == SeccionPortada.inicio ? '/' : '/?seccion=${s.name}');
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      child: Scaffold(
+        backgroundColor: Plataforma.marfil,
+        body: Stack(
+          children: [
+            RefreshIndicator(
+              edgeOffset: arriba,
+              onRefresh: _recargar,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(20, arriba + 40, 20, 80),
+                      child: _buildDashboard(usuario),
+                    ),
+                    PiePlataforma(onIrA: irA),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: EncabezadoPlataforma(
+                solido: true,
+                pleno: true,
+                onIrA: irA,
+                onBuscar: (texto) {
+                  ref.read(tiendaFiltrosProvider.notifier).setBusqueda(texto.trim());
+                  context.go('/catalogo');
+                },
+              ),
+            ),
+            Positioned(right: 16, bottom: 16 + MediaQuery.paddingOf(context).bottom, child: const WhatsappFloatButton()),
+          ],
+        ),
       ),
     );
   }
@@ -264,80 +342,95 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: () => context.go('/'),
-                icon: const Icon(Icons.arrow_back, size: 16),
-                label: const Text('VOLVER AL INICIO'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.brandDark, padding: EdgeInsets.zero),
+        // `.volver-link`
+        Align(
+          alignment: Alignment.centerLeft,
+          child: InkWell(
+            onTap: () => context.go('/'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.arrow_back, size: 16, color: _tinta),
+                  const SizedBox(width: 6),
+                  Text('VOLVER AL INICIO',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: _tinta)),
+                ],
               ),
-              const Spacer(),
-              if (auth.hasPermiso('CU13'))
-                OutlinedButton.icon(
-                  onPressed: () => context.push('/carrito'),
-                  icon: const Icon(Icons.shopping_bag_outlined, size: 16),
-                  label: const Text('MI CARRITO'),
-                  style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder(), padding: const EdgeInsets.symmetric(horizontal: 12)),
-                ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'HOLA, ${usuario.nombre.toUpperCase()}',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppColors.brandDark),
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        // `.dash__header`
+        Text('MI CUENTA', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.3, color: _grisClaro)),
+        const SizedBox(height: 4),
+        Text(
+          'HOLA, ${usuario.nombre.toUpperCase()}',
+          style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.26, height: 1.25, color: _tinta),
+        ),
+        if (auth.hasPermiso('CU13')) ...[
+          const SizedBox(height: 20),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/carrito'),
+              icon: const Icon(Icons.shopping_cart_outlined, size: 17),
+              label: const Text('IR A MI CARRITO'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _tinta,
+                side: const BorderSide(color: _tinta),
+                shape: const RoundedRectangleBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 28),
         _TabsBar(
           tab: _tab,
           noLeidas: noLeidas,
           visibleTabs: visibleTabs,
           onSelect: (t) => setState(() => _tab = t),
         ),
-        Expanded(
-          child: switch (_tab) {
-            _Tab.resumen => _buildResumen(),
-            _Tab.reservas => _buildReservas(),
-            _Tab.compras => _buildCompras(),
-            _Tab.pagos => _buildPagos(),
-            _Tab.notificaciones => _buildNotificaciones(),
-            _Tab.datos => _buildDatos(usuario),
-            _Tab.seguridad => _buildSeguridad(),
-          },
-        ),
+        const SizedBox(height: 28),
+        switch (_tab) {
+          _Tab.resumen => _buildResumen(),
+          _Tab.reservas => _buildReservas(),
+          _Tab.compras => _buildCompras(),
+          _Tab.pagos => _buildPagos(),
+          _Tab.notificaciones => _buildNotificaciones(),
+          _Tab.datos => _buildDatos(usuario),
+          _Tab.seguridad => _buildSeguridad(),
+        },
       ],
     );
   }
+
+  Widget _cargando() => const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: CircularProgressIndicator()));
+
+  Widget _vacio(String texto) => Text(texto, style: GoogleFonts.inter(fontSize: 13, color: _grisClaro));
 
   Widget _buildResumen() {
     final auth = ref.watch(authProvider);
     final verReservas = auth.hasPermiso('CU10');
     final verCompras = auth.hasPermiso('CU11');
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (verReservas || verCompras)
-          Row(
-            children: [
-              if (verReservas) Expanded(child: _StatCard(label: 'Reservas activas', value: '$_reservasActivas')),
-              if (verReservas && verCompras) const SizedBox(width: 10),
-              if (verCompras) Expanded(child: _StatCard(label: 'Compras realizadas', value: '${(_compras ?? []).length}')),
-            ],
-          ),
+        // `.dash-stats`: en celular una tarjeta debajo de la otra.
+        if (verReservas) ...[_StatCard(label: 'Reservas activas', value: '$_reservasActivas'), const SizedBox(height: 16)],
         if (verCompras) ...[
-          const SizedBox(height: 10),
-          _StatCard(label: 'Total gastado', value: '${_totalGastado.toStringAsFixed(2)} Bs', fullWidth: true),
+          _StatCard(label: 'Compras realizadas', value: '${(_compras ?? []).length}'),
+          const SizedBox(height: 16),
+          _StatCard(label: 'Total gastado', value: '${_totalGastado.toStringAsFixed(2)} Bs'),
+          const SizedBox(height: 16),
         ],
+        const SizedBox(height: 16),
         if (verReservas) ...[
-          const SizedBox(height: 20),
           _ResumenBloque(
             titulo: 'Ultimas reservas',
             vacio: 'Todavia no tienes reservas.',
@@ -348,9 +441,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               return _MiniItem(texto: etiqueta, estado: r.estado);
             }).toList(),
           ),
+          const SizedBox(height: 20),
         ],
-        if (verCompras) ...[
-          const SizedBox(height: 16),
+        if (verCompras)
           _ResumenBloque(
             titulo: 'Ultimas compras',
             vacio: 'Todavia no tienes compras.',
@@ -359,26 +452,19 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               return _MiniItem(texto: '#${v.id} · ${v.total.toStringAsFixed(2)} Bs', estado: v.estadoPago);
             }).toList(),
           ),
-        ],
       ],
     );
   }
 
   Widget _buildReservas() {
-    if (_cargandoReservas) return const Center(child: CircularProgressIndicator());
+    if (_cargandoReservas) return _cargando();
     final reservas = _reservas ?? [];
-    if (reservas.isEmpty) {
-      return const Center(child: Text('Todavia no tienes reservas.', style: TextStyle(color: AppColors.grayText)));
-    }
-    return RefreshIndicator(
-      onRefresh: _cargarReservas,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: reservas.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) {
-          final r = reservas[i];
-          return _DashCard(
+    if (reservas.isEmpty) return _vacio('Todavia no tienes reservas.');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final r in reservas) ...[
+          _DashCard(
             titulo: r.sucursalNombre,
             subtitulo: _fmtFecha(r.horarioAtencion),
             detalles: [for (final d in r.detalles) '${d.cantidad}x ${d.productoNombre} (${d.tallaCodigo}, ${d.colorNombre})'],
@@ -395,29 +481,24 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     child: Text(_procesandoReservaId == r.id ? '...' : 'CANCELAR', style: const TextStyle(fontSize: 11)),
                   )
                 : null,
-          );
-        },
-      ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
     );
   }
 
   Widget _buildCompras() {
-    if (_cargandoCompras) return const Center(child: CircularProgressIndicator());
+    if (_cargandoCompras) return _cargando();
     final compras = _compras ?? [];
-    if (compras.isEmpty) {
-      return const Center(child: Text('Todavia no tienes compras.', style: TextStyle(color: AppColors.grayText)));
-    }
-    return RefreshIndicator(
-      onRefresh: _cargarCompras,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: compras.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) {
-          final v = compras[i];
-          return Container(
-            decoration: BoxDecoration(border: Border.all(color: AppColors.grayBorderLight)),
-            padding: const EdgeInsets.all(16),
+    if (compras.isEmpty) return _vacio('Todavia no tienes compras.');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final v in compras) ...[
+          Container(
+            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _bordeTarjeta)),
+            padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -426,7 +507,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     Expanded(
                       child: Text(
                         'Compra #${v.id} · ${v.total.toStringAsFixed(2)} Bs',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.brandDark),
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _tinta),
                       ),
                     ),
                     _EstadoBadge(v.estadoPago),
@@ -518,39 +599,40 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                 ],
               ],
             ),
-          );
-        },
-      ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
     );
   }
 
   Widget _buildPagos() {
     final metodos = _metodosUsados;
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Por tu seguridad no guardamos numeros de tarjeta -- cuando pagas con tarjeta, eso pasa directo por PayPal '
           'y nunca llega a nuestros servidores. Aca ves con que metodos pagaste antes.',
-          style: TextStyle(fontSize: 12, color: AppColors.grayText),
+          style: GoogleFonts.inter(fontSize: 12, color: _grisClaro),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         if (_cargandoCompras)
-          const Center(child: Padding(padding: EdgeInsets.only(top: 20), child: CircularProgressIndicator()))
+          _cargando()
         else if (metodos.isEmpty)
-          const Text('Todavia no registras ningun pago.', style: TextStyle(fontSize: 13, color: AppColors.grayText))
+          _vacio('Todavia no registras ningun pago.')
         else
           for (final m in metodos)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(border: Border.all(color: AppColors.grayBorderLight)),
-              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _bordeTarjeta)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_metodoLabel[m.key] ?? m.key, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.brandDark)),
+                  Text(_metodoLabel[m.key] ?? m.key, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _tinta)),
                   const SizedBox(height: 4),
-                  Text('Usado ${m.value} ${m.value == 1 ? 'vez' : 'veces'}', style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark)),
+                  Text('Usado ${m.value} ${m.value == 1 ? 'vez' : 'veces'}', style: const TextStyle(fontSize: 12, color: _grisClaro)),
                 ],
               ),
             ),
@@ -562,85 +644,76 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     final notificaciones = ref.watch(notificacionesProvider);
     final noLeidas = ref.watch(notificacionesNoLeidasProvider);
 
-    if (notificaciones.isEmpty) {
-      return const Center(child: Text('Todavia no tienes notificaciones.', style: TextStyle(color: AppColors.grayText)));
-    }
+    if (notificaciones.isEmpty) return _vacio('Todavia no tienes notificaciones.');
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (noLeidas > 0)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => ref.read(notificacionesProvider.notifier).marcarTodasLeidas(),
-                child: const Text('MARCAR TODAS COMO LEIDAS', style: TextStyle(color: AppColors.brandDark, fontSize: 11)),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => ref.read(notificacionesProvider.notifier).marcarTodasLeidas(),
+              style: TextButton.styleFrom(foregroundColor: _tinta, padding: EdgeInsets.zero),
+              child: Text(
+                'Marcar todas como leidas',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, decoration: TextDecoration.underline),
               ),
             ),
           ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => ref.read(notificacionesProvider.notifier).cargar(),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: notificaciones.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final n = notificaciones[i];
-                return _NotifCard(notificacion: n, onTap: () => ref.read(notificacionesProvider.notifier).marcarLeida(n.id));
-              },
-            ),
-          ),
-        ),
+        const SizedBox(height: 4),
+        for (final n in notificaciones) ...[
+          _NotifCard(notificacion: n, onTap: () => ref.read(notificacionesProvider.notifier).marcarLeida(n.id)),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
 
+  Widget _tarjetaFormulario(List<Widget> hijos) => Container(
+        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _bordeTarjeta)),
+        padding: const EdgeInsets.all(24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: hijos),
+      );
+
   Widget _buildDatos(Usuario usuario) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        if (_errorPerfil != null) _ErrorBanner(_errorPerfil!),
-        if (_successPerfil != null) _SuccessBanner(_successPerfil!),
-        TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'NOMBRE COMPLETO')),
-        const SizedBox(height: 14),
-        TextFormField(initialValue: usuario.email, enabled: false, decoration: const InputDecoration(labelText: 'CORREO ELECTRONICO')),
-        const SizedBox(height: 14),
-        TextField(controller: _telefonoCtrl, decoration: const InputDecoration(labelText: 'TELEFONO')),
-        const SizedBox(height: 14),
-        TextField(controller: _direccionCtrl, decoration: const InputDecoration(labelText: 'DIRECCION')),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: _savingPerfil ? null : _guardarPerfil,
-          child: Text(_savingPerfil ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'),
-        ),
-      ],
-    );
+    return _tarjetaFormulario([
+      if (_errorPerfil != null) _ErrorBanner(_errorPerfil!),
+      if (_successPerfil != null) _SuccessBanner(_successPerfil!),
+      TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'NOMBRE COMPLETO')),
+      const SizedBox(height: 14),
+      TextFormField(initialValue: usuario.email, enabled: false, decoration: const InputDecoration(labelText: 'CORREO ELECTRONICO')),
+      const SizedBox(height: 14),
+      TextField(controller: _telefonoCtrl, decoration: const InputDecoration(labelText: 'TELEFONO')),
+      const SizedBox(height: 14),
+      TextField(controller: _direccionCtrl, decoration: const InputDecoration(labelText: 'DIRECCION')),
+      const SizedBox(height: 20),
+      ElevatedButton(
+        onPressed: _savingPerfil ? null : _guardarPerfil,
+        child: Text(_savingPerfil ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'),
+      ),
+    ]);
   }
 
   Widget _buildSeguridad() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        if (_errorPassword != null) _ErrorBanner(_errorPassword!),
-        if (_successPassword != null) _SuccessBanner(_successPassword!),
-        TextField(controller: _actualCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'CONTRASENA ACTUAL')),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _nuevaCtrl,
-          obscureText: true,
-          onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(labelText: 'NUEVA CONTRASENA'),
-        ),
-        const SizedBox(height: 10),
-        PasswordStrengthChecklist(password: _nuevaCtrl.text),
-        const SizedBox(height: 20),
-        OutlinedButton(
-          onPressed: _savingPassword ? null : _cambiarPassword,
-          child: Text(_savingPassword ? 'GUARDANDO...' : 'ACTUALIZAR CONTRASENA'),
-        ),
-      ],
-    );
+    return _tarjetaFormulario([
+      if (_errorPassword != null) _ErrorBanner(_errorPassword!),
+      if (_successPassword != null) _SuccessBanner(_successPassword!),
+      TextField(controller: _actualCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'CONTRASENA ACTUAL')),
+      const SizedBox(height: 14),
+      TextField(
+        controller: _nuevaCtrl,
+        obscureText: true,
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(labelText: 'NUEVA CONTRASENA'),
+      ),
+      const SizedBox(height: 10),
+      PasswordStrengthChecklist(password: _nuevaCtrl.text),
+      const SizedBox(height: 20),
+      OutlinedButton(
+        onPressed: _savingPassword ? null : _cambiarPassword,
+        child: Text(_savingPassword ? 'GUARDANDO...' : 'ACTUALIZAR CONTRASENA'),
+      ),
+    ]);
   }
 
   // ---------------------------------------------------------- Staff (simple)
@@ -739,22 +812,20 @@ class _TabsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // `.dash__tabs`: en celular las pestañas bajan a varias filas.
     return Container(
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.grayBorderLight))),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            for (final t in visibleTabs)
-              _TabButton(
-                label: _labels[t]!,
-                selected: t == tab,
-                badge: t == _Tab.notificaciones && noLeidas > 0 ? noLeidas : null,
-                onTap: () => onSelect(t),
-              ),
-          ],
-        ),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _bordeTarjeta))),
+      child: Wrap(
+        spacing: 4,
+        children: [
+          for (final t in visibleTabs)
+            _TabButton(
+              label: _labels[t]!,
+              selected: t == tab,
+              badge: t == _Tab.notificaciones && noLeidas > 0 ? noLeidas : null,
+              onTap: () => onSelect(t),
+            ),
+        ],
       ),
     );
   }
@@ -770,18 +841,18 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.brandDark : AppColors.grayText;
+    final color = selected ? _tinta : _grisClaro;
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: selected ? AppColors.brandDark : Colors.transparent, width: 2))),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: selected ? _tinta : Colors.transparent, width: 2))),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               label.toUpperCase(),
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.3, color: color),
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.36, color: color),
             ),
             if (badge != null) ...[
               const SizedBox(width: 6),
@@ -800,24 +871,24 @@ class _TabButton extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, this.fullWidth = false});
+  const _StatCard({required this.label, required this.value});
 
   final String label;
   final String value;
-  final bool fullWidth;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: fullWidth ? double.infinity : null,
-      decoration: BoxDecoration(border: Border.all(color: AppColors.grayBorderLight)),
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _bordeTarjeta)),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.4, color: AppColors.grayText)),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.brandDark)),
+          Text(label.toUpperCase(),
+              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.44, color: _grisClaro)),
+          const SizedBox(height: 8),
+          Text(value, style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w800, color: _tinta)),
         ],
       ),
     );
@@ -835,13 +906,14 @@ class _ResumenBloque extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(border: Border.all(color: AppColors.grayBorderLight)),
-      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _bordeTarjeta)),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(titulo.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.3, color: AppColors.brandDark)),
-          const SizedBox(height: 10),
+          Text(titulo.toUpperCase(),
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.52, color: _tinta)),
+          const SizedBox(height: 14),
           if (cargando)
             const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Center(child: CircularProgressIndicator()))
           else if (items.isEmpty)
@@ -867,7 +939,7 @@ class _MiniItem extends StatelessWidget {
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF5F5F5)))),
       child: Row(
         children: [
-          Expanded(child: Text(texto, style: const TextStyle(fontSize: 13, color: AppColors.brandDark))),
+          Expanded(child: Text(texto, style: GoogleFonts.inter(fontSize: 13, color: _tinta))),
           const SizedBox(width: 8),
           _EstadoBadge(estado),
         ],
@@ -903,8 +975,8 @@ class _DashCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(border: Border.all(color: AppColors.grayBorderLight)),
-      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: _bordeTarjeta)),
+      padding: const EdgeInsets.all(18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -950,8 +1022,11 @@ class _NotifCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: notificacion.leida ? null : const Color(0xFFF5F8F7),
-        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: notificacion.leida ? Colors.white : const Color(0xFFF5F8F7),
+          border: Border.all(color: _bordeTarjeta),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
             Expanded(

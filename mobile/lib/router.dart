@@ -114,7 +114,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/registro', builder: (context, state) => const RegistroScreen()),
       GoRoute(path: '/recuperar', builder: (context, state) => const RecuperarPasswordScreen()),
-      GoRoute(path: '/perfil', builder: (context, state) => const PerfilScreen()),
+      GoRoute(
+        path: '/perfil',
+        // ?tab=notificaciones (desde el menu), como `/perfil?tab=` en la web.
+        builder: (context, state) => PerfilScreen(tabInicial: state.uri.queryParameters['tab']),
+      ),
       GoRoute(path: '/admin', builder: (context, state) => const AdminShell()),
       GoRoute(path: '/admin/sesiones', builder: (context, state) => const SesionesScreen()),
       GoRoute(path: '/admin/usuarios', builder: (context, state) => const UsuariosScreen()),

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../auth/auth_provider.dart';
+import '../notificaciones/notificaciones_provider.dart';
 import '../storefront/cart_provider.dart';
 import 'estilo_plataforma.dart';
 import 'plataforma_data.dart';
@@ -228,6 +229,13 @@ class _MenuMovil extends ConsumerWidget {
             if (auth.usuario != null) ...[
               if (auth.isStaff) _EnlaceMenu(texto: 'Mi panel', onTap: () => onNavegar('/admin')),
               _EnlaceMenu(texto: 'Mi perfil', onTap: () => onNavegar('/perfil')),
+              // Como en la web: "Notificaciones (N)" con las no leidas del cliente.
+              if (auth.usuario!.isCliente && auth.hasPermiso('CU14'))
+                _EnlaceMenu(
+                  texto: 'Notificaciones',
+                  contador: ref.watch(notificacionesNoLeidasProvider),
+                  onTap: () => onNavegar('/perfil?tab=notificaciones'),
+                ),
               _EnlaceMenu(texto: 'Cerrar sesión', onTap: onCerrarSesion),
             ] else ...[
               _EnlaceMenu(texto: 'Iniciar sesión', onTap: () => onNavegar('/login')),
@@ -248,11 +256,14 @@ TextStyle _estiloMenu() => GoogleFonts.inter(
     );
 
 class _EnlaceMenu extends StatelessWidget {
-  const _EnlaceMenu({required this.texto, required this.onTap, this.borde = false});
+  const _EnlaceMenu({required this.texto, required this.onTap, this.borde = false, this.contador = 0});
 
   final String texto;
   final VoidCallback onTap;
   final bool borde;
+
+  /// "(N)" en oro rosa al lado del texto (no leidas).
+  final int contador;
 
   @override
   Widget build(BuildContext context) {
@@ -263,7 +274,15 @@ class _EnlaceMenu extends StatelessWidget {
         decoration: borde
             ? BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1))))
             : null,
-        child: Text(texto.toUpperCase(), style: _estiloMenu()),
+        child: Text.rich(
+          TextSpan(
+            text: texto.toUpperCase(),
+            children: [
+              if (contador > 0) TextSpan(text: ' ($contador)', style: _estiloMenu().copyWith(color: Plataforma.oro)),
+            ],
+          ),
+          style: _estiloMenu(),
+        ),
       ),
     );
   }
