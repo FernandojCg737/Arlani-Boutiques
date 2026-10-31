@@ -14,6 +14,7 @@ import '../portada/encabezado_plataforma.dart';
 import '../portada/estilo_plataforma.dart';
 import '../portada/plataforma_data.dart';
 import '../storefront/catalogo_provider.dart';
+import 'cuenta_repository.dart' show fechaDelBackend;
 
 const _metodo = {
   'paypal': 'PayPal / Tarjeta de crédito',
@@ -57,7 +58,7 @@ class _Comprobante {
       : id = j['id'] as int,
         tipo = j['tipo'] as String,
         sucursal = j['sucursal_nombre'] as String,
-        fecha = DateTime.parse('${j['fecha']}'.endsWith('Z') ? '${j['fecha']}' : '${j['fecha']}Z').toLocal(),
+        fecha = fechaDelBackend(j['fecha']!),
         total = _num(j['total']),
         metodoPago = j['metodo_pago'] as String? ?? '',
         metodoPagoNombre = j['metodo_pago_nombre'] as String?,

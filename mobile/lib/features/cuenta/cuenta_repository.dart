@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/auth_provider.dart';
 
 double _num(Object? v) => v == null ? 0 : num.parse(v.toString()).toDouble();
-DateTime _fecha(Object v) {
+/// Fecha del backend en hora local. Unas vienen con su zona
+/// ("...+00:00" o "...Z") y otras sin zona (son UTC).
+DateTime fechaDelBackend(Object v) {
   final s = v.toString();
-  // Las fechas sin zona del backend estan en UTC.
-  return DateTime.parse(s.endsWith('Z') || s.contains('+') ? s : '${s}Z').toLocal();
+  final conZona = s.endsWith('Z') || RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
+  return DateTime.parse(conZona ? s : '${s}Z').toLocal();
 }
+
+DateTime _fecha(Object v) => fechaDelBackend(v);
 
 const _meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
