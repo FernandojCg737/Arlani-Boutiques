@@ -17,9 +17,19 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-def create_access_token(subject: str, session_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": subject, "sid": session_id, "scope": "access", "exp": expire}
+def vigencia_sesion(tipo_usuario: str) -> int:
+    """Minutos sin actividad que aguanta la sesion: el cliente, una semana
+    (puede comprar sin internet y sincronizar dias despues); el personal de
+    las tiendas y la plataforma, un turno."""
+    if tipo_usuario == "cliente":
+        return settings.SESION_INACTIVIDAD_CLIENTE_MIN
+    return settings.SESION_INACTIVIDAD_PERSONAL_MIN
+
+
+def create_access_token(subject: str, session_id: str, minutes: int | None = None) -> str:
+    ahora = datetime.now(timezone.utc)
+    expire = ahora + timedelta(minutes=minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": subject, "sid": session_id, "scope": "access", "iat": ahora, "exp": expire}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 

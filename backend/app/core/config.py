@@ -17,6 +17,12 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = DEFAULT_SECRET_KEY
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    # Sesion con renovacion automatica: mientras se use, el token se renueva
+    # solo (header X-Token-Renovado); vence tras este tiempo SIN actividad.
+    SESION_INACTIVIDAD_CLIENTE_MIN: int = 7 * 24 * 60
+    SESION_INACTIVIDAD_PERSONAL_MIN: int = 8 * 60
+    # Cada cuanto se emite un token nuevo mientras hay actividad.
+    SESION_RENOVAR_CADA_MIN: int = 5
     ALGORITHM: str = "HS256"
 
     # str (no list[str]): asi pydantic-settings no intenta json.loads() el

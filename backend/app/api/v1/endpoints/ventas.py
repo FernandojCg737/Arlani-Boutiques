@@ -64,6 +64,7 @@ from app.schemas.ventas import (
     TiendaCheckoutOut,
     TiendaFacturaOut,
     DetalleVentaOut,
+    OrdenPaypalIn,
     OrdenPaypalOut,
     VentaAdminOut,
     VentaEditIn,
@@ -413,6 +414,7 @@ def verificar_stock_checkout(
 @router.post("/checkout/paypal/crear-orden", response_model=OrdenPaypalOut)
 def crear_orden_paypal(
     request: Request,
+    payload: OrdenPaypalIn | None = None,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso_cliente("CU11")),
 ) -> OrdenPaypalOut:
@@ -432,8 +434,9 @@ def crear_orden_paypal(
         referencia=f"carrito-{carrito.id}",
         return_url=f"{base}/paypal-embed/retorno",
         cancel_url=f"{base}/paypal-embed/cancelado",
+        guardar_paypal=bool(payload and payload.guardar_paypal),
     )
-    approve_url = next((link["href"] for link in orden.get("links", []) if link.get("rel") == "approve"), None)
+    approve_url = next((link["href"] for link in orden.get("links", []) if link.get("rel") in ("approve", "payer-action")), None)
     return OrdenPaypalOut(order_id=orden["id"], total=total, approve_url=approve_url)
 
 
@@ -795,6 +798,7 @@ def _total_usd_pagar_todo(db: Session, grupos: dict[int, tuple[MetodoPagoEmpresa
 @router.post("/checkout/todo/paypal/orden", response_model=OrdenPaypalOut)
 def crear_orden_pagar_todo(
     request: Request,
+    payload: OrdenPaypalIn | None = None,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso_cliente("CU11")),
 ) -> OrdenPaypalOut:
@@ -807,8 +811,9 @@ def crear_orden_pagar_todo(
         referencia=f"carrito-{carrito.id}-todo",
         return_url=f"{base}/paypal-embed/retorno",
         cancel_url=f"{base}/paypal-embed/cancelado",
+        guardar_paypal=bool(payload and payload.guardar_paypal),
     )
-    approve_url = next((link["href"] for link in orden.get("links", []) if link.get("rel") == "approve"), None)
+    approve_url = next((link["href"] for link in orden.get("links", []) if link.get("rel") in ("approve", "payer-action")), None)
     return OrdenPaypalOut(order_id=orden["id"], total=total_usd, approve_url=approve_url)
 
 
@@ -901,6 +906,7 @@ def capturar_pagar_todo(
 def crear_orden_paypal_tienda(
     empresa_id: int,
     request: Request,
+    payload: OrdenPaypalIn | None = None,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(require_permiso_cliente("CU11")),
 ) -> OrdenPaypalOut:
@@ -917,8 +923,9 @@ def crear_orden_paypal_tienda(
         return_url=f"{base}/paypal-embed/retorno",
         cancel_url=f"{base}/paypal-embed/cancelado",
         cuenta=cuenta,
+        guardar_paypal=bool(payload and payload.guardar_paypal),
     )
-    approve_url = next((link["href"] for link in orden.get("links", []) if link.get("rel") == "approve"), None)
+    approve_url = next((link["href"] for link in orden.get("links", []) if link.get("rel") in ("approve", "payer-action")), None)
     return OrdenPaypalOut(order_id=orden["id"], total=total_usd, approve_url=approve_url)
 
 
@@ -979,7 +986,7 @@ def capturar_orden_paypal_tienda(
             "No se pudo registrar tu compra. El cobro fue revertido; intenta de nuevo.",
         )
 
-    registrar_paypal_usado(db, cliente.id, resultado)
+    registrar_paypal_usado(db, cliente.id, resultado, empresa_id)
     for venta_id in venta_ids:
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Venta digital pagada con PayPal de la tienda (orden {order_id})", request)
     ventas = _query_venta_con_detalles(db).filter(Venta.id.in_(venta_ids)).all()

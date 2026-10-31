@@ -6,6 +6,12 @@ from pydantic import BaseModel, Field, field_serializer, field_validator, model_
 from app.schemas.metodos_pago import MetodoPagoPublicoOut
 
 
+class OrdenPaypalIn(BaseModel):
+    # El cliente eligio el boton de PayPal (no el de tarjeta): la orden pide
+    # guardar su cuenta y queda autorizada para comprar sin conexion.
+    guardar_paypal: bool = False
+
+
 class OrdenPaypalOut(BaseModel):
     order_id: str
     total: Decimal

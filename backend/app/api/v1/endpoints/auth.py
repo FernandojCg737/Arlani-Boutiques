@@ -16,7 +16,7 @@ from app.core.audit import client_ip, log_bitacora, set_client_ip_for_trigger
 from app.core.config import settings
 from app.core.email import send_email
 from app.core.rate_limit import verificar_limite
-from app.core.security import create_access_token, create_reset_token, hash_password, verify_password
+from app.core.security import create_access_token, vigencia_sesion, create_reset_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import Cliente, Usuario
 from app.schemas.auth import (
@@ -63,13 +63,15 @@ def _issue_token(usuario: Usuario, db: Session, request: Request) -> TokenRespon
     # usuario tenia una sesion abierta en otro dispositivo, su token anterior
     # deja de matchear "sid" y get_current_user lo rechaza en su proximo request.
     usuario.session_id = uuid.uuid4().hex
-    usuario.sesion_expira_en = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    usuario.sesion_expira_en = datetime.utcnow() + timedelta(minutes=vigencia_sesion(usuario.tipo))
     db.commit()
     db.refresh(usuario)
 
     _log_sesion_bitacora(db, usuario, "LOGIN", request)
 
-    token = create_access_token(subject=str(usuario.id), session_id=usuario.session_id)
+    token = create_access_token(
+        subject=str(usuario.id), session_id=usuario.session_id, minutes=vigencia_sesion(usuario.tipo)
+    )
     return TokenResponse(access_token=token, usuario=to_usuario_out(usuario))
 
 

@@ -15,6 +15,7 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Cart } from '../../services/cart';
+import { CatalogoClienteAuto } from '../../services/offline/catalogo-cliente-auto';
 import { DireccionCliente, MisDirecciones } from '../perfil/mis-direcciones/mis-direcciones';
 import { PaypalSdk } from '../../services/paypal-sdk';
 
@@ -107,6 +108,7 @@ export class Checkout implements OnInit, OnDestroy {
   private readonly cart = inject(Cart);
   private readonly http = inject(HttpClient);
   private readonly paypalSdk = inject(PaypalSdk);
+  private readonly catalogoSinConexion = inject(CatalogoClienteAuto);
   private readonly api = `${environment.apiUrl}/ventas/checkout`;
 
   private readonly paypalContainer = viewChild<ElementRef<HTMLDivElement>>('paypalContainer');
@@ -318,9 +320,12 @@ export class Checkout implements OnInit, OnDestroy {
       const paypal = (await this.paypalSdk.cargar()) as any;
       await paypal
         .Buttons({
-          createOrder: async () => {
+          // Con el boton de PayPal (no el de tarjeta) la orden guarda la cuenta:
+          // queda autorizada para comprar sin conexion en cualquier tienda.
+          createOrder: async (data: { paymentSource?: string }) => {
             this.errorMsg.set('');
-            return (await firstValueFrom(this.http.post<{ order_id: string }>(`${this.api}/todo/paypal/orden`, {})))
+            const cuerpo = { guardar_paypal: data?.paymentSource === 'paypal' };
+            return (await firstValueFrom(this.http.post<{ order_id: string }>(`${this.api}/todo/paypal/orden`, cuerpo)))
               .order_id;
           },
           onApprove: async (data: { orderID: string }) => {
@@ -331,6 +336,7 @@ export class Checkout implements OnInit, OnDestroy {
               );
               this.modoTodo.set(false);
               await this.registrarPagoTodo(ventas);
+              this.actualizarSinConexion();
             } catch (err) {
               this.errorMsg.set(this.extraerError(err));
             } finally {
@@ -392,10 +398,13 @@ export class Checkout implements OnInit, OnDestroy {
     this.desmontarPaypal?.();
     // Botones con el client-id de ESTA tienda, aislados en su iframe.
     this.desmontarPaypal = this.paypalSdk.montarBotones(contenedor, metodo.paypal_client_id, {
-      crearOrden: async () => {
+      // Con el boton de PayPal la orden guarda la cuenta (autorizada en esta tienda).
+      crearOrden: async (fuente?: string) => {
         this.errorMsg.set('');
         const res = await firstValueFrom(
-          this.http.post<{ order_id: string }>(`${this.api}/tienda/${empresaId}/paypal/orden`, {}),
+          this.http.post<{ order_id: string }>(`${this.api}/tienda/${empresaId}/paypal/orden`, {
+            guardar_paypal: fuente === 'paypal',
+          }),
         );
         return res.order_id;
       },
@@ -409,6 +418,7 @@ export class Checkout implements OnInit, OnDestroy {
             ),
           );
           await this.registrarPago(empresaId, ventas, false, metodo.nombre);
+          this.actualizarSinConexion();
         } catch (err) {
           this.errorMsg.set(this.extraerError(err));
         } finally {
@@ -456,6 +466,13 @@ export class Checkout implements OnInit, OnDestroy {
 
   // Guarda el resultado, saca esa tienda de la lista y refresca el carrito
   // (lo de las demas tiendas sigue ahi para pagarlo despues).
+  // La cuenta PayPal con la que pagó ya está en Métodos de pago: el catálogo
+  // sin conexión se actualiza ya para poder elegirla en "Mi PayPal guardado".
+  private actualizarSinConexion(): void {
+    this.catalogoSinConexion.iniciar();
+    void this.catalogoSinConexion.revisar(true).catch(() => undefined);
+  }
+
   private async registrarPago(empresaId: number, ventas: VentaCreada[], pendiente: boolean, metodo: string): Promise<void> {
     const tienda = this.tiendas().find((t) => t.empresa_id === empresaId);
     this.pagadas.update((p) => [

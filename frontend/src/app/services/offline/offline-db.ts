@@ -58,7 +58,10 @@ export interface CatalogoCliente {
 export interface PaypalLocal {
   id: number;
   cuenta: string | null;
+  // Autorizada con Arlani: vale en cualquier tienda.
   autorizada: boolean;
+  // Autorizada al pagar en estas tiendas (empresa_id): solo en ellas.
+  tiendas?: number[];
 }
 
 export interface PaqueteGuardado {

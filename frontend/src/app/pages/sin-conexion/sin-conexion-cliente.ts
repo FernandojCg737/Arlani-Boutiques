@@ -59,7 +59,9 @@ export class SinConexionCliente implements OnInit {
   protected readonly modo = signal<'reservar' | 'comprar'>('reservar');
   protected readonly entrega = signal<'retiro' | 'envio'>('retiro');
   protected readonly direccionId = signal<number | null>(null);
-  protected readonly formaPago = signal<'en_linea' | 'contra_entrega' | 'paypal_guardado'>('en_linea');
+  // Sin conexión se paga con una cuenta PayPal autorizada (se cobra sola al
+  // volver internet) o contra entrega: "en línea" no aplica aquí.
+  protected readonly formaPago = signal<'contra_entrega' | 'paypal_guardado'>('paypal_guardado');
   // Sus cuentas PayPal (Métodos de pago) y la elegida para pagar.
   protected readonly paypals = computed<PaypalLocal[]>(() => this.catalogo()?.paypals ?? []);
   protected readonly paypalId = signal<number | null>(null);
@@ -96,6 +98,21 @@ export class SinConexionCliente implements OnInit {
   });
   protected readonly aceptaContraEntrega = computed(() => this.tiendasElegidas().every((t) => !!t?.acepta_contra_entrega));
   protected readonly aceptaPaypal = computed(() => this.tiendasElegidas().every((t) => !!t?.acepta_paypal));
+  private readonly empresasElegidas = computed(() =>
+    this.tiendasElegidas().map((t) => t?.empresa_id).filter((id): id is number => id !== undefined),
+  );
+
+  // La cuenta sirve si está autorizada con Arlani o en TODAS las tiendas de lo elegido.
+  protected paypalSirve(pp: PaypalLocal): boolean {
+    return pp.autorizada || this.empresasElegidas().every((id) => (pp.tiendas ?? []).includes(id));
+  }
+
+  protected estadoPaypal(pp: PaypalLocal): string {
+    if (pp.autorizada) return 'autorizada en todas las tiendas';
+    if (this.paypalSirve(pp)) return 'autorizada en esta tienda';
+    if (pp.tiendas?.length) return 'autorizada solo en otras tiendas: autorízala en Métodos de pago';
+    return 'sin autorizar: autorízala en Métodos de pago';
+  }
 
   protected readonly direcciones = computed(() => this.catalogo()?.direcciones ?? []);
   protected readonly faltaParaComprar = computed(() => {
@@ -109,8 +126,14 @@ export class SinConexionCliente implements OnInit {
       );
     }
     if (this.modo() === 'reservar' && !this.horario()) falta.push('Indica hasta cuándo la recoges.');
-    if (this.modo() === 'comprar' && this.formaPago() === 'paypal_guardado' && this.paypalId() === null) {
-      falta.push('Elige con qué cuenta PayPal pagar.');
+    if (this.modo() === 'comprar' && this.items().length) {
+      if (!this.aceptaPaypal() && !this.aceptaContraEntrega()) {
+        falta.push('Estas tiendas no reciben pagos sin conexión (PayPal o contra entrega).');
+      } else if (this.formaPago() === 'paypal_guardado' && !this.paypals().length) {
+        falta.push('Agrega tu PayPal en Mi cuenta → Métodos de pago (con conexión) para pagar sin internet.');
+      } else if (this.formaPago() === 'paypal_guardado' && this.paypalId() === null) {
+        falta.push('Ninguna de tus cuentas PayPal está autorizada para estas tiendas: autorízala en Métodos de pago.');
+      }
     }
     return falta;
   });
@@ -142,18 +165,17 @@ export class SinConexionCliente implements OnInit {
       const c = this.catalogo();
       if (c) untracked(() => this.usar(c));
     });
-    // Si lo elegido ya no admite la forma de pago, vuelve a "En línea".
+    // Si lo elegido ya no admite la forma de pago, pasa a la otra.
     effect(() => {
       const f = this.formaPago();
-      if ((f === 'contra_entrega' && !this.aceptaContraEntrega()) || (f === 'paypal_guardado' && !this.aceptaPaypal())) {
-        this.formaPago.set('en_linea');
-      }
+      if (f === 'contra_entrega' && !this.aceptaContraEntrega()) this.formaPago.set('paypal_guardado');
+      else if (f === 'paypal_guardado' && !this.aceptaPaypal() && this.aceptaContraEntrega()) this.formaPago.set('contra_entrega');
     });
-    // La cuenta PayPal elegida tiene que seguir autorizada.
+    // La cuenta PayPal elegida tiene que servir para las tiendas de lo elegido.
     effect(() => {
-      const autorizadas = this.paypals().filter((p) => p.autorizada);
+      const sirven = this.paypals().filter((p) => this.paypalSirve(p));
       const id = untracked(this.paypalId);
-      if (!autorizadas.some((p) => p.id === id)) this.paypalId.set(autorizadas[0]?.id ?? null);
+      if (!sirven.some((p) => p.id === id)) this.paypalId.set(sirven[0]?.id ?? null);
     });
     effect(() => this.guardarCarrito(this.items()));
   }

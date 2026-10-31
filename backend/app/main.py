@@ -27,9 +27,21 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # El panel lee X-Suscripcion para llevar a "Mi suscripcion" si la tienda vencio.
-    expose_headers=["X-Suscripcion"],
+    # El panel lee X-Suscripcion para llevar a "Mi suscripcion" si la tienda vencio;
+    # la web y la app guardan el X-Token-Renovado (sesion que se renueva sola).
+    expose_headers=["X-Suscripcion", "X-Token-Renovado"],
 )
+
+
+@app.middleware("http")
+async def entregar_token_renovado(request: Request, call_next):
+    """Si la peticion renovo la sesion (deps._renovar_sesion), el token nuevo
+    viaja en la respuesta y el cliente lo usa desde la proxima."""
+    respuesta = await call_next(request)
+    token = getattr(request.state, "token_renovado", None)
+    if token:
+        respuesta.headers["X-Token-Renovado"] = token
+    return respuesta
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 

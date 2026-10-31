@@ -28,7 +28,8 @@
       '&currency=USD&intent=capture&enable-funding=card&locale=es_BO';
     s.onload = function () {
       window.paypal.Buttons({
-        createOrder: function () { return acciones.crearOrden(); },
+        // paymentSource: 'paypal' o 'card'; con PayPal la orden guarda la cuenta.
+        createOrder: function (data) { return acciones.crearOrden(data && data.paymentSource); },
         onApprove: function (data) { return acciones.aprobar(data.orderID); },
         onCancel: function () { acciones.cancelar(); },
         onError: function (e) { acciones.error(e); }

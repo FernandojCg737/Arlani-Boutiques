@@ -394,6 +394,19 @@ def _metodo_paypal(db: Session, empresa_id: int) -> MetodoPagoEmpresa | None:
     )
 
 
+def _cobro_paypal(db: Session, permiso: dict, empresa_id: int) -> tuple[MetodoPagoEmpresa, object | None] | None:
+    """(metodo de la tienda, cuenta de PayPal que cobra) segun el permiso:
+    el de Arlani cobra en la cuenta de Arlani (cuenta None) y le liquida a la
+    tienda; el de la tienda cobra directo en la cuenta de esa tienda."""
+    if permiso["empresa_id"] is None:
+        metodo = _metodo_paypal(db, empresa_id)
+        return (metodo, None) if metodo else None
+    try:
+        return _paypal_de_tienda(db, empresa_id)
+    except HTTPException:
+        return None
+
+
 def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empresa_id: int) -> str | None:
     if op.forma_pago is None:
         return "Elige cómo vas a pagar la compra."
@@ -406,10 +419,12 @@ def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empre
         return "Elige una de tus direcciones para el envío."
     if op.forma_pago == "contra_entrega" and _metodo_contra_entrega(db, empresa_id) is None:
         return "Esta tienda no acepta pago contra entrega."
-    if op.forma_pago == "paypal_guardado" and not token_de(db, cliente_id, op.metodo_pago_id):
-        return "Esa cuenta PayPal no está autorizada: autorízala en Métodos de pago y vuelve a comprar."
-    if op.forma_pago == "paypal_guardado" and _metodo_paypal(db, empresa_id) is None:
-        return "Esta tienda no recibe pagos con PayPal."
+    if op.forma_pago == "paypal_guardado":
+        permiso = token_de(db, cliente_id, op.metodo_pago_id, empresa_id)
+        if permiso is None:
+            return "Esa cuenta PayPal no está autorizada para esta tienda: autorízala en Métodos de pago y vuelve a comprar."
+        if _cobro_paypal(db, permiso, empresa_id) is None:
+            return "Esta tienda no recibe pagos con PayPal."
     return None
 
 
@@ -1128,7 +1143,7 @@ def pedido_paypal_capturar(
         db.rollback()
         reembolsar_captura(captura["id"], cuenta)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo registrar tu compra. El cobro fue revertido.")
-    registrar_paypal_usado(db, usuario.id, resultado)
+    registrar_paypal_usado(db, usuario.id, resultado, fila["empresa_id"])
     return _revisar(db, _cliente_pedido(db, usuario, uuid))
 
 
@@ -1311,14 +1326,15 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
 
     validos, no_pagados = _revisar_items(db, datos)
     todos = no_pagados + [b for _, b in validos]
-    cuenta_paypal = token_de(db, fila["usuario_id"], datos.metodo_pago_id)
-    metodo = _metodo_paypal(db, fila["empresa_id"])
-    if not cuenta_paypal:
+    permiso = token_de(db, fila["usuario_id"], datos.metodo_pago_id, fila["empresa_id"])
+    if not permiso:
         motivo = "Esa cuenta PayPal ya no está autorizada en tus métodos de pago: vuelve a comprar con otra."
         return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
-    if metodo is None:
+    cobro = _cobro_paypal(db, permiso, fila["empresa_id"])
+    if cobro is None:
         motivo = "La tienda ya no recibe pagos con PayPal."
         return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
+    metodo, cuenta = cobro
     if not validos:
         return no_pagada("ninguna prenda se pudo comprar.", no_pagados)
 
@@ -1343,7 +1359,7 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
 
     # 2) El cobro con el PayPal guardado. El uuid evita cobrar dos veces.
     try:
-        orden = cobrar_con_token(cuenta_paypal[1], total_usd, referencia, f"arlani-offline-{fila['uuid']}")
+        orden = cobrar_con_token(permiso["token"], total_usd, referencia, f"arlani-offline-{fila['uuid']}", cuenta)
     except (CobroRechazado, HTTPException) as exc:
         db.rollback()
         motivo = f"PayPal rechazó el cobro ({exc.detail if isinstance(exc, HTTPException) else exc})."
@@ -1359,14 +1375,18 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
             {"o": orden["id"], "v": venta_id},
         )
         _guardar_captura(db, [venta_id], captura["id"])
-        marcar_uso(db, cuenta_paypal[0])
+        marcar_uso(db, permiso["metodo_id"])
         db.execute(text("UPDATE venta SET origen = 'offline', sincronizado_en = now() WHERE id = :v"), {"v": venta_id})
         if datos.entrega == "envio":
             _guardar_envio(db, [venta_id], fila["usuario_id"], datos.direccion_id)
-        liquidacion = db.execute(
-            text("SELECT sp_registrar_liquidacion(:e, :o, :c, :v, :tc)"),
-            {"e": fila["empresa_id"], "o": orden["id"], "c": captura["id"], "v": [venta_id], "tc": tc},
-        ).scalar_one()
+        # Cobrado por Arlani: a la tienda se le liquida lo suyo. Cobrado en la
+        # cuenta de la tienda: el dinero ya es de ella.
+        liquidacion = None
+        if cuenta is None:
+            liquidacion = db.execute(
+                text("SELECT sp_registrar_liquidacion(:e, :o, :c, :v, :tc)"),
+                {"e": fila["empresa_id"], "o": orden["id"], "c": captura["id"], "v": [venta_id], "tc": tc},
+            ).scalar_one()
         if no_pagados:
             _cerrar_cobro(
                 db, fila, "pago_parcial",
@@ -1400,13 +1420,15 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
     except Exception:
         db.rollback()
         logger.exception("Compra sin conexion %s cobrada pero no registrada: se devuelve el cobro", fila["uuid"])
-        if not reembolsar_captura(captura["id"]):
+        if not reembolsar_captura(captura["id"], cuenta):
             logger.error("No se pudo devolver la captura %s (orden %s): revisar a mano", captura["id"], orden["id"])
         motivo = "No se pudo registrar la compra; el cobro fue devuelto a tu PayPal."
         return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
 
     # 4) Lo de la tienda (menos la comision) se le envia al instante; si PayPal
     # falla queda para reintentar: la compra del cliente ya esta confirmada.
+    if liquidacion is None:
+        return
     try:
         enviar_liquidaciones(db, [liquidacion])
     except Exception:

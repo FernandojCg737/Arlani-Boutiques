@@ -186,6 +186,16 @@ export class Auth {
     }
   }
 
+  // El backend renovó la sesión (ver auth-interceptor): mismo usuario, token nuevo.
+  renovarToken(token: string): void {
+    this.token.set(token);
+    try {
+      localStorage.setItem(TOKEN_KEY, token);
+    } catch {
+      // localStorage no disponible; la sesion sigue viva en memoria.
+    }
+  }
+
   // Usado por el interceptor HTTP cuando el backend rechaza el token (sesion
   // abierta en otro dispositivo, expirada, o cuenta desactivada).
   forceLogout(message: string): void {
