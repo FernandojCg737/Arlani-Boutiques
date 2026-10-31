@@ -544,6 +544,20 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                       style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark),
                     ),
                   ),
+                if (v.estadoPago == 'completado')
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => context.push('/mis-compras/${v.id}'),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                      label: const Text('Ver comprobante'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _tinta,
+                        padding: EdgeInsets.zero,
+                        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ),
                 if (v.completada) ...[
                   const Divider(height: 24),
                   if (v.puedeCambiar) ...[
