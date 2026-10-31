@@ -10,7 +10,7 @@ from app.api.deps import require_permiso_cliente
 from app.core.audit import log_bitacora
 from app.core.config import settings
 from app.core.email import send_email
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import create_access_token, vigencia_sesion, hash_password, verify_password
 from app.db.session import get_db
 from app.models import Cliente, Usuario
 from app.schemas.auth import TokenResponse, UsuarioOut
@@ -69,7 +69,7 @@ def cambiar_password(
     db.commit()
 
     usuario = db.query(Usuario).filter(Usuario.id == usuario.id).first()
-    usuario.sesion_expira_en = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    usuario.sesion_expira_en = datetime.utcnow() + timedelta(minutes=vigencia_sesion(usuario.tipo))
     db.commit()
     db.refresh(usuario)
     log_bitacora(db, usuario, "ACTUALIZAR", "usuario", usuario.id, f"Cambio de contrasena: {usuario.email}", request)
@@ -87,5 +87,7 @@ def cambiar_password(
     except Exception:
         logger.exception("No se pudo enviar el aviso de cambio de contrasena a %s", usuario.email)
 
-    token = create_access_token(subject=str(usuario.id), session_id=usuario.session_id)
+    token = create_access_token(
+        subject=str(usuario.id), session_id=usuario.session_id, minutes=vigencia_sesion(usuario.tipo)
+    )
     return TokenResponse(access_token=token, usuario=to_usuario_out(usuario))

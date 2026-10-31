@@ -78,8 +78,10 @@ class TiendaOfflineOut(BaseModel):
 class PaypalClienteOfflineOut(BaseModel):
     id: int
     cuenta: str | None
-    # Solo las autorizadas se pueden cobrar sin conexion.
+    # Autorizada con la cuenta de Arlani: se cobra sin conexion en cualquier tienda.
     autorizada: bool
+    # Autorizada al pagar en estas tiendas (empresa_id): solo en ellas.
+    tiendas: list[int] = []
 
 
 class DireccionOfflineOut(BaseModel):

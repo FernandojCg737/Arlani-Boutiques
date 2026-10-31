@@ -389,7 +389,7 @@ def capturar_diferencia(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayPal no confirmó el pago de la diferencia.")
     db.execute(text("UPDATE cambio_prenda SET captura_id = :c WHERE id = :id"), {"c": captura["id"], "id": cambio_id})
     db.commit()
-    registrar_paypal_usado(db, cliente.id, resultado)
+    registrar_paypal_usado(db, cliente.id, resultado, fila["empresa_id"])
     log_bitacora(db, usuario, "ACTUALIZAR", "cambio_prenda", cambio_id, f"Diferencia del cambio pagada con PayPal (orden {order_id})", request)
     return _to_out(db, _cambio(db, cambio_id, cliente.id))
 

@@ -187,10 +187,6 @@
               }
               <span class="mostrador-etiqueta">¿Cómo pagas?</span>
               <div class="mostrador-opciones">
-                <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'en_linea'" (click)="formaPago.set('en_linea')">
-                  En línea
-                  <small>al volver internet</small>
-                </button>
                 @if (aceptaContraEntrega()) {
                   <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'contra_entrega'"
                           (click)="formaPago.set('contra_entrega')">
@@ -198,7 +194,7 @@
                     <small>{{ entrega() === 'envio' ? 'al recibirla' : 'al recogerla' }}</small>
                   </button>
                 }
-                @if (aceptaPaypal() && paypals().length) {
+                @if (aceptaPaypal()) {
                   <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'paypal_guardado'"
                           (click)="formaPago.set('paypal_guardado')">
                     Mi PayPal guardado
@@ -206,14 +202,14 @@
                   </button>
                 }
               </div>
-              @if (formaPago() === 'paypal_guardado') {
+              @if (formaPago() === 'paypal_guardado' && paypals().length) {
                 <span class="mostrador-etiqueta">¿Con qué cuenta PayPal?</span>
                 <div class="cliente-offline__paypals">
                   @for (pp of paypals(); track pp.id) {
                     <button type="button" class="mostrador-opcion" [class.is-activa]="paypalId() === pp.id"
-                            [disabled]="!pp.autorizada" (click)="paypalId.set(pp.id)">
+                            [disabled]="!paypalSirve(pp)" (click)="paypalId.set(pp.id)">
                       {{ pp.cuenta || 'Cuenta PayPal' }}
-                      <small>{{ pp.autorizada ? 'autorizada' : 'sin autorizar: autorízala en Métodos de pago' }}</small>
+                      <small>{{ estadoPaypal(pp) }}</small>
                     </button>
                   }
                 </div>
@@ -221,10 +217,10 @@
                   Verás «Pago enviado». Al volver internet se cobra solo lo que siga con stock y al mismo precio (o menor);
                   lo demás no se te cobra.
                 </p>
-              } @else if (aceptaPaypal() && !paypals().length) {
+              } @else if (formaPago() === 'paypal_guardado') {
                 <p class="offline-sub">
-                  ¿Quieres que se cobre sola? <a routerLink="/perfil" [queryParams]="{ tab: 'pagos' }">Agrega tu PayPal en Métodos de pago</a>
-                  (con conexión).
+                  Aún no tienes cuentas PayPal: paga una vez con PayPal en Arlani o
+                  <a routerLink="/perfil" [queryParams]="{ tab: 'pagos' }">agrégala en Métodos de pago</a> (con conexión).
                 </p>
               }
             }

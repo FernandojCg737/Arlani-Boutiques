@@ -3,7 +3,9 @@ se cobran solas).
 
 - Automatico: cada vez que el cliente paga con PayPal en Arlani, esa cuenta
   (su correo de PayPal) queda registrada en sus Metodos de pago
-  (`registrar_paypal_usado`), con cuantas veces y cuando la uso.
+  (`registrar_paypal_usado`), con cuantas veces y cuando la uso. Si la orden
+  pidio guardarla ("vault con compra"), queda ademas AUTORIZADA: con "Pagar
+  todo" para cualquier tienda; pagando en una tienda, para esa tienda.
 - Manual: "Agregar cuenta PayPal" abre la autorizacion de PayPal (Vault).
 - Para cobrar una compra sin conexion PayPal exige que el cliente autorice
   esa cuenta una vez: Arlani recibe un token de cobro y lo guarda cifrado
@@ -24,7 +26,7 @@ from app.api.deps import get_current_user
 from app.core.audit import log_bitacora
 from app.core.cifrado import cifrar, descifrar
 from app.core.config import settings
-from app.core.paypal import borrar_payment_token, crear_payment_token, crear_setup_token
+from app.core.paypal import borrar_payment_token, crear_payment_token, crear_setup_token, vault_de
 from app.db.session import get_db
 from app.models import Usuario
 
@@ -53,6 +55,8 @@ class MetodoPagoClienteOut(BaseModel):
     veces_usado: int
     ultimo_uso: datetime | None
     creado_en: datetime
+    # Autorizada solo en estas tiendas (se guardo al pagar en ellas).
+    tiendas: list[str] = []
 
 
 def _cliente(usuario: Usuario) -> int:
@@ -73,10 +77,13 @@ def _url_permitida(url: str, request: Request) -> bool:
 def _metodos(db: Session, cliente_id: int) -> list[MetodoPagoClienteOut]:
     filas = db.execute(
         text(
-            """SELECT id, tipo, cuenta, origen, estado = 'autorizada' AS autorizada, veces_usado, ultimo_uso, creado_en
-               FROM cliente_metodo_pago
-               WHERE cliente_id = :c AND NOT (estado = 'pendiente' AND cuenta IS NULL)
-               ORDER BY (estado = 'autorizada') DESC, ultimo_uso DESC NULLS LAST, creado_en DESC"""
+            """SELECT m.id, m.tipo, m.cuenta, m.origen, m.estado = 'autorizada' AS autorizada, m.veces_usado,
+                      m.ultimo_uso, m.creado_en,
+                      coalesce((SELECT array_agg(e.nombre ORDER BY e.nombre) FROM cliente_paypal_token_tienda t
+                                JOIN empresa e ON e.id = t.empresa_id WHERE t.metodo_id = m.id), '{}') AS tiendas
+               FROM cliente_metodo_pago m
+               WHERE m.cliente_id = :c AND NOT (m.estado = 'pendiente' AND m.cuenta IS NULL)
+               ORDER BY (m.estado = 'autorizada') DESC, m.ultimo_uso DESC NULLS LAST, m.creado_en DESC"""
         ),
         {"c": cliente_id},
     ).mappings().all()
@@ -198,10 +205,15 @@ def quitar_metodo(
     ).first()
     if fila is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Método de pago no encontrado.")
+    de_tiendas = db.execute(
+        text("SELECT empresa_id, token_cifrado FROM cliente_paypal_token_tienda WHERE metodo_id = :i"), {"i": metodo_id}
+    ).all()
     db.execute(text("DELETE FROM cliente_metodo_pago WHERE id = :i"), {"i": metodo_id})
     db.commit()
     if fila.token_cifrado and (token := descifrar(fila.token_cifrado)):
         borrar_payment_token(token)
+    for t in de_tiendas:
+        _borrar_token_de_tienda(db, t.empresa_id, t.token_cifrado)
     log_bitacora(db, usuario, "ACTUALIZAR", "cliente", cliente_id, f"Quitó su PayPal {fila.cuenta or ''} de sus métodos de pago", request)
     return _metodos(db, cliente_id)
 
@@ -209,9 +221,26 @@ def quitar_metodo(
 # ------------------------------------------------- para otros modulos
 
 
-def registrar_paypal_usado(db: Session, cliente_id: int, resultado: dict | None) -> None:
+def _cuenta_de_tienda(db: Session, empresa_id: int):
+    from app.api.v1.endpoints.ventas import _paypal_de_tienda  # evita el import circular
+
+    return _paypal_de_tienda(db, empresa_id)[1]
+
+
+def _borrar_token_de_tienda(db: Session, empresa_id: int, cifrado: str) -> None:
+    try:
+        if token := descifrar(cifrado):
+            borrar_payment_token(token, _cuenta_de_tienda(db, empresa_id))
+    except Exception:
+        logger.warning("No se pudo desvincular en PayPal el token del cliente en la tienda %s", empresa_id)
+
+
+def registrar_paypal_usado(db: Session, cliente_id: int, resultado: dict | None, empresa_id: int | None = None) -> None:
     """Despues de un pago con PayPal ya confirmado: la cuenta con la que pago
-    queda en sus Metodos de pago (o suma un uso). Nunca hace fallar la venta."""
+    queda en sus Metodos de pago (o suma un uso). Si PayPal guardo la cuenta
+    con la compra, queda autorizada: cobrada por Arlani (`empresa_id` None),
+    para cualquier tienda; cobrada por una tienda, para esa tienda. Nunca hace
+    fallar la venta."""
     try:
         resultado = resultado or {}
         fuente = resultado.get("payment_source") or {"paypal": {}}
@@ -223,7 +252,7 @@ def registrar_paypal_usado(db: Session, cliente_id: int, resultado: dict | None)
         correo = payer.get("email_address") or paypal.get("email_address")
         if not correo:
             return
-        db.execute(
+        metodo_id = db.execute(
             text(
                 """INSERT INTO cliente_metodo_pago (cliente_id, tipo, cuenta, paypal_payer_id, origen, estado,
                                                    veces_usado, ultimo_uso)
@@ -231,27 +260,59 @@ def registrar_paypal_usado(db: Session, cliente_id: int, resultado: dict | None)
                    ON CONFLICT (cliente_id, tipo, lower(cuenta)) WHERE cuenta IS NOT NULL DO UPDATE
                    SET veces_usado = cliente_metodo_pago.veces_usado + 1, ultimo_uso = now(),
                        paypal_payer_id = coalesce(EXCLUDED.paypal_payer_id, cliente_metodo_pago.paypal_payer_id),
-                       actualizado_en = now()"""
+                       actualizado_en = now()
+                   RETURNING id"""
             ),
             {"c": cliente_id, "m": correo, "p": payer.get("payer_id") or paypal.get("account_id")},
-        )
+        ).scalar_one()
+        token = vault_de(resultado)
+        if token and empresa_id is None:
+            db.execute(
+                text(
+                    """UPDATE cliente_metodo_pago SET estado = 'autorizada', token_cifrado = :t, actualizado_en = now()
+                       WHERE id = :i"""
+                ),
+                {"t": cifrar(token), "i": metodo_id},
+            )
+        elif token:
+            db.execute(
+                text(
+                    """INSERT INTO cliente_paypal_token_tienda (metodo_id, empresa_id, token_cifrado)
+                       VALUES (:i, :e, :t)
+                       ON CONFLICT (metodo_id, empresa_id) DO UPDATE SET token_cifrado = :t, creado_en = now()"""
+                ),
+                {"i": metodo_id, "e": empresa_id, "t": cifrar(token)},
+            )
         db.commit()
     except Exception:
         db.rollback()
         logger.exception("No se pudo registrar el PayPal usado por el cliente %s", cliente_id)
 
 
-def token_de(db: Session, cliente_id: int, metodo_id: int | None = None) -> tuple[int, str] | None:
-    """(id, token de cobro descifrado) de una cuenta PayPal autorizada del
-    cliente: la elegida o, sin elegir, la ultima autorizada."""
-    sql = "SELECT id, token_cifrado FROM cliente_metodo_pago WHERE cliente_id = :c AND estado = 'autorizada'"
-    params: dict = {"c": cliente_id}
-    if metodo_id is not None:
-        sql += " AND id = :i"
-        params["i"] = metodo_id
-    fila = db.execute(text(sql + " ORDER BY actualizado_en DESC LIMIT 1"), params).first()
-    token = descifrar(fila.token_cifrado) if fila and fila.token_cifrado else None
-    return (fila.id, token) if token else None
+def token_de(db: Session, cliente_id: int, metodo_id: int | None, empresa_id: int) -> dict | None:
+    """Con que permiso de PayPal se cobra al cliente una compra en esa tienda:
+    {"metodo_id", "token", "empresa_id"}. empresa_id None = la cuenta de Arlani
+    (vale en cualquier tienda); si no, la de la tienda (cobro directo en ella).
+    `metodo_id` es la cuenta que eligio; sin elegir, la ultima autorizada."""
+    filtro = " AND m.id = :i" if metodo_id is not None else ""
+    fila = db.execute(
+        text(
+            f"""SELECT m.id, CASE WHEN m.estado = 'autorizada' THEN m.token_cifrado END AS arlani,
+                       t.token_cifrado AS tienda
+                FROM cliente_metodo_pago m
+                LEFT JOIN cliente_paypal_token_tienda t ON t.metodo_id = m.id AND t.empresa_id = :e
+                WHERE m.cliente_id = :c AND (m.estado = 'autorizada' OR t.token_cifrado IS NOT NULL){filtro}
+                ORDER BY m.actualizado_en DESC LIMIT 1"""
+        ),
+        {"c": cliente_id, "e": empresa_id, "i": metodo_id},
+    ).first()
+    if fila is None:
+        return None
+    if fila.arlani and (token := descifrar(fila.arlani)):
+        return {"metodo_id": fila.id, "token": token, "empresa_id": None}
+    if fila.tienda and (token := descifrar(fila.tienda)):
+        return {"metodo_id": fila.id, "token": token, "empresa_id": empresa_id}
+    return None
 
 
 def marcar_uso(db: Session, metodo_id: int) -> None:
@@ -262,14 +323,18 @@ def marcar_uso(db: Session, metodo_id: int) -> None:
 
 
 def paypals_de(db: Session, cliente_id: int) -> list[dict]:
-    """Sus cuentas PayPal para el catalogo sin conexion (autorizadas primero)."""
+    """Sus cuentas PayPal para el catalogo sin conexion (autorizadas primero):
+    `autorizada` vale en cualquier tienda; `tiendas`, solo en esas."""
     return [
         dict(f)
         for f in db.execute(
             text(
-                """SELECT id, cuenta, estado = 'autorizada' AS autorizada FROM cliente_metodo_pago
-                   WHERE cliente_id = :c AND tipo = 'paypal' AND NOT (estado = 'pendiente' AND cuenta IS NULL)
-                   ORDER BY (estado = 'autorizada') DESC, ultimo_uso DESC NULLS LAST, id"""
+                """SELECT m.id, m.cuenta, m.estado = 'autorizada' AS autorizada,
+                          coalesce((SELECT array_agg(t.empresa_id) FROM cliente_paypal_token_tienda t
+                                    WHERE t.metodo_id = m.id), '{}') AS tiendas
+                   FROM cliente_metodo_pago m
+                   WHERE m.cliente_id = :c AND m.tipo = 'paypal' AND NOT (m.estado = 'pendiente' AND m.cuenta IS NULL)
+                   ORDER BY (m.estado = 'autorizada') DESC, m.ultimo_uso DESC NULLS LAST, m.id"""
             ),
             {"c": cliente_id},
         ).mappings()

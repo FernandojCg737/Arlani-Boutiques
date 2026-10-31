@@ -53,6 +53,13 @@ class ApiClient {
           }
           handler.next(options);
         },
+        // Sesion que se renueva sola mientras se usa (igual que la web): el
+        // backend manda el token nuevo en X-Token-Renovado.
+        onResponse: (response, handler) async {
+          final nuevo = response.headers.value('x-token-renovado');
+          if (nuevo != null && nuevo.isNotEmpty) await secureStorage.saveToken(nuevo);
+          handler.next(response);
+        },
         onError: (error, handler) async {
           final hadToken = error.requestOptions.headers.containsKey('Authorization');
           if (error.response?.statusCode == 401 && hadToken) {

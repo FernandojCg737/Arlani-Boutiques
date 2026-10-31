@@ -9,7 +9,8 @@ declare global {
 }
 
 export interface AccionesPaypal {
-  crearOrden: () => Promise<string>;
+  // fuente: el boton que eligio el cliente ('paypal', 'card'...).
+  crearOrden: (fuente?: string) => Promise<string>;
   aprobar: (orderId: string) => Promise<void>;
   cancelar: () => void;
   error: (e: unknown) => void;

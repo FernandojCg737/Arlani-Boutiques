@@ -83,6 +83,8 @@ interface MetodoPagoCliente {
   veces_usado: number;
   ultimo_uso: string | null;
   creado_en: string;
+  // Autorizada al pagar en estas tiendas (solo vale en ellas).
+  tiendas: string[];
 }
 
 type Tab =
@@ -266,6 +268,7 @@ export class Perfil implements OnInit {
     this.paypalProcesando.set(true);
     try {
       this.metodosPago.set(await firstValueFrom(this.http.post<MetodoPagoCliente[]>(`${this.apiPagos}/paypal/confirmar`, {})));
+      void this.catalogoSinConexion.revisar(true).catch(() => undefined);
       this.paypalAviso.set('Listo: la cuenta quedó autorizada. Ya puedes elegirla al comprar sin conexión.');
     } catch (err) {
       this.paypalError.set(this.detalle(err, 'No se pudo autorizar la cuenta. Intenta de nuevo.'));
@@ -282,6 +285,7 @@ export class Perfil implements OnInit {
     this.paypalAviso.set('');
     try {
       this.metodosPago.set(await firstValueFrom(this.http.delete<MetodoPagoCliente[]>(`${this.apiPagos}/metodos/${m.id}`)));
+      void this.catalogoSinConexion.revisar(true).catch(() => undefined);
       this.paypalAviso.set('Quitaste la cuenta de tus métodos de pago.');
     } catch (err) {
       this.paypalError.set(this.detalle(err, 'No se pudo quitar. Intenta de nuevo.'));

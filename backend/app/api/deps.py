@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -7,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.security import create_access_token, vigencia_sesion
 from app.db.session import get_db, limitar_a_empresa
 from app.models import Empresa, Usuario
 from app.services.usuarios import codigos_permiso
@@ -47,6 +49,8 @@ def get_current_user(
     x_empresa: int | None = Header(default=None, alias="X-Empresa"),
 ) -> Usuario:
     usuario = _usuario_del_token(credentials, db)
+    # Antes de limitar la sesion a la empresa (su SET LOCAL se pierde al confirmar).
+    _renovar_sesion(request, credentials, usuario, db)
     # El SuperAdministrador y los clientes (sin empresa) ven toda la plataforma.
     if usuario.empresa_id is not None and usuario.tipo in PERSONAL_DE_TIENDA:
         limitar_a_empresa(db, usuario.empresa_id)
@@ -59,6 +63,25 @@ def get_current_user(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Empresa no encontrada.")
         limitar_a_empresa(db, x_empresa)
     return usuario
+
+
+def _renovar_sesion(request: Request, credentials: HTTPAuthorizationCredentials, usuario: Usuario, db: Session) -> None:
+    """Renovacion automatica: si el token tiene mas de unos minutos, se emite
+    uno nuevo (header X-Token-Renovado, ver main.py) y la sesion vuelve a
+    vencer recien tras `vigencia_sesion` sin actividad. Los tokens de antes
+    (sin "iat") se renuevan en su primera peticion."""
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        return
+    emitido = payload.get("iat")
+    ahora = datetime.now(timezone.utc)
+    if emitido and ahora.timestamp() - float(emitido) < settings.SESION_RENOVAR_CADA_MIN * 60:
+        return
+    minutos = vigencia_sesion(usuario.tipo)
+    usuario.sesion_expira_en = ahora.replace(tzinfo=None) + timedelta(minutes=minutos)
+    db.commit()
+    request.state.token_renovado = create_access_token(str(usuario.id), usuario.session_id, minutos)
 
 
 def _usuario_del_token(credentials: HTTPAuthorizationCredentials | None, db: Session) -> Usuario:

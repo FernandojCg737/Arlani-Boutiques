@@ -356,8 +356,9 @@
             <div>
               <h3>Mis cuentas PayPal</h3>
               <p>
-                Cada cuenta con la que pagas en Arlani se registra aquí sola. Autoriza una vez la que quieras usar al comprar
-                sin conexión: Arlani guarda solo el permiso de PayPal, nunca tus datos.
+                Cada cuenta con la que pagas con PayPal en Arlani se registra aquí sola y queda autorizada para comprar sin
+                conexión: con «Pagar todo», en cualquier tienda; pagando en una tienda, en esa tienda. Arlani guarda solo el
+                permiso de PayPal, nunca tus datos.
               </p>
             </div>
             <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
@@ -387,14 +388,20 @@
                         · última vez el {{ m.ultimo_uso + 'Z' | date: "d MMM 'de' yyyy" }}
                       }
                     </span>
-                    <span class="paypal-guardado__estado" [class.is-ok]="m.autorizada">
-                      {{ m.autorizada ? 'Autorizada para compras sin conexión' : 'Sin autorizar para compras sin conexión' }}
+                    <span class="paypal-guardado__estado" [class.is-ok]="m.autorizada || m.tiendas.length">
+                      @if (m.autorizada) {
+                        Autorizada para compras sin conexión en todas las tiendas
+                      } @else if (m.tiendas.length) {
+                        Autorizada para compras sin conexión en {{ m.tiendas.join(', ') }}
+                      } @else {
+                        Sin autorizar para compras sin conexión
+                      }
                     </span>
                   </div>
                   <div class="paypal-guardado__acciones">
                     @if (!m.autorizada) {
                       <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
-                        Autorizar
+                        {{ m.tiendas.length ? 'Autorizar en todas' : 'Autorizar' }}
                       </button>
                     }
                     <button type="button" class="paypal-guardado__btn is-secundario" [disabled]="paypalProcesando()"

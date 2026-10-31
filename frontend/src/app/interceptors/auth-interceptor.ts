@@ -1,7 +1,7 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, throwError } from 'rxjs';
+import { catchError, tap, throwError } from 'rxjs';
 import { tiendaDeUrl } from '../pages/superadmin/por-tienda';
 import { Auth } from '../services/auth';
 import { EstadoTienda } from '../services/estado-tienda';
@@ -27,6 +27,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authReq = req.clone({ setHeaders: headers });
 
   return next(authReq).pipe(
+    // Sesión que se renueva sola mientras se usa: el backend manda el token
+    // nuevo en X-Token-Renovado y vence recién tras días sin actividad.
+    tap((evento) => {
+      const nuevo = evento instanceof HttpResponse ? evento.headers.get('X-Token-Renovado') : null;
+      if (nuevo && auth.token() === token) auth.renovarToken(nuevo);
+    }),
     catchError((error: unknown) => {
       // Tienda con la suscripcion vencida: el panel se bloquea y el
       // Administrador va directo a renovarla.

@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -16,6 +17,8 @@ PAYPAL_BASE_URLS = {
 # numerico del carrito pero en USD. Es una simplificacion conocida, no una
 # conversion de moneda real.
 PAYPAL_CURRENCY = "USD"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,7 @@ def crear_orden(
     return_url: str | None = None,
     cancel_url: str | None = None,
     cuenta: CuentaPaypal | None = None,
+    guardar_paypal: bool = False,
 ) -> dict:
     """Crea una orden de pago en PayPal (intent=CAPTURE). Esto NO cobra nada
     todavia: el frontend (web o el WebView inline del movil, ver
@@ -115,12 +119,45 @@ def crear_orden(
             }
         ],
     }
+    if guardar_paypal:
+        # "Vault con compra": al pagar, PayPal deja guardada esa cuenta y da un
+        # token de cobro (ver vault_de). Asi queda autorizada para comprar sin
+        # conexion sin que el cliente tenga que autorizarla aparte.
+        contexto = {"return_url": return_url, "cancel_url": cancel_url} if return_url and cancel_url else {}
+        con_vault = {
+            **body,
+            "payment_source": {
+                "paypal": {
+                    "attributes": {
+                        "vault": {"store_in_vault": "ON_SUCCESS", "usage_type": "MERCHANT", "customer_type": "CONSUMER"}
+                    },
+                    "experience_context": contexto,
+                }
+            },
+        }
+        resp = requests.post(f"{_base_url(c)}/v2/checkout/orders", headers=_cabeceras(c), json=con_vault, timeout=15)
+        if resp.status_code == 403:
+            resp = requests.post(
+                f"{_base_url(c)}/v2/checkout/orders", headers=_cabeceras(c, nuevo=True), json=con_vault, timeout=15
+            )
+        if resp.ok:
+            return resp.json()
+        # Esa cuenta de PayPal no tiene "Save payment methods": se cobra igual,
+        # sin guardar la cuenta.
+        logger.warning("PayPal no acepto guardar la cuenta del cliente: %s", _detalle_error(resp))
     if return_url and cancel_url:
         body["application_context"] = {"return_url": return_url, "cancel_url": cancel_url}
     resp = requests.post(f"{_base_url(c)}/v2/checkout/orders", headers=_cabeceras(c), json=body, timeout=15)
     if not resp.ok:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "No se pudo crear la orden de pago en PayPal.")
     return resp.json()
+
+
+def vault_de(resultado: dict | None) -> str | None:
+    """Token de cobro que PayPal guardo con la compra (si la orden lo pidio y
+    el cliente pago con su cuenta PayPal)."""
+    vault = (((resultado or {}).get("payment_source") or {}).get("paypal") or {}).get("attributes", {}).get("vault") or {}
+    return vault.get("id") if vault.get("status") == "VAULTED" else None
 
 
 def obtener_orden(order_id: str, cuenta: CuentaPaypal | None = None) -> dict:
@@ -275,10 +312,10 @@ def crear_payment_token(setup_token_id: str) -> dict:
     return resp.json()
 
 
-def borrar_payment_token(token_id: str) -> bool:
+def borrar_payment_token(token_id: str, cuenta: CuentaPaypal | None = None) -> bool:
     """Desvincula el PayPal del cliente en PayPal (best effort)."""
     try:
-        c = _cuenta(None)
+        c = _cuenta(cuenta)
         resp = _vault("DELETE", c, f"/v3/vault/payment-tokens/{token_id}", timeout=15)
         return resp.ok or resp.status_code == 404
     except Exception:
@@ -289,12 +326,14 @@ class CobroRechazado(Exception):
     """PayPal no cobro con el PayPal guardado (sin fondos, desvinculado...)."""
 
 
-def cobrar_con_token(token_id: str, total: Decimal, referencia: str, idempotencia: str) -> dict:
+def cobrar_con_token(
+    token_id: str, total: Decimal, referencia: str, idempotencia: str, cuenta: CuentaPaypal | None = None
+) -> dict:
     """Cobra `total` (US$) con el PayPal guardado, en la cuenta de Arlani, sin
     que el cliente intervenga. La orden se crea y se captura en el mismo paso.
     `idempotencia` (PayPal-Request-Id) evita cobrar dos veces lo mismo si el
     pedido se reintenta."""
-    c = _cuenta(None)
+    c = _cuenta(cuenta)
     body = {
         "intent": "CAPTURE",
         "purchase_units": [
@@ -309,7 +348,7 @@ def cobrar_con_token(token_id: str, total: Decimal, referencia: str, idempotenci
     orden = resp.json()
     # Si PayPal la dejo aprobada pero sin capturar, se captura ahora.
     if orden.get("status") == "APPROVED":
-        orden = capturar_orden(orden["id"])
+        orden = capturar_orden(orden["id"], cuenta)
     if orden.get("status") != "COMPLETED" or captura_de(orden) is None:
         raise CobroRechazado("PayPal no completó el cobro.")
     return orden

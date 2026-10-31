@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api_client.dart';
@@ -52,6 +53,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final usuario = await _repository.me();
       state = state.copyWith(usuario: usuario, bootstrapping: false);
+    } on DioException catch (e) {
+      // Solo un 401 significa que la sesion ya no vale. Sin internet (o con el
+      // servidor dormido) se sigue con el usuario guardado, como en la web.
+      if (e.response?.statusCode == 401) {
+        await _storage.clear();
+        state = state.copyWith(bootstrapping: false, clearUsuario: true);
+        return;
+      }
+      final guardado = await _storage.readUsuario();
+      state = guardado != null
+          ? state.copyWith(usuario: Usuario.fromJson(guardado), bootstrapping: false)
+          : state.copyWith(bootstrapping: false, clearUsuario: true);
     } catch (_) {
       await _storage.clear();
       state = state.copyWith(bootstrapping: false, clearUsuario: true);
