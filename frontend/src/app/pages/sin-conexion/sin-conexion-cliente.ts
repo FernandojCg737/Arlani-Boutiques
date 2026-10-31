@@ -107,11 +107,12 @@ export class SinConexionCliente implements OnInit {
     return pp.autorizada || this.empresasElegidas().every((id) => (pp.tiendas ?? []).includes(id));
   }
 
+  // Cualquier cuenta registrada sirve: si ya tiene permiso se cobra sola; si
+  // no, al volver internet se confirma el pago una vez y queda autorizada.
   protected estadoPaypal(pp: PaypalLocal): string {
-    if (pp.autorizada) return 'autorizada en todas las tiendas';
-    if (this.paypalSirve(pp)) return 'autorizada en esta tienda';
-    if (pp.tiendas?.length) return 'autorizada en otras tiendas: queda autorizada en todas la próxima vez que pagues con PayPal en Arlani';
-    return 'sin autorizar: autorízala en Métodos de pago';
+    return this.paypalSirve(pp)
+      ? 'se cobra sola al volver internet'
+      : 'al volver internet confirmas el pago una vez y queda autorizada';
   }
 
   protected readonly direcciones = computed(() => this.catalogo()?.direcciones ?? []);
@@ -129,10 +130,6 @@ export class SinConexionCliente implements OnInit {
     if (this.modo() === 'comprar' && this.items().length) {
       if (!this.aceptaPaypal() && !this.aceptaContraEntrega()) {
         falta.push('Estas tiendas no reciben pagos sin conexión (PayPal o contra entrega).');
-      } else if (this.formaPago() === 'paypal_guardado' && !this.paypals().length) {
-        falta.push('Agrega tu PayPal en Mi cuenta → Métodos de pago (con conexión) para pagar sin internet.');
-      } else if (this.formaPago() === 'paypal_guardado' && this.paypalId() === null) {
-        falta.push('Ninguna de tus cuentas PayPal está autorizada para estas tiendas: autorízala en Métodos de pago.');
       }
     }
     return falta;
@@ -171,11 +168,11 @@ export class SinConexionCliente implements OnInit {
       if (f === 'contra_entrega' && !this.aceptaContraEntrega()) this.formaPago.set('paypal_guardado');
       else if (f === 'paypal_guardado' && !this.aceptaPaypal() && this.aceptaContraEntrega()) this.formaPago.set('contra_entrega');
     });
-    // La cuenta PayPal elegida tiene que servir para las tiendas de lo elegido.
+    // Cuenta PayPal elegida: la que eligió o, por defecto, una que ya se cobre sola.
     effect(() => {
-      const sirven = this.paypals().filter((p) => this.paypalSirve(p));
+      const todas = this.paypals();
       const id = untracked(this.paypalId);
-      if (!sirven.some((p) => p.id === id)) this.paypalId.set(sirven[0]?.id ?? null);
+      if (!todas.some((p) => p.id === id)) this.paypalId.set((todas.find((p) => this.paypalSirve(p)) ?? todas[0])?.id ?? null);
     });
     effect(() => this.guardarCarrito(this.items()));
   }
@@ -293,7 +290,12 @@ export class SinConexionCliente implements OnInit {
       }
       this.items.set([]);
       const varias = grupos.length > 1 ? ` Se enviaron ${grupos.length} pedidos: cada tienda o sucursal recibe el suyo.` : '';
-      if (conPaypal) {
+      if (conPaypal && !(paypal && this.paypalSirve(paypal))) {
+        this.aviso.set(
+          'Pago enviado. Al volver internet te pedimos confirmar el pago con tu PayPal (solo esta vez): desde ahí tu cuenta queda autorizada y tus próximas compras sin conexión se cobran solas.' +
+            varias,
+        );
+      } else if (conPaypal) {
         const cuenta = paypal?.cuenta ? ` ${paypal.cuenta}` : '';
         this.aviso.set(
           (this.sync.enLinea()

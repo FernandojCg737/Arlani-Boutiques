@@ -37,6 +37,8 @@ from app.api.v1.endpoints.paypal_guardado import marcar_uso, paypals_de, registr
 from app.api.v1.endpoints.reservas import _mover_stock_reserva
 from app.api.v1.endpoints.ventas import (
     _a_usd,
+    _cobro_de_tienda,
+    metodo_publico_cobro,
     _error_sp,
     _guardar_captura,
     _guardar_envio,
@@ -60,6 +62,7 @@ from app.core.storage import upload_comprobante_pago
 from app.db.session import get_db
 from app.models import Bitacora, DetalleReserva, MetodoPagoEmpresa, Notificacion, Reserva, Usuario
 from app.services.usuarios import codigos_permiso
+from app.schemas.ventas import OrdenPaypalIn
 from app.schemas.offline import (
     CatalogoClienteOfflineOut,
     ClienteOfflineOut,
@@ -407,6 +410,18 @@ def _cobro_paypal(db: Session, permiso: dict, empresa_id: int) -> tuple[MetodoPa
         return None
 
 
+def _metodo_paypal_cualquiera(db: Session, empresa_id: int) -> MetodoPagoEmpresa | None:
+    return (
+        db.query(MetodoPagoEmpresa)
+        .filter(
+            MetodoPagoEmpresa.empresa_id == empresa_id,
+            MetodoPagoEmpresa.tipo == "paypal",
+            MetodoPagoEmpresa.activo.is_(True),
+        )
+        .first()
+    )
+
+
 def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empresa_id: int) -> str | None:
     if op.forma_pago is None:
         return "Elige cómo vas a pagar la compra."
@@ -419,12 +434,8 @@ def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empre
         return "Elige una de tus direcciones para el envío."
     if op.forma_pago == "contra_entrega" and _metodo_contra_entrega(db, empresa_id) is None:
         return "Esta tienda no acepta pago contra entrega."
-    if op.forma_pago == "paypal_guardado":
-        permiso = token_de(db, cliente_id, op.metodo_pago_id, empresa_id)
-        if permiso is None:
-            return "Esa cuenta PayPal no está autorizada para esta tienda: autorízala en Métodos de pago y vuelve a comprar."
-        if _cobro_paypal(db, permiso, empresa_id) is None:
-            return "Esta tienda no recibe pagos con PayPal."
+    if op.forma_pago == "paypal_guardado" and _metodo_paypal_cualquiera(db, empresa_id) is None:
+        return "Esta tienda no recibe pagos con PayPal."
     return None
 
 
@@ -520,7 +531,12 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
         or db.execute(text("SELECT 1 FROM cliente WHERE id = :c"), {"c": cliente_reserva}).scalar() is None
     ):
         estado, mensaje = "rechazada", "La reserva necesita un cliente registrado."
-    elif op.tipo == "pedido" and op.forma_pago == "paypal_guardado":
+    elif (
+        op.tipo == "pedido"
+        and op.forma_pago == "paypal_guardado"
+        and (permiso := token_de(db, usuario.id, op.metodo_pago_id, sucursal["empresa_id"])) is not None
+        and _cobro_paypal(db, permiso, sucursal["empresa_id"]) is not None
+    ):
         # "Pago enviado": se cobra con el PayPal guardado apenas termina la
         # sincronizacion (_cobrar_pendientes), prenda por prenda.
         estado, mensaje = "por_cobrar", "Pago enviado: se cobra con tu PayPal guardado."
@@ -540,6 +556,13 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
                 "Cambió el precio de alguna prenda: verás el precio nuevo al pagar."
                 if _aviso_precios(db, op.items) else "Lista para pagar."
             )
+            if op.forma_pago == "paypal_guardado":
+                # Esa cuenta PayPal aun no tiene permiso de cobro (se registro
+                # antes): se confirma el pago una vez y queda autorizada.
+                mensaje = (
+                    "Confirma el pago con tu PayPal (solo esta vez): desde ahí tu cuenta queda autorizada "
+                    "y tus próximas compras sin conexión se cobran solas."
+                )
         elif op.tipo == "venta":
             venta_id = _registrar_venta(db, op, usuario, fecha)
             mensaje = _aviso_precios(db, op.items) or "Venta registrada."
@@ -1012,7 +1035,7 @@ def _revisar(db: Session, fila) -> PedidoOfflineOut:
         metodos = [_publico(metodo)] if metodo else []
     else:
         metodos = [
-            _publico(m)
+            metodo_publico_cobro(m)
             for m in db.query(MetodoPagoEmpresa)
             .filter(
                 MetodoPagoEmpresa.empresa_id == fila["empresa_id"],
@@ -1096,15 +1119,17 @@ def _marcar_pagada(db: Session, fila, venta_id: int, datos: OperacionOfflineIn, 
 def pedido_paypal_orden(
     uuid: str,
     request: Request,
+    payload: OrdenPaypalIn | None = None,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_current_user),
 ) -> dict:
     fila, revisado, _ = _pagable(db, usuario, uuid)
-    _, cuenta = _paypal_de_tienda(db, fila["empresa_id"])
+    _, cuenta = _cobro_de_tienda(db, fila["empresa_id"])
     base = str(request.base_url).rstrip("/")
     orden = crear_orden(
         revisado.total_usd, referencia=f"pedido-offline-{fila['id']}",
         return_url=f"{base}/paypal-embed/retorno", cancel_url=f"{base}/paypal-embed/cancelado", cuenta=cuenta,
+        guardar_paypal=bool(payload and payload.guardar_paypal),
     )
     return {"order_id": orden["id"], "total": revisado.total_usd}
 
@@ -1118,7 +1143,7 @@ def pedido_paypal_capturar(
     usuario: Usuario = Depends(get_current_user),
 ) -> PedidoOfflineOut:
     fila, revisado, datos = _pagable(db, usuario, uuid)
-    metodo, cuenta = _paypal_de_tienda(db, fila["empresa_id"])
+    metodo, cuenta = _cobro_de_tienda(db, fila["empresa_id"])
     unidad = (obtener_orden(order_id, cuenta).get("purchase_units") or [{}])[0]
     if unidad.get("reference_id") != f"pedido-offline-{fila['id']}" or not _monto_coincide(unidad.get("amount"), revisado.total_usd):
         raise HTTPException(status.HTTP_409_CONFLICT, "El precio cambió desde que iniciaste el pago. Vuelve a intentarlo.")
@@ -1135,15 +1160,28 @@ def pedido_paypal_capturar(
     if resultado.get("status") != "COMPLETED" or captura is None:
         db.rollback()
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayPal no confirmó el pago.")
+    liquidacion = None
     try:
         _guardar_captura(db, [venta_id], captura["id"])
+        if cuenta is None:
+            # Lo cobro Arlani: a la tienda se le liquida lo suyo (como en el checkout).
+            liquidacion = db.execute(
+                text("SELECT sp_registrar_liquidacion(:e, :o, :c, :v, :tc)"),
+                {"e": fila["empresa_id"], "o": order_id, "c": captura["id"], "v": [venta_id], "tc": _a_usd(db, Decimal(1))[1]},
+            ).scalar_one()
         _marcar_pagada(db, fila, venta_id, datos, f"Pagada con PayPal · Venta #{venta_id}")
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Compra sin conexión pagada con PayPal (orden {order_id})", request)
     except Exception:
         db.rollback()
         reembolsar_captura(captura["id"], cuenta)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo registrar tu compra. El cobro fue revertido.")
-    registrar_paypal_usado(db, usuario.id, resultado, fila["empresa_id"])
+    registrar_paypal_usado(db, usuario.id, resultado, fila["empresa_id"] if cuenta is not None else None)
+    if liquidacion is not None:
+        try:
+            enviar_liquidaciones(db, [liquidacion])
+        except Exception:
+            db.rollback()
+            logger.exception("No se pudo enviar la liquidacion %s (orden %s)", liquidacion, order_id)
     return _revisar(db, _cliente_pedido(db, usuario, uuid))
 
 
