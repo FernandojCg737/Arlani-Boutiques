@@ -64,7 +64,7 @@
                   <dt>Modo</dt>
                   <dd>{{ m.paypal_modo === 'live' ? 'Real' : 'Sandbox (pruebas)' }}</dd>
                   <dt>Correo PayPal</dt>
-                  <dd>{{ m.paypal_email ?? 'Falta: edítalo para recibir pagos de "Pagar todo"' }}</dd>
+                  <dd>{{ m.paypal_email ?? 'Falta: edítalo para recibir tus pagos con PayPal al instante' }}</dd>
                 </dl>
                 <p class="mp-nota">Se confirma solo: la venta queda pagada al instante.</p>
               }
@@ -198,8 +198,8 @@
               </label>
             </div>
             <p class="mp-ayuda">
-              El correo es el de la cuenta PayPal donde recibes tu dinero: cuando un cliente paga varias tiendas con
-              "Pagar todo", Arlani te envía ahí lo tuyo menos la comisión.
+              El correo es el de la cuenta PayPal donde recibes tu dinero: cuando un cliente paga con PayPal (solo tu
+              tienda o varias con "Pagar todo"), Arlani cobra y te envía ahí lo tuyo al instante, menos la comisión.
             </p>
           }
           @case ('qr') {

@@ -228,7 +228,7 @@ export class AdminMetodosPago implements OnInit {
       return;
     }
     if (f.tipo === 'paypal' && !f.paypal_email.includes('@')) {
-      this.errorForm.set('Escribe el correo de tu cuenta PayPal: ahí te llega lo de las compras con "Pagar todo".');
+      this.errorForm.set('Escribe el correo de tu cuenta PayPal: ahí te llega lo de las compras pagadas con PayPal.');
       return;
     }
     if (f.tipo === 'qr' && !this.qrNuevo() && !m?.qr_url) {
