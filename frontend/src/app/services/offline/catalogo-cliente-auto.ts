@@ -28,26 +28,37 @@ export class CatalogoClienteAuto {
   readonly catalogo = signal<CatalogoCliente | null>(null);
   readonly ultima = signal<string | null>(null);
   readonly descargando = signal(false);
+  // Última vez que se confirmó con el servidor que el stock está al día.
+  readonly revisadoEn = signal<Date | null>(null);
 
   private version: string | null = null;
   private reloj: ReturnType<typeof setInterval> | null = null;
   private usuarioId: number | null = null;
+  // Se pidió iniciar (perfil o "Sin conexión"), aunque la sesión aún cargaba.
+  private pedido = false;
 
   constructor() {
     const cliente = computed(() => {
       const u = this.auth.currentUser();
       return u?.tipo === 'cliente' ? u.id : null;
     });
+    // El cliente de ahora se fija YA (no en el effect, que corre después de
+    // iniciar() y antes detenía el reloj recién creado).
+    this.usuarioId = untracked(cliente);
+    if (this.usuarioId !== null) void this.leerGuardado(this.usuarioId);
     // Al cambiar quién inició sesión: lo guardado de ese cliente, o nada.
     effect(() => {
       const id = cliente();
       if (id === this.usuarioId) return;
       untracked(() => {
+        // Se pidió iniciar mientras la sesión todavía cargaba: arranca ahora.
+        const esperaba = this.pedido && this.usuarioId === null;
         this.detener();
         this.usuarioId = id;
         this.version = null;
         this.catalogo.set(null);
         if (id !== null) void this.leerGuardado(id);
+        if (id !== null && esperaba) this.iniciar();
       });
     });
     window.addEventListener('online', () => void this.revisar());
@@ -58,7 +69,9 @@ export class CatalogoClienteAuto {
 
   // Se llama al entrar al perfil (y en "Sin conexión").
   iniciar(): void {
-    if (this.reloj || !this.puede()) return;
+    this.pedido = true;
+    // Los permisos pueden llegar después: revisar() los vuelve a mirar en cada vuelta.
+    if (this.reloj || this.auth.currentUser()?.tipo !== 'cliente') return;
     this.reloj = setInterval(() => void this.revisar(), CADA_MS);
     void this.revisar();
   }
@@ -66,6 +79,7 @@ export class CatalogoClienteAuto {
   detener(): void {
     if (this.reloj) clearInterval(this.reloj);
     this.reloj = null;
+    this.pedido = false;
   }
 
   // forzar: el botón "Actualizar catálogo" (descarga aunque no haya cambios y
@@ -77,6 +91,7 @@ export class CatalogoClienteAuto {
     this.descargando.set(true);
     try {
       const { version } = await firstValueFrom(this.http.get<{ version: string }>(`${this.api}/version`));
+      this.revisadoEn.set(new Date());
       if (!forzar && version === this.version && this.catalogo()) return;
       const c = await firstValueFrom(
         this.http.get<CatalogoCliente>(this.api, { params: { automatica: !forzar } }),

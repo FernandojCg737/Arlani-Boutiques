@@ -351,40 +351,66 @@
       }
 
       @if (tab() === 'pagos' && auth.hasPermiso('CU11')) {
-        <div class="dash-card paypal-guardado" id="paypal-guardado">
-          <div class="dash-card__info">
-            <strong>PayPal para comprar sin conexión</strong>
-            @if (paypal()?.vinculado) {
-              <span>
-                Guardado{{ paypal()?.correo ? ': ' + paypal()?.correo : '' }}
-                @if (paypal()?.desde) {
-                  · desde el {{ paypal()?.desde | date: "d MMM 'de' yyyy" }}
-                }
-              </span>
-            } @else {
-              <span>
-                Guárdalo una vez y tus compras sin internet se cobran solas al volver la conexión, solo por lo que siga
-                disponible. Arlani guarda solo la autorización de PayPal, nunca tus datos.
-              </span>
-            }
-            @if (paypalError()) {
-              <div class="perfil-alert is-error">{{ paypalError() }}</div>
-            }
-            @if (paypalAviso()) {
-              <div class="perfil-alert is-success">{{ paypalAviso() }}</div>
-            }
-          </div>
-          @if (paypal()?.vinculado) {
-            <button type="button" class="paypal-guardado__btn is-secundario" [disabled]="paypalProcesando()"
-                    (click)="desvincularPaypal()">
-              Quitar
-            </button>
-          } @else {
+        <div class="metodos-pago">
+          <div class="metodos-pago__cabecera">
+            <div>
+              <h3>Mis cuentas PayPal</h3>
+              <p>
+                Cada cuenta con la que pagas en Arlani se registra aquí sola. Autoriza una vez la que quieras usar al comprar
+                sin conexión: Arlani guarda solo el permiso de PayPal, nunca tus datos.
+              </p>
+            </div>
             <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
-              {{ paypalProcesando() ? 'Abriendo PayPal…' : 'Guardar mi PayPal' }}
+              {{ paypalProcesando() ? 'Abriendo PayPal…' : 'Agregar cuenta PayPal' }}
             </button>
+          </div>
+          @if (paypalError()) {
+            <div class="perfil-alert is-error">{{ paypalError() }}</div>
           }
+          @if (paypalAviso()) {
+            <div class="perfil-alert is-success">{{ paypalAviso() }}</div>
+          }
+          @if (metodosPago().length === 0) {
+            <p class="dash-vacio">Todavía no tienes cuentas PayPal: se agregan solas cuando pagas con PayPal, o agrégala tú.</p>
+          } @else {
+            <ul class="dash-lista">
+              @for (m of metodosPago(); track m.id) {
+                <li class="dash-card paypal-guardado">
+                  <div class="dash-card__info">
+                    <strong>PayPal · {{ m.cuenta || 'Cuenta PayPal' }}</strong>
+                    <span>
+                      {{ m.origen === 'automatico' ? 'Registrada al pagar' : 'Agregada por ti' }}
+                      @if (m.veces_usado > 0) {
+                        · usada {{ m.veces_usado }} {{ m.veces_usado === 1 ? 'vez' : 'veces' }}
+                      }
+                      @if (m.ultimo_uso) {
+                        · última vez el {{ m.ultimo_uso + 'Z' | date: "d MMM 'de' yyyy" }}
+                      }
+                    </span>
+                    <span class="paypal-guardado__estado" [class.is-ok]="m.autorizada">
+                      {{ m.autorizada ? 'Autorizada para compras sin conexión' : 'Sin autorizar para compras sin conexión' }}
+                    </span>
+                  </div>
+                  <div class="paypal-guardado__acciones">
+                    @if (!m.autorizada) {
+                      <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
+                        Autorizar
+                      </button>
+                    }
+                    <button type="button" class="paypal-guardado__btn is-secundario" [disabled]="paypalProcesando()"
+                            (click)="quitarMetodoPago(m)">
+                      Quitar
+                    </button>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+          <p class="dash-nota">
+            Al autorizar, inicia sesión en PayPal con esa misma cuenta. Si entras con otra, se agrega como cuenta nueva.
+          </p>
         </div>
+        <h3 class="metodos-pago__subtitulo">Otros métodos con los que pagaste</h3>
         <p class="dash-nota">
           Por tu seguridad no guardamos numeros de tarjeta -- cuando pagas con tarjeta, eso pasa directo por PayPal
           y nunca llega a nuestros servidores. Aca ves con que metodos pagaste antes.

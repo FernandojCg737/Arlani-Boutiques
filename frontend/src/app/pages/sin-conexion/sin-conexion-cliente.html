@@ -40,8 +40,8 @@
   @if (catalogo(); as c) {
     <p class="offline-sub cliente-offline__fecha">
       Catálogo guardado {{ hace(c.descargado_en) }} ({{ c.descargado_en | date: 'dd/MM/yyyy HH:mm' }}).
-      @if (sync.enLinea()) {
-        Se mantiene al día solo mientras tengas internet.
+      @if (sync.enLinea() && auto.revisadoEn(); as r) {
+        <span class="cliente-offline__al-dia">Stock al día · revisado a las {{ r | date: 'HH:mm:ss' }}</span>
       }
       @if (desactualizado() || !sync.enLinea()) {
         <span class="offline-viejo">El stock puede haber cambiado: la tienda lo confirma al recibir tu reserva.</span>
@@ -134,15 +134,26 @@
             </div>
             <h2>{{ modo() === 'reservar' ? 'Mi reserva' : 'Mi compra' }}</h2>
             @if (items().length) {
-              <ul class="ventas-detalles ventas-detalles--form">
-                @for (i of items(); track $index) {
-                  <li>
-                    <span>{{ i.cantidad }}× {{ i.producto_nombre }} ({{ i.talla }}, {{ i.color }})</span>
-                    <button type="button" (click)="quitar($index)" aria-label="Quitar">&times;</button>
-                  </li>
-                }
-              </ul>
+              @for (g of grupos(); track g.sucursal_id) {
+                <div class="cliente-offline__grupo">
+                  <p class="cliente-offline__grupo-titulo">
+                    <strong>{{ g.empresa_nombre }}</strong> · {{ g.sucursal_nombre }}
+                    <span>Bs {{ g.total | number: '1.2-2' }}</span>
+                  </p>
+                  <ul class="ventas-detalles ventas-detalles--form">
+                    @for (i of g.items; track $index) {
+                      <li>
+                        <span>{{ i.cantidad }}× {{ i.producto_nombre }} ({{ i.talla }}, {{ i.color }})</span>
+                        <button type="button" (click)="quitar(i)" aria-label="Quitar">&times;</button>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
               <p class="ventas-seleccion">Total: Bs {{ total() | number: '1.2-2' }}</p>
+              @if (grupos().length > 1) {
+                <p class="offline-sub">Son {{ grupos().length }} tiendas o sucursales: cada una recibe su pedido.</p>
+              }
               @if (modo() === 'comprar') {
                 <p class="offline-sub">Precio conocido al descargar: se confirma al pagar.</p>
               }
@@ -180,30 +191,40 @@
                   En línea
                   <small>al volver internet</small>
                 </button>
-                @if (tienda()?.acepta_contra_entrega) {
+                @if (aceptaContraEntrega()) {
                   <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'contra_entrega'"
                           (click)="formaPago.set('contra_entrega')">
                     Contra entrega
                     <small>{{ entrega() === 'envio' ? 'al recibirla' : 'al recogerla' }}</small>
                   </button>
                 }
-                @if (tienda()?.acepta_paypal && paypalGuardado() !== null) {
+                @if (aceptaPaypal() && paypals().length) {
                   <button type="button" class="mostrador-opcion" [class.is-activa]="formaPago() === 'paypal_guardado'"
                           (click)="formaPago.set('paypal_guardado')">
                     Mi PayPal guardado
-                    <small>{{ paypalGuardado() || 'se cobra al sincronizar' }}</small>
+                    <small>se cobra al sincronizar</small>
                   </button>
                 }
               </div>
               @if (formaPago() === 'paypal_guardado') {
+                <span class="mostrador-etiqueta">¿Con qué cuenta PayPal?</span>
+                <div class="cliente-offline__paypals">
+                  @for (pp of paypals(); track pp.id) {
+                    <button type="button" class="mostrador-opcion" [class.is-activa]="paypalId() === pp.id"
+                            [disabled]="!pp.autorizada" (click)="paypalId.set(pp.id)">
+                      {{ pp.cuenta || 'Cuenta PayPal' }}
+                      <small>{{ pp.autorizada ? 'autorizada' : 'sin autorizar: autorízala en Métodos de pago' }}</small>
+                    </button>
+                  }
+                </div>
                 <p class="offline-sub">
                   Verás «Pago enviado». Al volver internet se cobra solo lo que siga con stock y al mismo precio (o menor);
                   lo demás no se te cobra.
                 </p>
-              } @else if (tienda()?.acepta_paypal && paypalGuardado() === null) {
+              } @else if (aceptaPaypal() && !paypals().length) {
                 <p class="offline-sub">
-                  ¿Quieres que se cobre sola? <a routerLink="/perfil" [queryParams]="{ tab: 'pagos' }">Guarda tu PayPal en Mi cuenta</a>
-                  (con conexión) y descarga el catálogo de nuevo.
+                  ¿Quieres que se cobre sola? <a routerLink="/perfil" [queryParams]="{ tab: 'pagos' }">Agrega tu PayPal en Métodos de pago</a>
+                  (con conexión).
                 </p>
               }
             }

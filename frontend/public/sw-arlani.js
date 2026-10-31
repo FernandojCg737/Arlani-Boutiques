@@ -56,6 +56,7 @@ function contrato(o) {
     entrega: o.entrega || 'retiro',
     direccion_id: o.direccion_id ?? null,
     forma_pago: o.forma_pago ?? null,
+    metodo_pago_id: o.metodo_pago_id ?? null,
     items: o.items.map((i) => ({
       producto_id: i.producto_id,
       talla_id: i.talla_id,

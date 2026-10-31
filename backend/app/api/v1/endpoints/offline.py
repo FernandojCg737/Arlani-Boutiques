@@ -33,7 +33,7 @@ from app.api.deps import (
     verificar_acceso_sucursal,
 )
 from app.api.v1.endpoints.metodos_pago import _publico
-from app.api.v1.endpoints.paypal_guardado import token_activo
+from app.api.v1.endpoints.paypal_guardado import marcar_uso, paypals_de, registrar_paypal_usado, token_de
 from app.api.v1.endpoints.reservas import _mover_stock_reserva
 from app.api.v1.endpoints.ventas import (
     _a_usd,
@@ -64,6 +64,7 @@ from app.schemas.offline import (
     CatalogoClienteOfflineOut,
     ClienteOfflineOut,
     DireccionOfflineOut,
+    PaypalClienteOfflineOut,
     ItemPedidoOut,
     PedidoOfflineOut,
     DescargaOfflineOut,
@@ -249,7 +250,7 @@ _SQL_VERSION_CATALOGO = """
         UNION ALL
         SELECT 'd' || id || alias || direccion || predeterminada FROM direccion_cliente WHERE cliente_id = :c
         UNION ALL
-        SELECT 'p' || estado || coalesce(correo, '') FROM cliente_paypal_guardado WHERE cliente_id = :c
+        SELECT 'p' || id || estado || coalesce(cuenta, '') FROM cliente_metodo_pago WHERE cliente_id = :c
     ) partes
 """
 
@@ -315,14 +316,11 @@ def catalogo_cliente(
         text("SELECT id, alias, direccion FROM direccion_cliente WHERE cliente_id = :c ORDER BY predeterminada DESC, id"),
         {"c": usuario.id},
     ).mappings().all()
-    paypal = db.execute(
-        text("SELECT coalesce(correo, '') FROM cliente_paypal_guardado WHERE cliente_id = :c AND estado = 'activo'"),
-        {"c": usuario.id},
-    ).scalar()
+    paypals = [PaypalClienteOfflineOut(**p) for p in paypals_de(db, usuario.id)]
     db.commit()
     return CatalogoClienteOfflineOut(
         descargado_en=_ahora(), tiendas=salida, direcciones=[DireccionOfflineOut(**d) for d in direcciones],
-        paypal_guardado=paypal,
+        paypals=paypals,
     )
 
 
@@ -408,8 +406,8 @@ def _pedido_invalido(db: Session, op: OperacionOfflineIn, cliente_id: int, empre
         return "Elige una de tus direcciones para el envío."
     if op.forma_pago == "contra_entrega" and _metodo_contra_entrega(db, empresa_id) is None:
         return "Esta tienda no acepta pago contra entrega."
-    if op.forma_pago == "paypal_guardado" and not token_activo(db, cliente_id):
-        return "No tienes un PayPal guardado: vincúlalo en tu perfil y vuelve a comprar."
+    if op.forma_pago == "paypal_guardado" and not token_de(db, cliente_id, op.metodo_pago_id):
+        return "Esa cuenta PayPal no está autorizada: autorízala en Métodos de pago y vuelve a comprar."
     if op.forma_pago == "paypal_guardado" and _metodo_paypal(db, empresa_id) is None:
         return "Esta tienda no recibe pagos con PayPal."
     return None
@@ -1130,6 +1128,7 @@ def pedido_paypal_capturar(
         db.rollback()
         reembolsar_captura(captura["id"], cuenta)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo registrar tu compra. El cobro fue revertido.")
+    registrar_paypal_usado(db, usuario.id, resultado)
     return _revisar(db, _cliente_pedido(db, usuario, uuid))
 
 
@@ -1312,10 +1311,10 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
 
     validos, no_pagados = _revisar_items(db, datos)
     todos = no_pagados + [b for _, b in validos]
-    token = token_activo(db, fila["usuario_id"])
+    cuenta_paypal = token_de(db, fila["usuario_id"], datos.metodo_pago_id)
     metodo = _metodo_paypal(db, fila["empresa_id"])
-    if not token:
-        motivo = "Ya no tienes un PayPal guardado: vincúlalo en tu perfil y vuelve a comprar."
+    if not cuenta_paypal:
+        motivo = "Esa cuenta PayPal ya no está autorizada en tus métodos de pago: vuelve a comprar con otra."
         return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
     if metodo is None:
         motivo = "La tienda ya no recibe pagos con PayPal."
@@ -1344,7 +1343,7 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
 
     # 2) El cobro con el PayPal guardado. El uuid evita cobrar dos veces.
     try:
-        orden = cobrar_con_token(token, total_usd, referencia, f"arlani-offline-{fila['uuid']}")
+        orden = cobrar_con_token(cuenta_paypal[1], total_usd, referencia, f"arlani-offline-{fila['uuid']}")
     except (CobroRechazado, HTTPException) as exc:
         db.rollback()
         motivo = f"PayPal rechazó el cobro ({exc.detail if isinstance(exc, HTTPException) else exc})."
@@ -1360,6 +1359,7 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
             {"o": orden["id"], "v": venta_id},
         )
         _guardar_captura(db, [venta_id], captura["id"])
+        marcar_uso(db, cuenta_paypal[0])
         db.execute(text("UPDATE venta SET origen = 'offline', sincronizado_en = now() WHERE id = :v"), {"v": venta_id})
         if datos.entrega == "envio":
             _guardar_envio(db, [venta_id], fila["usuario_id"], datos.direccion_id)
