@@ -207,7 +207,7 @@
                 <div class="cliente-offline__paypals">
                   @for (pp of paypals(); track pp.id) {
                     <button type="button" class="mostrador-opcion" [class.is-activa]="paypalId() === pp.id"
-                            [disabled]="!paypalSirve(pp)" (click)="paypalId.set(pp.id)">
+                            (click)="paypalId.set(pp.id)">
                       {{ pp.cuenta || 'Cuenta PayPal' }}
                       <small>{{ estadoPaypal(pp) }}</small>
                     </button>
@@ -219,8 +219,8 @@
                 </p>
               } @else if (formaPago() === 'paypal_guardado') {
                 <p class="offline-sub">
-                  Aún no tienes cuentas PayPal: paga una vez con PayPal en Arlani o
-                  <a routerLink="/perfil" [queryParams]="{ tab: 'pagos' }">agrégala en Métodos de pago</a> (con conexión).
+                  Verás «Pago enviado». Al volver internet confirmas el pago con PayPal (solo esta vez) y desde ahí tus
+                  compras sin conexión se cobran solas.
                 </p>
               }
             }

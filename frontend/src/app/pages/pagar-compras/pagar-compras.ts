@@ -4,6 +4,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { CatalogoClienteAuto } from '../../services/offline/catalogo-cliente-auto';
 import { Sincronizacion } from '../../services/offline/sincronizacion';
 import { PaypalSdk } from '../../services/paypal-sdk';
 import { mensajeError } from '../../services/plataforma';
@@ -70,6 +71,7 @@ export class PagarCompras implements OnInit, OnDestroy {
   private readonly paypal = inject(PaypalSdk);
   private readonly sync = inject(Sincronizacion);
   private readonly porPagar = inject(ComprasPorPagar);
+  private readonly catalogoSinConexion = inject(CatalogoClienteAuto);
   private readonly api = `${environment.apiUrl}/offline/pedidos`;
 
   protected readonly compras = signal<CompraOffline[]>([]);
@@ -127,14 +129,20 @@ export class PagarCompras implements OnInit, OnDestroy {
     const contenedor = document.getElementById(`paypal-${c.uuid}`);
     if (!contenedor || !m.paypal_client_id) return;
     this.desmontar = this.paypal.montarBotones(contenedor, m.paypal_client_id, {
-      crearOrden: async () => {
-        const r = await firstValueFrom(this.http.post<{ order_id: string }>(`${this.api}/${c.uuid}/paypal/orden`, {}));
+      // Con el boton de PayPal la orden guarda la cuenta: queda autorizada y las
+      // proximas compras sin conexion se cobran solas.
+      crearOrden: async (fuente?: string) => {
+        const r = await firstValueFrom(
+          this.http.post<{ order_id: string }>(`${this.api}/${c.uuid}/paypal/orden`, { guardar_paypal: fuente === 'paypal' }),
+        );
         return r.order_id;
       },
       aprobar: async (orderId: string) => {
         await this.ejecutar(c, () =>
           firstValueFrom(this.http.post<CompraOffline>(`${this.api}/${c.uuid}/paypal/capturar/${orderId}`, {})),
         );
+        // La cuenta quedó autorizada: el catálogo sin conexión lo sabe ya.
+        void this.catalogoSinConexion.revisar(true).catch(() => undefined);
       },
       cancelar: () => this.ponerError(c, 'Cancelaste el pago. Puedes intentarlo de nuevo.'),
       error: () => this.ponerError(c, 'Ocurrió un error con PayPal. Intenta de nuevo o elige otro método.'),

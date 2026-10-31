@@ -718,15 +718,6 @@ def checkout_por_tienda(
     ):
         metodos.setdefault(m.empresa_id, []).append(m)
 
-    from app.api.v1.endpoints.metodos_pago import _publico
-
-    def publico(m: MetodoPagoEmpresa) -> MetodoPagoPublicoOut:
-        datos = _publico(m)
-        if m.tipo == "paypal" and m.paypal_email and settings.PAYPAL_CLIENT_ID:
-            # Lo cobra Arlani y le liquida a la tienda (ver _cobro_de_tienda).
-            datos["paypal_client_id"] = settings.PAYPAL_CLIENT_ID
-        return MetodoPagoPublicoOut(**datos)
-
     resultado = []
     for empresa_id, detalles in grupos.items():
         e = detalles[0].producto.empresa
@@ -757,7 +748,7 @@ def checkout_por_tienda(
                 ],
                 total=_total_de(detalles),
                 total_usd=_a_usd(db, _total_de(detalles))[0],
-                metodos=[publico(m) for m in propios],
+                metodos=[MetodoPagoPublicoOut(**metodo_publico_cobro(m)) for m in propios],
                 acepta_pagar_todo=any(m.tipo == "paypal" and m.paypal_email for m in propios),
             )
         )
@@ -908,6 +899,17 @@ def capturar_pagar_todo(
 
     ventas = _query_venta_con_detalles(db).filter(Venta.id.in_(todas)).all()
     return [_to_out(v) for v in ventas]
+
+
+def metodo_publico_cobro(m: MetodoPagoEmpresa) -> dict:
+    """El metodo como lo ve el cliente al pagar: el PayPal de una tienda que
+    cobra Arlani (ver _cobro_de_tienda) usa los botones de Arlani."""
+    from app.api.v1.endpoints.metodos_pago import _publico
+
+    datos = _publico(m)
+    if m.tipo == "paypal" and m.paypal_email and settings.PAYPAL_CLIENT_ID:
+        datos["paypal_client_id"] = settings.PAYPAL_CLIENT_ID
+    return datos
 
 
 def _cobro_de_tienda(db: Session, empresa_id: int) -> tuple[MetodoPagoEmpresa, CuentaPaypal | None]:
