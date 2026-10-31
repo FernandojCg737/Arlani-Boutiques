@@ -16,7 +16,7 @@ import '../portada/estilo_plataforma.dart';
 import '../portada/plataforma_data.dart';
 import '../storefront/catalogo_provider.dart' show publicos;
 import 'empezar_repository.dart';
-import 'paypal_aprobar_screen.dart';
+import 'panel_paypal.dart';
 
 // Colores de `registro-empresa.scss`.
 const _noche = Color(0xFF0B111D);
@@ -120,6 +120,9 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
   bool _procesando = false;
   String? _errorEnvio;
   SuscripcionCreada? _creada;
+  // Pago en curso: (order_id, enlace de PayPal) del panel incrustado.
+  (String, String)? _pago;
+  final _panelKey = GlobalKey();
 
   @override
   void initState() {
@@ -209,6 +212,7 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
     setState(() {
       _intento = false;
       _errorEnvio = null;
+      _pago = null;
       if (_paso > 0) _paso--;
     });
     _arriba();
@@ -220,6 +224,7 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
     setState(() {
       _intento = false;
       _errorEnvio = null;
+      _pago = null;
       _paso = destino;
     });
     _arriba();
@@ -333,7 +338,9 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
     }
   }
 
-  // "Pagar mi suscripcion": PayPal se abre dentro de la app.
+  // "Pagar mi suscripcion": el panel de PayPal se abre ahi mismo, debajo
+  // (como los botones de PayPal de la web): se inicia sesion y se aprueba
+  // sin salir de la pantalla.
   Future<void> _pagar() async {
     setState(() {
       _errorEnvio = null;
@@ -343,21 +350,26 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
       final (orderId, approveUrl) = await ref.read(empezarRepositoryProvider).crearOrden(_solicitud);
       if (!mounted) return;
       if (approveUrl == null) throw StateError('sin enlace');
-      setState(() => _procesando = false);
-      final aprobada = await Navigator.of(context).push<String>(
-        MaterialPageRoute(builder: (_) => PaypalAprobarScreen(url: approveUrl, orderId: orderId)),
-      );
-      if (!mounted) return;
-      if (aprobada == null) {
-        setState(() => _errorEnvio = 'Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.');
-        return;
-      }
-      await _confirmar(aprobada);
+      setState(() => _pago = (orderId, approveUrl));
+      // Se lleva la vista al panel recien abierto.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _panelKey.currentContext;
+        if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 400), alignment: 0.05);
+      });
     } catch (e) {
       if (mounted) setState(() => _errorEnvio = _mensaje(e, 'No se pudo iniciar el pago con PayPal. Inténtalo de nuevo.'));
     } finally {
       if (mounted) setState(() => _procesando = false);
     }
+  }
+
+  void _alTerminarPaypal(String? orderId) {
+    setState(() => _pago = null);
+    if (orderId == null) {
+      setState(() => _errorEnvio = 'Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.');
+      return;
+    }
+    _confirmar(orderId);
   }
 
   Future<void> _confirmar(String? orderId) async {
@@ -1205,6 +1217,21 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
             ),
           ),
         ],
+        if (_pago case (final orderId, final url)) ...[
+          const SizedBox(height: 16),
+          Text('Inicia sesión en PayPal y aprueba el pago:',
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: _tinta)),
+          const SizedBox(height: 10),
+          KeyedSubtree(
+            key: _panelKey,
+            child: PanelPaypal(
+              url: url,
+              orderId: orderId,
+              alto: (MediaQuery.sizeOf(context).height * 0.78).clamp(480.0, 720.0),
+              alTerminar: _alTerminarPaypal,
+            ),
+          ),
+        ],
         if (_procesando) ...[
           const SizedBox(height: 16),
           Row(
@@ -1277,7 +1304,9 @@ class _EmpezarScreenState extends ConsumerState<EmpezarScreen> {
             lleno: true,
           )
         else
-          _botonPildora('Pagar mi suscripción', _cotizacion == null || _procesando ? null : _pagar, lleno: true),
+          // Con el panel de PayPal abierto, el pago sigue ahi (como en la web).
+          if (_pago == null)
+            _botonPildora('Pagar mi suscripción', _cotizacion == null || _procesando ? null : _pagar, lleno: true),
       ],
     );
   }
