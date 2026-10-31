@@ -393,15 +393,19 @@
                         Autorizada para compras sin conexión en todas las tiendas
                       } @else if (m.tiendas.length) {
                         Autorizada para compras sin conexión en {{ m.tiendas.join(', ') }}
+                        <small class="paypal-guardado__nota">
+                          En otra tienda se autoriza sola la primera vez que pagues ahí con PayPal (o en todas con «Pagar todo»).
+                        </small>
                       } @else {
                         Sin autorizar para compras sin conexión
                       }
                     </span>
                   </div>
                   <div class="paypal-guardado__acciones">
-                    @if (!m.autorizada) {
+                    <!-- Solo las cuentas sin ningún permiso (registradas antes) se autorizan a mano. -->
+                    @if (!m.autorizada && !m.tiendas.length) {
                       <button type="button" class="paypal-guardado__btn" [disabled]="paypalProcesando()" (click)="vincularPaypal()">
-                        {{ m.tiendas.length ? 'Autorizar en todas' : 'Autorizar' }}
+                        Autorizar
                       </button>
                     }
                     <button type="button" class="paypal-guardado__btn is-secundario" [disabled]="paypalProcesando()"
