@@ -5,10 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_config.dart';
 import '../auth/auth_provider.dart';
+import '../auth/login_screen.dart';
 
 /// Una tienda activa de la lista publica (GET /tiendas), igual que
 /// `TiendaResumen` en `services/tienda-publica.ts`.
@@ -146,10 +146,27 @@ void abrirTienda(BuildContext context, String subdominio) => context.push('/tien
 
 /// Alta de boutiques (/empezar): por ahora en la web publicada, con el plan y
 /// el periodo elegidos ya cargados.
-Future<void> abrirEmpezar({String? plan, String? periodo}) async {
+/// "Crear mi boutique" dentro de la app (`/empezar`). Hace falta sesion: si
+/// no la hay, primero el login y, al entrar, sigue directo al alta.
+Future<void> abrirEmpezar(BuildContext context, {String? plan, String? periodo}) async {
   final params = {'plan': ?plan, 'periodo': ?periodo};
-  final uri = Uri.parse('$webAssetsBaseUrl/empezar').replace(queryParameters: params.isEmpty ? null : params);
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+  final ruta = Uri(path: '/empezar', queryParameters: params.isEmpty ? null : params).toString();
+  if (ProviderScope.containerOf(context).read(authProvider).isAuthenticated) {
+    context.push(ruta);
+    return;
+  }
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final router = GoRouter.of(context);
+  await navigator.push(
+    MaterialPageRoute(
+      builder: (_) => LoginScreen(
+        onSuccess: () {
+          navigator.pop();
+          router.push(ruta);
+        },
+      ),
+    ),
+  );
 }
 
 /// Logo o foto que puede venir del backend (URL absoluta de Supabase) o de los

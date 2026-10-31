@@ -315,7 +315,7 @@ class _TarjetaPlan extends StatelessWidget {
               _BotonPlan(
                 texto: plan.esPrueba ? 'Probar gratis' : 'Elegir ${plan.nombre}',
                 lleno: recomendado,
-                onTap: () => abrirEmpezar(plan: plan.id, periodo: anual ? 'anual' : 'mensual'),
+                onTap: () => abrirEmpezar(context, plan: plan.id, periodo: anual ? 'anual' : 'mensual'),
               ),
               const SizedBox(height: 26),
               Container(
@@ -467,7 +467,7 @@ class CtaFinal extends StatelessWidget {
                     spacing: 12,
                     runSpacing: 12,
                     children: [
-                      _BotonPildora(texto: 'Crear mi boutique', lleno: true, onTap: () => abrirEmpezar()),
+                      _BotonPildora(texto: 'Crear mi boutique', lleno: true, onTap: () => abrirEmpezar(context)),
                       _BotonPildora(texto: 'Ver planes', onTap: onVerPlanes),
                     ],
                   ),
@@ -685,7 +685,7 @@ class PiePlataforma extends StatelessWidget {
               ),
               Expanded(
                 child: columna('Para boutiques', [
-                  ('Crear mi boutique', () => abrirEmpezar()),
+                  ('Crear mi boutique', () => abrirEmpezar(context)),
                   ('Iniciar sesión', () => context.push('/login')),
                 ]),
               ),

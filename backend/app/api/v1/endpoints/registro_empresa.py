@@ -98,13 +98,25 @@ def cotizar(
 
 @router.post("/registro/orden", response_model=OrdenSuscripcionOut)
 def crear_orden_suscripcion(
-    payload: SolicitudSuscripcionIn, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)
+    payload: SolicitudSuscripcionIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
 ) -> OrdenSuscripcionOut:
     cot = _cotizar(db, payload)
     if not cot.requiere_pago:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "El plan de prueba no requiere pago.")
-    orden = crear_orden(cot.monto_usd, referencia=f"SUSC-{cot.plan_codigo}-{cot.periodo}")
-    return OrdenSuscripcionOut(order_id=orden["id"], monto_usd=cot.monto_usd, monto_bob=cot.monto_bob)
+    base = str(request.base_url).rstrip("/")
+    orden = crear_orden(
+        cot.monto_usd,
+        referencia=f"SUSC-{cot.plan_codigo}-{cot.periodo}",
+        return_url=f"{base}/paypal-embed/retorno",
+        cancel_url=f"{base}/paypal-embed/cancelado",
+    )
+    approve = next((l["href"] for l in orden.get("links", []) if l.get("rel") in ("approve", "payer-action")), None)
+    return OrdenSuscripcionOut(
+        order_id=orden["id"], monto_usd=cot.monto_usd, monto_bob=cot.monto_bob, approve_url=approve
+    )
 
 
 def _monto_de(unidad: dict) -> tuple[Decimal, str]:

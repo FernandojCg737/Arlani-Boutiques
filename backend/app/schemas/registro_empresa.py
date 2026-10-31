@@ -55,6 +55,8 @@ class OrdenSuscripcionOut(BaseModel):
     order_id: str
     monto_usd: Decimal
     monto_bob: Decimal
+    # La app movil abre este enlace de PayPal y vuelve a /paypal-embed/retorno.
+    approve_url: str | None = None
 
 
 class SuscripcionCreadaOut(BaseModel):
