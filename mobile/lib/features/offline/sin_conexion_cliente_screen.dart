@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../auth/auth_provider.dart';
 import '../portada/encabezado_plataforma.dart';
 import '../portada/estilo_plataforma.dart';
 import '../portada/plataforma_data.dart';
@@ -23,6 +24,10 @@ class MarcoClienteOffline extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final arriba = MediaQuery.paddingOf(context).top + EncabezadoPlataforma.alto;
+    // Es parte del perfil: al cerrar sesion (o vencer) se sale de aqui.
+    ref.listen<AuthState>(authProvider, (_, s) {
+      if (!s.isAuthenticated) context.go('/');
+    });
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
       child: Scaffold(
@@ -219,7 +224,7 @@ class _SinConexionClienteScreenState extends ConsumerState<SinConexionClienteScr
               if (s.enLinea && s.revisadoEn != null)
                 TextSpan(
                   text: 'Stock al día · revisado a las ${fechaCorta(s.revisadoEn!).substring(11)}. ',
-                  style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                  style: const TextStyle(color: marcaOffline, fontWeight: FontWeight.w600),
                 ),
               if (!s.enLinea || DateTime.now().difference(c.descargadoEn).inHours >= 6)
                 const TextSpan(
@@ -308,6 +313,11 @@ class _SinConexionClienteScreenState extends ConsumerState<SinConexionClienteScr
         ),
       );
 
+  String _prendas() {
+    final n = _items.fold(0, (t, i) => t + i.cantidad);
+    return '$n ${n == 1 ? 'prenda' : 'prendas'}';
+  }
+
   /// En celular: barra fija con el total que lleva al resumen.
   Widget _barraResumen(double total) => SafeArea(
         child: Container(
@@ -317,7 +327,7 @@ class _SinConexionClienteScreenState extends ConsumerState<SinConexionClienteScr
             children: [
               Expanded(
                 child: Text(
-                  '${_modo == 'reservar' ? 'Mi reserva' : 'Mi compra'} · ${_items.fold(0, (t, i) => t + i.cantidad)} prendas · Bs ${bs(total)}',
+                  '${_modo == 'reservar' ? 'Mi reserva' : 'Mi compra'} · ${_prendas()} · Bs ${bs(total)}',
                   style: textoOffline(peso: FontWeight.w700, color: marcaOffline),
                 ),
               ),

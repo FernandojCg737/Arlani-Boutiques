@@ -7,8 +7,9 @@ import '../../core/api_config.dart';
 import 'offline_modelos.dart';
 import 'offline_servicio.dart';
 
-/// Estilos de `sin-conexion.scss` y `ventas.scss` de la web.
-const marcaOffline = Color(0xFF203C40);
+/// Estilos de `sin-conexion.scss` y `ventas.scss` de la web, con el azul
+/// oscuro del SaaS (Arlani) en botones, pestañas y titulos.
+const marcaOffline = Color(0xFF121A2C);
 const bordeOffline = Color(0xFFE5E2DF);
 const ambarOffline = Color(0xFFB26A00);
 
@@ -24,14 +25,17 @@ TextStyle textoOffline({double size = 13, FontWeight peso = FontWeight.w400, Col
     GoogleFonts.inter(fontSize: size, fontWeight: peso, color: color, height: 1.45);
 
 Widget subOffline(String t) => Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Text(t, style: textoOffline(size: 12, color: const Color(0xFF777777))),
-    );
+  padding: const EdgeInsets.only(top: 2),
+  child: Text(t, style: textoOffline(size: 12, color: const Color(0xFF777777))),
+);
 
 Widget tituloSeccionOffline(String t) => Padding(
-      padding: const EdgeInsets.fromLTRB(0, 24, 0, 8),
-      child: Text(t.toUpperCase(), style: textoOffline(size: 12, peso: FontWeight.w800, color: marcaOffline)),
-    );
+  padding: const EdgeInsets.fromLTRB(0, 24, 0, 8),
+  child: Text(
+    t.toUpperCase(),
+    style: textoOffline(size: 12, peso: FontWeight.w800, color: marcaOffline),
+  ),
+);
 
 /// `.admin-content__header`: titulo y explicacion.
 class CabeceraOffline extends StatelessWidget {
@@ -42,16 +46,22 @@ class CabeceraOffline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (eyebrow != null)
-            Text(eyebrow!.toUpperCase(), style: textoOffline(size: 11, peso: FontWeight.w700, color: const Color(0xFF999999))),
-          Text(titulo, style: GoogleFonts.playfairDisplay(fontSize: 26, fontWeight: FontWeight.w600, color: marcaOffline)),
-          const SizedBox(height: 6),
-          Text(texto, style: textoOffline(color: const Color(0xFF666666))),
-          const SizedBox(height: 14),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (eyebrow != null)
+        Text(
+          eyebrow!.toUpperCase(),
+          style: textoOffline(size: 11, peso: FontWeight.w700, color: const Color(0xFF999999)),
+        ),
+      Text(
+        titulo,
+        style: GoogleFonts.playfairDisplay(fontSize: 26, fontWeight: FontWeight.w600, color: marcaOffline),
+      ),
+      const SizedBox(height: 6),
+      Text(texto, style: textoOffline(color: const Color(0xFF666666))),
+      const SizedBox(height: 14),
+    ],
+  );
 }
 
 /// `.ventas-nueva-btn`: boton oscuro en mayusculas.
@@ -63,19 +73,19 @@ class BotonOffline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: ancho ? double.infinity : null,
-        child: FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: marcaOffline,
-            disabledBackgroundColor: const Color(0xFFB8C2C3),
-            foregroundColor: Colors.white,
-            shape: const RoundedRectangleBorder(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
-          onPressed: onPressed,
-          child: Text(texto.toUpperCase(), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-        ),
-      );
+    width: ancho ? double.infinity : null,
+    child: FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: marcaOffline,
+        disabledBackgroundColor: const Color(0xFFB9BCC4),
+        foregroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      onPressed: onPressed,
+      child: Text(texto.toUpperCase(), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+    ),
+  );
 }
 
 /// `.offline-estado`: verde con conexion, ambar sin ella, y "Enviar ahora".
@@ -86,7 +96,9 @@ class BarraConexion extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = ref.watch(offlineProvider);
-    final (fondo, tinta) = s.enLinea ? (const Color(0xFFE8F5E9), const Color(0xFF1F5C25)) : (const Color(0xFFFFF4E0), const Color(0xFF8A4F00));
+    final (fondo, tinta) = s.enLinea
+        ? (const Color(0xFFEEF0F5), marcaOffline)
+        : (const Color(0xFFFFF4E0), const Color(0xFF8A4F00));
     final n = s.pendientes;
     var detalle = n == 0 && personal
         ? 'Nada pendiente de enviar'
@@ -98,14 +110,23 @@ class BarraConexion extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Container(width: 9, height: 9, decoration: BoxDecoration(color: tinta, shape: BoxShape.circle)),
+          Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(color: tinta, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: s.enLinea ? 'Con conexión' : 'Sin conexión', style: const TextStyle(fontWeight: FontWeight.w700)),
-                TextSpan(text: ' · $detalle'),
-              ]),
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: s.enLinea ? 'Con conexión' : 'Sin conexión',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: ' · $detalle'),
+                ],
+              ),
               style: textoOffline(size: 12.5, color: tinta),
             ),
           ),
@@ -131,12 +152,12 @@ class AvisoOffline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        color: error ? const Color(0xFFFDECEA) : const Color(0xFFF1F5FF),
-        child: Text(texto, style: textoOffline(size: 12.5, color: error ? const Color(0xFFB3261E) : const Color(0xFF1F2A44))),
-      );
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(12),
+    color: error ? const Color(0xFFFDECEA) : const Color(0xFFF1F5FF),
+    child: Text(texto, style: textoOffline(size: 12.5, color: error ? const Color(0xFFB3261E) : const Color(0xFF1F2A44))),
+  );
 }
 
 /// `.offline-chip--{estado}`.
@@ -148,8 +169,13 @@ class ChipEstado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (fondo, tinta) = switch (estado) {
-      'pendiente' || 'enviando' || 'error' || 'por_pagar' || 'por_cobrar' || 'pago_parcial' => (const Color(0xFFFFF4E0), ambarOffline),
-      'confirmada' || 'resuelta' || 'pagada' => (const Color(0xFFE8F5E9), const Color(0xFF2E7D32)),
+      'pendiente' ||
+      'enviando' ||
+      'error' ||
+      'por_pagar' ||
+      'por_cobrar' ||
+      'pago_parcial' => (const Color(0xFFFFF4E0), ambarOffline),
+      'confirmada' || 'resuelta' || 'pagada' => (const Color(0xFFEEF0F5), marcaOffline),
       'conflicto' || 'sin_stock' || 'no_pagada' => (const Color(0xFFFDECEA), const Color(0xFFB3261E)),
       'rechazada' || 'anulada' || 'cancelada' => (const Color(0xFFEEEEEE), const Color(0xFF666666)),
       _ => (const Color(0xFFF1F1F1), const Color(0xFF555555)),
@@ -157,8 +183,10 @@ class ChipEstado extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       color: fondo,
-      child: Text((texto ?? estadoOperacion[estado] ?? estado).toUpperCase(),
-          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: tinta)),
+      child: Text(
+        (texto ?? estadoOperacion[estado] ?? estado).toUpperCase(),
+        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: tinta),
+      ),
     );
   }
 }
@@ -186,11 +214,14 @@ class OpcionOffline extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(texto,
-                style: textoOffline(
-                    peso: FontWeight.w700, color: activa ? Colors.white : (apagada ? const Color(0xFFAAAAAA) : marcaOffline))),
-            if (sub != null)
-              Text(sub!, style: textoOffline(size: 11, color: activa ? Colors.white70 : const Color(0xFF888888))),
+            Text(
+              texto,
+              style: textoOffline(
+                peso: FontWeight.w700,
+                color: activa ? Colors.white : (apagada ? const Color(0xFFAAAAAA) : marcaOffline),
+              ),
+            ),
+            if (sub != null) Text(sub!, style: textoOffline(size: 11, color: activa ? Colors.white70 : const Color(0xFF888888))),
           ],
         ),
       ),
@@ -199,9 +230,12 @@ class OpcionOffline extends StatelessWidget {
 }
 
 Widget etiquetaOffline(String t) => Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 6),
-      child: Text(t.toUpperCase(), style: textoOffline(size: 11, peso: FontWeight.w700, color: const Color(0xFF888888))),
-    );
+  padding: const EdgeInsets.only(top: 12, bottom: 6),
+  child: Text(
+    t.toUpperCase(),
+    style: textoOffline(size: 11, peso: FontWeight.w700, color: const Color(0xFF888888)),
+  ),
+);
 
 /// Foto de la prenda: la guardada en el telefono, la de internet o la inicial.
 class FotoPrenda extends ConsumerWidget {
@@ -216,7 +250,10 @@ class FotoPrenda extends ConsumerWidget {
     final inicial = Container(
       color: const Color(0xFFF3F3F1),
       alignment: Alignment.center,
-      child: Text(nombre.isEmpty ? '?' : nombre[0], style: textoOffline(size: 28, peso: FontWeight.w700, color: const Color(0xFFAAAAAA))),
+      child: Text(
+        nombre.isEmpty ? '?' : nombre[0],
+        style: textoOffline(size: 28, peso: FontWeight.w700, color: const Color(0xFFAAAAAA)),
+      ),
     );
     if (local != null) return Image.file(local, fit: BoxFit.cover, errorBuilder: (_, _, _) => inicial);
     if (url == null || !s.enLinea) return inicial;
@@ -246,8 +283,41 @@ class CatalogoOffline extends StatefulWidget {
 class _CatalogoOfflineState extends State<CatalogoOffline> {
   String _buscar = '';
   int? _productoId;
-  VarianteLocal? _variante;
-  int _cantidad = 1;
+
+  /// En celular, la talla y el color se eligen en una hoja desde abajo (junto
+  /// a la prenda tocada); en pantalla ancha, debajo de la grilla como en la web.
+  void _elegirProducto(ProductoLocal p) {
+    setState(() => _productoId = p.productoId);
+    if (MediaQuery.sizeOf(context).width >= 840) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(),
+      // A todo el ancho del celular (Material 3 la limita por defecto).
+      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+          child: SingleChildScrollView(
+            child: SizedBox(
+              width: double.infinity,
+              child: ElegirVariante(
+                producto: p,
+                disponible: widget.disponible,
+                alAgregar: (v, n) {
+                  widget.alAgregar(p, v, n);
+                  Navigator.pop(ctx);
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    ).whenComplete(() {
+      if (mounted) setState(() => _productoId = null);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -255,8 +325,8 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
     final lista = widget.productos
         .where((p) => q.isEmpty || p.nombre.toLowerCase().contains(q) || (p.categoria ?? '').toLowerCase().contains(q))
         .toList();
-    final sel = widget.productos.where((p) => p.productoId == _productoId).firstOrNull;
     final ancho = MediaQuery.sizeOf(context).width;
+    final sel = ancho < 840 ? null : widget.productos.where((p) => p.productoId == _productoId).firstOrNull;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -288,13 +358,7 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
               final activa = p.productoId == _productoId;
               final bloqueada = widget.bloquearSinStock && p.stockTotal < 1;
               return InkWell(
-                onTap: bloqueada
-                    ? null
-                    : () => setState(() {
-                          _productoId = p.productoId;
-                          _variante = null;
-                          _cantidad = 1;
-                        }),
+                onTap: bloqueada ? null : () => _elegirProducto(p),
                 child: Opacity(
                   opacity: bloqueada ? 0.45 : 1,
                   child: Container(
@@ -306,9 +370,19 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: SizedBox(width: double.infinity, child: FotoPrenda(url: p.imagenUrl, nombre: p.nombre))),
+                        Expanded(
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: FotoPrenda(url: p.imagenUrl, nombre: p.nombre),
+                          ),
+                        ),
                         const SizedBox(height: 6),
-                        Text(p.nombre, maxLines: 2, overflow: TextOverflow.ellipsis, style: textoOffline(size: 12.5, peso: FontWeight.w700)),
+                        Text(
+                          p.nombre,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textoOffline(size: 12.5, peso: FontWeight.w700),
+                        ),
                         Text('Bs ${bs(p.precio)}', style: textoOffline(size: 12, color: const Color(0xFF777777))),
                       ],
                     ),
@@ -317,22 +391,54 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
               );
             },
           ),
-        if (sel != null) _elegir(sel),
+        if (sel != null)
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFAF8),
+              border: Border.all(color: bordeOffline),
+            ),
+            child: ElegirVariante(
+              key: ValueKey(sel.productoId),
+              producto: sel,
+              disponible: widget.disponible,
+              alAgregar: (v, n) => widget.alAgregar(sel, v, n),
+            ),
+          ),
       ],
     );
   }
+}
 
-  Widget _elegir(ProductoLocal p) {
+/// `.mostrador-elegir`: talla y color, cantidad y "Agregar".
+class ElegirVariante extends StatefulWidget {
+  const ElegirVariante({super.key, required this.producto, required this.disponible, required this.alAgregar});
+  final ProductoLocal producto;
+  final int Function(ProductoLocal, VarianteLocal) disponible;
+  final void Function(VarianteLocal, int) alAgregar;
+
+  @override
+  State<ElegirVariante> createState() => _ElegirVarianteState();
+}
+
+class _ElegirVarianteState extends State<ElegirVariante> {
+  VarianteLocal? _variante;
+  int _cantidad = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.producto;
     final v = _variante;
     final max = v == null ? 0 : widget.disponible(p, v);
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: const Color(0xFFFAFAF8), border: Border.all(color: bordeOffline)),
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${p.nombre} · Bs ${bs(p.precio)}', style: textoOffline(peso: FontWeight.w700, color: marcaOffline)),
+          Text(
+            '${p.nombre} · Bs ${bs(p.precio)}',
+            style: textoOffline(peso: FontWeight.w700, color: marcaOffline),
+          ),
           etiquetaOffline('Talla y color'),
           Wrap(
             spacing: 6,
@@ -346,9 +452,9 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
                   onTap: widget.disponible(p, x) < 1
                       ? null
                       : () => setState(() {
-                            _variante = x;
-                            _cantidad = 1;
-                          }),
+                          _variante = x;
+                          _cantidad = 1;
+                        }),
                 ),
             ],
           ),
@@ -360,7 +466,14 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
                   onPressed: _cantidad > 1 ? () => setState(() => _cantidad--) : null,
                   icon: const Icon(Icons.remove, size: 18),
                 ),
-                SizedBox(width: 40, child: Text('$_cantidad', textAlign: TextAlign.center, style: textoOffline(size: 15, peso: FontWeight.w700))),
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    '$_cantidad',
+                    textAlign: TextAlign.center,
+                    style: textoOffline(size: 15, peso: FontWeight.w700),
+                  ),
+                ),
                 IconButton.outlined(
                   onPressed: _cantidad < max ? () => setState(() => _cantidad++) : null,
                   icon: const Icon(Icons.add, size: 18),
@@ -372,7 +485,7 @@ class _CatalogoOfflineState extends State<CatalogoOffline> {
                     onPressed: _cantidad < 1 || _cantidad > max
                         ? null
                         : () {
-                            widget.alAgregar(p, v, _cantidad);
+                            widget.alAgregar(v, _cantidad);
                             setState(() {
                               _variante = null;
                               _cantidad = 1;
@@ -397,49 +510,56 @@ class LineasElegidas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          for (final i in items)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(i.texto, style: textoOffline(size: 12.5)),
-                        Text('Bs ${bs(i.precio * i.cantidad)}', style: textoOffline(size: 11.5, color: const Color(0xFF888888))),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: 'Quitar',
-                    onPressed: () => alQuitar(i),
-                    icon: const Icon(Icons.close, size: 18),
-                  ),
-                ],
+    children: [
+      for (final i in items)
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(i.texto, style: textoOffline(size: 12.5)),
+                    Text('Bs ${bs(i.precio * i.cantidad)}', style: textoOffline(size: 11.5, color: const Color(0xFF888888))),
+                  ],
+                ),
               ),
-            ),
-        ],
-      );
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Quitar',
+                onPressed: () => alQuitar(i),
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
 }
 
 /// Lo que falta para registrar (`.ventas-falta`).
 Widget faltaOffline(List<String> falta) => Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final f in falta) Text('• $f', style: textoOffline(size: 12, color: const Color(0xFFB3261E))),
-        ],
-      ),
-    );
+  padding: const EdgeInsets.only(top: 10),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [for (final f in falta) Text('• $f', style: textoOffline(size: 12, color: const Color(0xFFB3261E)))],
+  ),
+);
 
 /// Tarjeta de una operacion del telefono (la tabla de la web, en celular).
 class TarjetaOperacion extends StatelessWidget {
-  const TarjetaOperacion({super.key, required this.titulo, required this.sub, required this.op, this.estadoTexto, this.extra = const []});
+  const TarjetaOperacion({
+    super.key,
+    required this.titulo,
+    required this.sub,
+    required this.op,
+    this.estadoTexto,
+    this.extra = const [],
+  });
   final String titulo;
   final String sub;
   final OperacionLocal op;
@@ -448,34 +568,45 @@ class TarjetaOperacion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFEEEEEE))),
-        child: Column(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: const Color(0xFFEEEEEE)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: Text(titulo, style: textoOffline(peso: FontWeight.w700, color: marcaOffline))),
-                const SizedBox(width: 8),
-                ChipEstado(op.estado, texto: estadoTexto),
-              ],
-            ),
-            subOffline(sub),
-            const SizedBox(height: 6),
-            for (final i in op.items) Text(i.texto, style: textoOffline(size: 12.5)),
-            if (op.mensaje != null && op.mensaje!.isNotEmpty) subOffline(op.mensaje!),
-            for (final n in op.noPagados)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text('${n.producto} (${n.talla}, ${n.color}) · ${n.motivo}', style: textoOffline(size: 12, color: const Color(0xFFB3261E))),
+            Expanded(
+              child: Text(
+                titulo,
+                style: textoOffline(peso: FontWeight.w700, color: marcaOffline),
               ),
-            ...extra,
+            ),
+            const SizedBox(width: 8),
+            ChipEstado(op.estado, texto: estadoTexto),
           ],
         ),
-      );
+        subOffline(sub),
+        const SizedBox(height: 6),
+        for (final i in op.items) Text(i.texto, style: textoOffline(size: 12.5)),
+        if (op.mensaje != null && op.mensaje!.isNotEmpty) subOffline(op.mensaje!),
+        for (final n in op.noPagados)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              '${n.producto} (${n.talla}, ${n.color}) · ${n.motivo}',
+              style: textoOffline(size: 12, color: const Color(0xFFB3261E)),
+            ),
+          ),
+        ...extra,
+      ],
+    ),
+  );
 }
 
 /// Fecha y hora con los selectores del sistema ("La recojo hasta").
@@ -487,25 +618,29 @@ class CampoFechaHora extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          etiquetaOffline(etiqueta),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder(), foregroundColor: marcaOffline),
-            icon: const Icon(Icons.event, size: 18),
-            label: Text(fechaCorta(valor)),
-            onPressed: () async {
-              final hoy = DateTime.now();
-              final dia = await showDatePicker(
-                  context: context, initialDate: valor, firstDate: hoy, lastDate: hoy.add(const Duration(days: 60)));
-              if (dia == null || !context.mounted) return;
-              final hora = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(valor));
-              if (hora == null) return;
-              alCambiar(DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute));
-            },
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      etiquetaOffline(etiqueta),
+      OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder(), foregroundColor: marcaOffline),
+        icon: const Icon(Icons.event, size: 18),
+        label: Text(fechaCorta(valor)),
+        onPressed: () async {
+          final hoy = DateTime.now();
+          final dia = await showDatePicker(
+            context: context,
+            initialDate: valor,
+            firstDate: hoy,
+            lastDate: hoy.add(const Duration(days: 60)),
+          );
+          if (dia == null || !context.mounted) return;
+          final hora = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(valor));
+          if (hora == null) return;
+          alCambiar(DateTime(dia.year, dia.month, dia.day, hora.hour, hora.minute));
+        },
+      ),
+    ],
+  );
 }
 
 DateTime mananaMediodia() {

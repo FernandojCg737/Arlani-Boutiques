@@ -141,9 +141,9 @@ class _PagarComprasScreenState extends ConsumerState<PagarComprasScreen> {
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
-            color: const Color(0xFFE8F5E9),
+            color: const Color(0xFFEEF0F5),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${h.tienda}: ${h.mensaje ?? 'Compra pagada.'}', style: textoOffline(size: 12.5, color: const Color(0xFF1F5C25))),
+              Text('${h.tienda}: ${h.mensaje ?? 'Compra pagada.'}', style: textoOffline(size: 12.5, color: marcaOffline)),
               if (h.ventaId != null)
                 TextButton(onPressed: () => context.push('/mis-compras/${h.ventaId}'), child: const Text('Ver comprobante')),
             ]),

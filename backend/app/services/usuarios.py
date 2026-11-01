@@ -25,6 +25,8 @@ def to_usuario_out(usuario: Usuario) -> UsuarioOut:
     return UsuarioOut(
         id=usuario.id,
         nombre=usuario.nombre,
+        apellidos=usuario.apellidos,
+        foto_url=usuario.foto_url,
         email=usuario.email,
         telefono=getattr(usuario, "telefono", None),
         direccion=getattr(usuario, "direccion", None),

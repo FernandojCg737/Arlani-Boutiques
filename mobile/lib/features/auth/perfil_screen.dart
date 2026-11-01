@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,7 +26,7 @@ import '../storefront/reservas_repository.dart';
 import '../storefront/ventas_repository.dart';
 import 'auth_provider.dart';
 
-enum _Tab { resumen, reservas, compras, cambios, devoluciones, direcciones, pagos, notificaciones, datos, seguridad }
+enum _Tab { resumen, reservas, compras, cambios, devoluciones, direcciones, pagos, notificaciones, datos }
 
 const _metodoLabel = {'paypal': 'PayPal / Tarjeta', 'qr': 'QR (transferencia)', 'efectivo': 'Efectivo en sucursal'};
 
@@ -67,6 +68,8 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   String? _errorCalificacion;
 
   late final TextEditingController _nombreCtrl;
+  late final TextEditingController _apellidosCtrl;
+  bool _subiendoFoto = false;
   late final TextEditingController _telefonoCtrl;
   late final TextEditingController _direccionCtrl;
   bool _savingPerfil = false;
@@ -75,6 +78,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
 
   final _actualCtrl = TextEditingController();
   final _nuevaCtrl = TextEditingController();
+  final _confirmarCtrl = TextEditingController();
   bool _savingPassword = false;
   String? _errorPassword;
   String? _successPassword;
@@ -83,8 +87,12 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   void initState() {
     super.initState();
     final usuario = ref.read(authProvider).usuario;
-    _tab = _Tab.values.where((t) => t.name == widget.tabInicial).firstOrNull ?? _Tab.resumen;
-    _nombreCtrl = TextEditingController(text: usuario?.nombre ?? '');
+    // "Seguridad" ahora es parte de "Actualizar Perfil".
+    final inicial = widget.tabInicial == 'seguridad' ? 'datos' : widget.tabInicial;
+    _tab = _Tab.values.where((t) => t.name == inicial).firstOrNull ?? _Tab.resumen;
+    final (nombres, apellidos) = usuario?.partesNombre ?? ('', '');
+    _nombreCtrl = TextEditingController(text: nombres);
+    _apellidosCtrl = TextEditingController(text: apellidos);
     _telefonoCtrl = TextEditingController(text: usuario?.telefono ?? '');
     _direccionCtrl = TextEditingController(text: usuario?.direccion ?? '');
     if (usuario?.isCliente ?? false) {
@@ -97,6 +105,8 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   @override
   void dispose() {
     _nombreCtrl.dispose();
+    _apellidosCtrl.dispose();
+    _confirmarCtrl.dispose();
     _telefonoCtrl.dispose();
     _direccionCtrl.dispose();
     _actualCtrl.dispose();
@@ -213,6 +223,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     try {
       await ref.read(authProvider.notifier).updateProfile(
             nombre: _nombreCtrl.text.trim(),
+            apellidos: _apellidosCtrl.text.trim().isEmpty ? null : _apellidosCtrl.text.trim(),
             telefono: _telefonoCtrl.text.trim().isEmpty ? null : _telefonoCtrl.text.trim(),
             direccion: _direccionCtrl.text.trim().isEmpty ? null : _direccionCtrl.text.trim(),
           );
@@ -225,8 +236,16 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   }
 
   Future<void> _cambiarPassword() async {
+    if (_actualCtrl.text.isEmpty) {
+      setState(() => _errorPassword = 'Ingresa tu contraseña actual.');
+      return;
+    }
     if (!isPasswordValid(_nuevaCtrl.text)) {
       setState(() => _errorPassword = 'La nueva contrasena no cumple los requisitos.');
+      return;
+    }
+    if (_nuevaCtrl.text != _confirmarCtrl.text) {
+      setState(() => _errorPassword = 'Las contraseñas no coinciden.');
       return;
     }
     setState(() {
@@ -238,12 +257,35 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       await ref.read(authProvider.notifier).changePassword(actual: _actualCtrl.text, nueva: _nuevaCtrl.text);
       _actualCtrl.clear();
       _nuevaCtrl.clear();
-      if (mounted) setState(() => _successPassword = 'Tu contrasena se actualizo.');
+      _confirmarCtrl.clear();
+      if (mounted) setState(() => _successPassword = 'Tu contraseña se actualizó. Te avisamos por correo.');
     } catch (e) {
       if (mounted) setState(() => _errorPassword = extractErrorMessage(e));
     } finally {
       if (mounted) setState(() => _savingPassword = false);
     }
+  }
+
+  Future<void> _cambiarFoto(Future<void> Function() accion, String ok) async {
+    setState(() {
+      _subiendoFoto = true;
+      _errorPerfil = null;
+      _successPerfil = null;
+    });
+    try {
+      await accion();
+      if (mounted) setState(() => _successPerfil = ok);
+    } catch (e) {
+      if (mounted) setState(() => _errorPerfil = extractErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _subiendoFoto = false);
+    }
+  }
+
+  Future<void> _elegirFoto() async {
+    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    if (f == null) return;
+    await _cambiarFoto(() => ref.read(authProvider.notifier).subirFoto(f.path, f.name), 'Tu foto de perfil se actualizó.');
   }
 
   int get _reservasActivas => (_reservas ?? []).where((r) => r.estado == 'pendiente' || r.estado == 'confirmada').length;
@@ -357,7 +399,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       // Mismo orden que la web: compras, cambios, devoluciones, direcciones, pagos.
       if (auth.hasPermiso('CU11')) ...[_Tab.compras, _Tab.cambios, _Tab.devoluciones, _Tab.direcciones, _Tab.pagos],
       if (auth.hasPermiso('CU14')) _Tab.notificaciones,
-      if (auth.hasPermiso('CU15')) ...[_Tab.datos, _Tab.seguridad],
+      if (auth.hasPermiso('CU15')) _Tab.datos,
     ];
     if (!visibleTabs.contains(_tab)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -431,7 +473,6 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
           _Tab.pagos => _buildPagos(),
           _Tab.notificaciones => _buildNotificaciones(),
           _Tab.datos => _buildDatos(usuario),
-          _Tab.seguridad => _buildSeguridad(),
         },
       ],
     );
@@ -732,45 +773,122 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: hijos),
       );
 
-  Widget _buildDatos(Usuario usuario) {
-    return _tarjetaFormulario([
-      if (_errorPerfil != null) _ErrorBanner(_errorPerfil!),
-      if (_successPerfil != null) _SuccessBanner(_successPerfil!),
-      TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'NOMBRE COMPLETO')),
-      const SizedBox(height: 14),
-      TextFormField(initialValue: usuario.email, enabled: false, decoration: const InputDecoration(labelText: 'CORREO ELECTRONICO')),
-      const SizedBox(height: 14),
-      TextField(controller: _telefonoCtrl, decoration: const InputDecoration(labelText: 'TELEFONO')),
-      const SizedBox(height: 14),
-      TextField(controller: _direccionCtrl, decoration: const InputDecoration(labelText: 'DIRECCION')),
-      const SizedBox(height: 20),
-      ElevatedButton(
-        onPressed: _savingPerfil ? null : _guardarPerfil,
-        child: Text(_savingPerfil ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'),
-      ),
-    ]);
+  // CU15 "Actualizar Perfil": foto, nombres, apellidos, datos y contraseña,
+  // con el azul oscuro del SaaS en los botones.
+  static const _saas = Color(0xFF121A2C);
+
+  ButtonStyle get _botonSaas => FilledButton.styleFrom(
+        backgroundColor: _saas,
+        disabledBackgroundColor: _saas.withValues(alpha: 0.5),
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(50),
+        shape: const RoundedRectangleBorder(),
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1),
+      );
+
+  Widget _tituloTarjeta(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 18),
+        child: Text(t, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _saas)),
+      );
+
+  Widget _foto(Usuario usuario) {
+    final (n, a) = usuario.partesNombre;
+    final iniciales = [n, a].where((x) => x.isNotEmpty).map((x) => x[0]).join().toUpperCase();
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 40,
+          backgroundColor: _saas,
+          backgroundImage: usuario.fotoUrl != null ? NetworkImage(usuario.fotoUrl!) : null,
+          child: usuario.fotoUrl == null
+              ? Text(iniciales, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800))
+              : null,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _saas,
+                  foregroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8),
+                ),
+                onPressed: _subiendoFoto ? null : _elegirFoto,
+                child: Text(_subiendoFoto ? 'SUBIENDO...' : (usuario.fotoUrl != null ? 'CAMBIAR FOTO' : 'SUBIR FOTO')),
+              ),
+              if (usuario.fotoUrl != null && !_subiendoFoto)
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFFB3261E), padding: EdgeInsets.zero),
+                  onPressed: () => _cambiarFoto(() => ref.read(authProvider.notifier).quitarFoto(), 'Quitamos tu foto de perfil.'),
+                  child: const Text('Quitar foto', style: TextStyle(fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
+                ),
+              const Text('JPG, PNG o WEBP · hasta 10 MB', style: TextStyle(fontSize: 11, color: Color(0xFF999999))),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _buildSeguridad() {
-    return _tarjetaFormulario([
-      if (_errorPassword != null) _ErrorBanner(_errorPassword!),
-      if (_successPassword != null) _SuccessBanner(_successPassword!),
-      TextField(controller: _actualCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'CONTRASENA ACTUAL')),
-      const SizedBox(height: 14),
-      TextField(
-        controller: _nuevaCtrl,
-        obscureText: true,
-        onChanged: (_) => setState(() {}),
-        decoration: const InputDecoration(labelText: 'NUEVA CONTRASENA'),
-      ),
-      const SizedBox(height: 10),
-      PasswordStrengthChecklist(password: _nuevaCtrl.text),
-      const SizedBox(height: 20),
-      OutlinedButton(
-        onPressed: _savingPassword ? null : _cambiarPassword,
-        child: Text(_savingPassword ? 'GUARDANDO...' : 'ACTUALIZAR CONTRASENA'),
-      ),
-    ]);
+  Widget _buildDatos(Usuario usuario) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _tarjetaFormulario([
+          _tituloTarjeta('Datos personales'),
+          _foto(usuario),
+          const SizedBox(height: 22),
+          if (_errorPerfil != null) _ErrorBanner(_errorPerfil!),
+          if (_successPerfil != null) _SuccessBanner(_successPerfil!),
+          TextField(controller: _nombreCtrl, maxLength: 100, decoration: const InputDecoration(labelText: 'NOMBRES', counterText: '')),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _apellidosCtrl,
+            maxLength: 100,
+            decoration: const InputDecoration(labelText: 'APELLIDOS', counterText: ''),
+          ),
+          const SizedBox(height: 14),
+          TextFormField(initialValue: usuario.email, enabled: false, decoration: const InputDecoration(labelText: 'CORREO ELECTRONICO')),
+          const SizedBox(height: 14),
+          TextField(controller: _telefonoCtrl, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'TELEFONO')),
+          const SizedBox(height: 14),
+          TextField(controller: _direccionCtrl, decoration: const InputDecoration(labelText: 'DIRECCION')),
+          const SizedBox(height: 20),
+          FilledButton(
+            style: _botonSaas,
+            onPressed: _savingPerfil ? null : _guardarPerfil,
+            child: Text(_savingPerfil ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        _tarjetaFormulario([
+          _tituloTarjeta('Cambiar contraseña'),
+          if (_errorPassword != null) _ErrorBanner(_errorPassword!),
+          if (_successPassword != null) _SuccessBanner(_successPassword!),
+          TextField(controller: _actualCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'CONTRASEÑA ACTUAL')),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _nuevaCtrl,
+            obscureText: true,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(labelText: 'NUEVA CONTRASEÑA'),
+          ),
+          const SizedBox(height: 10),
+          PasswordStrengthChecklist(password: _nuevaCtrl.text),
+          const SizedBox(height: 14),
+          TextField(controller: _confirmarCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'CONFIRMAR CONTRASEÑA')),
+          const SizedBox(height: 20),
+          FilledButton(
+            style: _botonSaas,
+            onPressed: _savingPassword ? null : _cambiarPassword,
+            child: Text(_savingPassword ? 'ACTUALIZANDO...' : 'CAMBIAR CONTRASEÑA'),
+          ),
+        ]),
+      ],
+    );
   }
 
   // ---------------------------------------------------------- Staff (simple)
@@ -792,7 +910,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
         const SizedBox(height: 12),
         if (_errorPerfil != null) _ErrorBanner(_errorPerfil!),
         if (_successPerfil != null) _SuccessBanner(_successPerfil!),
-        TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'NOMBRE')),
+        TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'NOMBRES')),
+        const SizedBox(height: 14),
+        TextField(controller: _apellidosCtrl, decoration: const InputDecoration(labelText: 'APELLIDOS')),
         const SizedBox(height: 14),
         TextFormField(initialValue: usuario?.email, enabled: false, decoration: const InputDecoration(labelText: 'CORREO')),
         const SizedBox(height: 20),
@@ -866,8 +986,7 @@ class _TabsBar extends StatelessWidget {
     _Tab.direcciones: 'Mis Direcciones',
     _Tab.pagos: 'Metodos de Pago',
     _Tab.notificaciones: 'Notificaciones',
-    _Tab.datos: 'Mis Datos',
-    _Tab.seguridad: 'Seguridad',
+    _Tab.datos: 'Actualizar Perfil',
   };
 
   @override

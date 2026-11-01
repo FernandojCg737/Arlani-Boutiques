@@ -27,6 +27,8 @@ class GoogleAuthPayload(BaseModel):
 class UsuarioOut(BaseModel):
     id: int
     nombre: str
+    apellidos: str | None = None
+    foto_url: str | None = None
     email: EmailStr
     telefono: str | None = None
     direccion: str | None = None

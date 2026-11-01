@@ -47,8 +47,7 @@
         </button>
       }
       @if (auth.hasPermiso('CU15')) {
-        <button type="button" [class.is-active]="tab() === 'datos'" (click)="setTab('datos')">Mis Datos</button>
-        <button type="button" [class.is-active]="tab() === 'seguridad'" (click)="setTab('seguridad')">Seguridad</button>
+        <button type="button" [class.is-active]="tab() === 'datos'" (click)="setTab('datos')">Actualizar Perfil</button>
       }
     </nav>
 
@@ -467,7 +466,26 @@
       }
 
       @if (tab() === 'datos' && auth.hasPermiso('CU15')) {
-        <div class="perfil-card">
+        <div class="perfil-card perfil-card--saas">
+          <h2>Datos personales</h2>
+          <div class="perfil-foto">
+            @if (auth.currentUser()?.foto_url; as foto) {
+              <img class="perfil-foto__img" [src]="foto" alt="Tu foto de perfil" />
+            } @else {
+              <span class="perfil-foto__img perfil-foto__img--vacia">{{ iniciales() }}</span>
+            }
+            <div class="perfil-foto__acciones">
+              <label class="perfil-foto__btn" [class.is-disabled]="fotoSubiendo()">
+                {{ fotoSubiendo() ? 'Subiendo…' : auth.currentUser()?.foto_url ? 'Cambiar foto' : 'Subir foto' }}
+                <input type="file" accept="image/jpeg,image/png,image/webp" hidden [disabled]="fotoSubiendo()"
+                       (change)="elegirFoto($event)" />
+              </label>
+              @if (auth.currentUser()?.foto_url && !fotoSubiendo()) {
+                <button type="button" class="perfil-foto__quitar" (click)="quitarFoto()">Quitar foto</button>
+              }
+              <small>JPG, PNG o WEBP · hasta 10 MB</small>
+            </div>
+          </div>
           @if (profileError()) {
             <div class="perfil-alert is-error">{{ profileError() }}</div>
           }
@@ -476,10 +494,16 @@
           }
 
           <form (submit)="$event.preventDefault(); submitProfile()">
-            <label class="perfil-field">
-              <span>Nombre Completo</span>
-              <input type="text" [value]="nombre()" (input)="nombre.set($any($event.target).value)" />
-            </label>
+            <div class="perfil-fila">
+              <label class="perfil-field">
+                <span>Nombres</span>
+                <input type="text" maxlength="100" [value]="nombre()" (input)="nombre.set($any($event.target).value)" />
+              </label>
+              <label class="perfil-field">
+                <span>Apellidos</span>
+                <input type="text" maxlength="100" [value]="apellidos()" (input)="apellidos.set($any($event.target).value)" />
+              </label>
+            </div>
 
             <label class="perfil-field">
               <span>Correo Electronico</span>
@@ -503,8 +527,9 @@
         </div>
       }
 
-      @if (tab() === 'seguridad' && auth.hasPermiso('CU15')) {
-        <div class="perfil-card">
+      @if (tab() === 'datos' && auth.hasPermiso('CU15')) {
+        <div class="perfil-card perfil-card--saas perfil-card--contrasena">
+          <h2>Cambiar contraseña</h2>
           @if (passwordError()) {
             <div class="perfil-alert is-error">{{ passwordError() }}</div>
           }
@@ -642,8 +667,13 @@
 
         <form (submit)="$event.preventDefault(); submitProfile()">
           <label class="perfil-field">
-            <span>Nombre Completo</span>
-            <input type="text" [value]="nombre()" (input)="nombre.set($any($event.target).value)" />
+            <span>Nombres</span>
+            <input type="text" maxlength="100" [value]="nombre()" (input)="nombre.set($any($event.target).value)" />
+          </label>
+
+          <label class="perfil-field">
+            <span>Apellidos</span>
+            <input type="text" maxlength="100" [value]="apellidos()" (input)="apellidos.set($any($event.target).value)" />
           </label>
 
           <label class="perfil-field">

@@ -107,8 +107,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _persist(token);
   }
 
-  Future<void> updateProfile({required String nombre, String? telefono, String? direccion}) async {
-    final usuario = await _repository.updateProfile(nombre: nombre, telefono: telefono, direccion: direccion);
+  Future<void> updateProfile({required String nombre, String? apellidos, String? telefono, String? direccion}) async {
+    await _guardarUsuario(
+      await _repository.updateProfile(nombre: nombre, apellidos: apellidos, telefono: telefono, direccion: direccion),
+    );
+  }
+
+  Future<void> subirFoto(String ruta, String nombreArchivo) async =>
+      _guardarUsuario(await _repository.subirFoto(ruta, nombreArchivo));
+
+  Future<void> quitarFoto() async => _guardarUsuario(await _repository.quitarFoto());
+
+  Future<void> _guardarUsuario(Usuario usuario) async {
     await _storage.saveUsuario(usuario.toJson());
     state = state.copyWith(usuario: usuario);
   }
@@ -118,7 +128,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _persist(token);
   }
 
+  // Cerrando sesion a proposito: un 401 de una consulta que iba en camino
+  // (p. ej. la revision del catalogo sin conexion) no es "otro dispositivo".
+  bool _cerrando = false;
+
   Future<void> logout() async {
+    _cerrando = true;
     try {
       await _repository.logout();
     } catch (_) {
@@ -127,11 +142,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await signOutGoogleSilently();
     await _storage.clear();
     state = state.copyWith(clearUsuario: true, clearMessage: true);
+    _cerrando = false;
   }
 
   /// Llamado por el interceptor de Dio ante un 401: la sesion ya no es
   /// valida en el backend (token vencido o reemplazado por otro login).
   Future<void> forceLogout(String message) async {
+    if (_cerrando || state.usuario == null) return;
     await _storage.clear();
     state = state.copyWith(clearUsuario: true, sessionMessage: message);
   }
