@@ -277,8 +277,10 @@
                   <strong>{{ n.producto }} ({{ n.talla }}, {{ n.color }})</strong> · {{ n.motivo }}
                 </small>
               }
-              @if (o.tipo === 'pedido' && (o.estado === 'por_pagar' || o.estado === 'sin_stock')) {
-                <a class="offline-link" routerLink="/pagar-compras">{{ o.estado === 'por_pagar' ? 'Pagar ahora' : 'Ver' }}</a>
+              @if (o.tipo === 'pedido' && (o.estado === 'por_pagar' || o.estado === 'sin_stock' || o.estado === 'en_espera')) {
+                <a class="offline-link" routerLink="/pagar-compras">
+                  {{ o.estado === 'por_pagar' ? 'Pagar ahora' : o.estado === 'en_espera' ? 'Ver o cancelar' : 'Ver' }}
+                </a>
               }
             </td>
           </tr>

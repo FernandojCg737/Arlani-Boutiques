@@ -35,7 +35,7 @@ export interface ItemCompra {
 export interface CompraOffline {
   id: number;
   uuid: string;
-  estado: 'por_pagar' | 'sin_stock' | 'pagada' | 'cancelada';
+  estado: 'por_pagar' | 'sin_stock' | 'en_espera' | 'pagada' | 'cancelada';
   mensaje: string | null;
   tienda: string;
   logo_url: string | null;

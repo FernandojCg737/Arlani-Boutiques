@@ -7,7 +7,7 @@ import { Sincronizacion } from './sincronizacion';
 
 interface CompraResumen {
   uuid: string;
-  estado: 'por_pagar' | 'sin_stock';
+  estado: 'por_pagar' | 'sin_stock' | 'en_espera';
   tienda: string;
   total_actual: string;
   precio_cambio: boolean;
@@ -54,7 +54,9 @@ export class ComprasPorPagar {
   async revisar(): Promise<void> {
     if (this.auth.currentUser()?.tipo !== 'cliente' || !navigator.onLine) return;
     try {
-      this.compras.set(await firstValueFrom(this.http.get<CompraResumen[]>(`${environment.apiUrl}/offline/pedidos`)));
+      const todas = await firstValueFrom(this.http.get<CompraResumen[]>(`${environment.apiUrl}/offline/pedidos`));
+      // Las que esperan stock no tienen nada que pagar: no se insiste con ellas.
+      this.compras.set(todas.filter((c) => c.estado !== 'en_espera'));
     } catch {
       // Sin respuesta: se vuelve a revisar en la próxima sincronización.
     }

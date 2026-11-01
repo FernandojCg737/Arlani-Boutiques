@@ -543,12 +543,12 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
     else:
         faltan = _faltantes(db, op.sucursal_id, op.items)
         if faltan:
-            estado, conflicto = ("sin_stock" if op.tipo == "pedido" else "conflicto"), faltan
+            estado, conflicto = ("en_espera" if op.tipo == "pedido" else "conflicto"), faltan
             mensaje = "Al sincronizar ya no había stock suficiente: " + "; ".join(
                 f"{f['producto']} ({f['talla']}, {f['color']}) pidió {f['pedido']}, hay {f['disponible']}" for f in faltan
             )
             if op.tipo == "pedido":
-                mensaje += ". No se puede comprar."
+                mensaje += ". Quedaste en espera: tu compra se completa sola cuando vuelva el stock de todas tus prendas (hasta 7 días). Puedes cancelarla cuando quieras."
         elif op.tipo == "pedido":
             # No se cobra nada todavia: la app le pide pagarla con prioridad.
             estado = "por_pagar"
@@ -971,7 +971,10 @@ def seguimiento(
 # falta stock no se puede comprar; si cambio el precio, se le muestra y paga
 # el actual. Al pagar se registra la venta (origen 'offline').
 
-PEDIDO_ABIERTO = ("por_pagar", "sin_stock")
+# en_espera: en la cola de stock (la atiende atender_cola por orden de llegada).
+ESPERA_COLA = "Quedaste en espera: tu compra se completa sola cuando vuelva el stock de todas tus prendas (hasta 7 días). Puedes cancelarla cuando quieras."
+
+PEDIDO_ABIERTO = ("por_pagar", "sin_stock", "en_espera")
 
 
 def _cliente_pedido(db: Session, usuario: Usuario, uuid: str):
@@ -1018,11 +1021,11 @@ def _revisar(db: Session, fila) -> PedidoOfflineOut:
         )
     sin_stock = any(i.stock < i.cantidad for i in items)
     estado = fila["estado"]
-    if estado in PEDIDO_ABIERTO:
-        nuevo = "sin_stock" if sin_stock else "por_pagar"
+    if estado in ("por_pagar", "sin_stock"):
+        nuevo = "en_espera" if sin_stock else "por_pagar"
         if nuevo != estado:
             mensaje = (
-                "Ya no hay stock suficiente: no se puede comprar." if sin_stock else "Volvió a haber stock: lista para pagar."
+                "Ya no hay stock suficiente. Quedaste en espera: tu compra se completa sola cuando vuelva el stock de todas tus prendas (hasta 7 días). Puedes cancelarla cuando quieras." if sin_stock else "Volvió a haber stock: lista para pagar."
             )
             db.execute(
                 text("UPDATE operacion_offline SET estado = :e, mensaje = :m, actualizada_en = now() WHERE id = :i"),
@@ -1075,7 +1078,7 @@ def pedidos_por_pagar(
         text(
             """SELECT o.*, s.nombre AS sucursal_nombre, e.id AS e_id, e.nombre AS e_nombre, e.logo_url, e.color_marca
                FROM operacion_offline o JOIN sucursal s ON s.id = o.sucursal_id JOIN empresa e ON e.id = o.empresa_id
-               WHERE o.usuario_id = :c AND o.tipo = 'pedido' AND o.estado IN ('por_pagar', 'sin_stock')
+               WHERE o.usuario_id = :c AND o.tipo = 'pedido' AND o.estado IN ('por_pagar', 'sin_stock', 'en_espera')
                ORDER BY o.registrada_en"""
         ),
         {"c": usuario.id},
@@ -1088,6 +1091,10 @@ def _pagable(db: Session, usuario: Usuario, uuid: str) -> tuple[dict, PedidoOffl
     revisado = _revisar(db, fila)
     if revisado.estado not in PEDIDO_ABIERTO:
         raise HTTPException(status.HTTP_409_CONFLICT, "Esta compra ya fue pagada o cancelada.")
+    if revisado.estado == "en_espera":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Está en espera de stock: se completa sola cuando vuelva, o puedes cancelarla."
+        )
     if revisado.sin_stock:
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya no hay stock suficiente de alguna prenda: no se puede comprar.")
     return fila, revisado, OperacionOfflineIn.model_validate(fila["datos"])
@@ -1328,22 +1335,23 @@ def _revisar_items(db: Session, datos: OperacionOfflineIn) -> tuple[list[tuple[I
         actual = Decimal(f["precio"]) if f else Decimal(0)
         guardado = it.precio if it.precio is not None else actual
         if f is None or f["estado"] != "activo":
-            no_pagados.append({**base, "motivo": "La prenda ya no está a la venta."})
+            no_pagados.append({**base, "tipo": "inactiva", "motivo": "La prenda ya no está a la venta."})
         elif stock < it.cantidad:
             no_pagados.append(
-                {**base, "motivo": f"Sin stock suficiente en {sucursal}: pediste {it.cantidad} y hay {stock}."}
+                {**base, "tipo": "stock", "motivo": f"Sin stock suficiente en {sucursal}: pediste {it.cantidad} y hay {stock}."}
             )
         elif actual > guardado:
             # No se cobra mas de lo que el cliente acepto al comprar.
             no_pagados.append(
-                {**base, "motivo": f"Subió de precio (de Bs {guardado:.2f} a Bs {actual:.2f}): no se cobró sin tu permiso."}
+                {**base, "tipo": "precio",
+                 "motivo": f"Subió de precio (de Bs {guardado:.2f} a Bs {actual:.2f}): no se cobró sin tu permiso."}
             )
         else:
             validos.append((it, base))
     return validos, no_pagados
 
 
-def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) -> None:
+def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request | None) -> None:
     """Cobra una compra sin conexion con el PayPal guardado del cliente (cuenta
     de Arlani, como "Pagar todo") y la deja en 'pagada', 'pago_parcial' o
     'no_pagada'. A la tienda le llega lo suyo por la liquidacion."""
@@ -1375,6 +1383,37 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
         motivo = "La tienda ya no recibe pagos con PayPal."
         return no_pagada(motivo, [{**b, "motivo": motivo} for b in todos])
     metodo, cuenta = cobro
+    # Falta stock de alguna prenda: espera en la cola hasta que esten TODAS.
+    if any(n.get("tipo") == "stock" for n in no_pagados):
+        faltan = [n for n in no_pagados if n.get("tipo") == "stock"]
+        _cerrar_cobro(
+            db, fila, "en_espera",
+            "Sin stock por ahora: " + "; ".join(
+                f"{n['producto']} ({n['talla']}, {n['color']}) pediste {n['pedido']} y hay {n['disponible']}" for n in faltan
+            ) + ". " + ESPERA_COLA,
+            faltan, None,
+        )
+        _avisar_cobro(
+            db, fila, "Compra en espera de stock",
+            f"Tu compra sin conexión en {tienda} quedó en espera porque no hay stock suficiente. Se cobra sola con tu "
+            "PayPal apenas vuelva (hasta 7 días); no se te cobró nada todavía.",
+        )
+        db.commit()
+        return
+    # Subio el precio: no se cobra sin su permiso, se le pregunta.
+    if any(n.get("tipo") == "precio" for n in no_pagados):
+        _cerrar_cobro(
+            db, fila, "por_pagar",
+            "Subió el precio de alguna prenda: revisa el precio nuevo y págala en Compras por pagar (o cancélala).",
+            [], None,
+        )
+        _avisar_cobro(
+            db, fila, "Subió el precio de tu compra",
+            f"Hay stock para tu compra sin conexión en {tienda}, pero subió el precio de alguna prenda. No se te cobró: "
+            "revisa el precio nuevo y decide en Compras por pagar.",
+        )
+        db.commit()
+        return
     if not validos:
         return no_pagada("ninguna prenda se pudo comprar.", no_pagados)
 
@@ -1453,7 +1492,8 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request) 
             Bitacora(
                 usuario_id=usuario.id, accion="CREAR", entidad_afectada="venta", entidad_id=venta_id,
                 detalle=f"Compra sin conexión cobrada con PayPal guardado (orden {orden['id']})",
-                ip_address=client_ip(request), plataforma=client_platform(request),
+                ip_address=client_ip(request) if request else None,
+                plataforma=client_platform(request) if request else None,
             )
         )
         db.commit()
@@ -1494,3 +1534,124 @@ def _cobrar_pendientes(db: Session, usuario: Usuario, request: Request) -> dict[
         fila = db.execute(text("SELECT * FROM operacion_offline WHERE id = :i"), {"i": operacion_id}).mappings().first()
         resultados[str(fila["uuid"])] = _con_total(db, fila)
     return resultados
+
+
+# ====================================== cola de espera de stock (en_espera)
+# Una compra sin conexion sin stock suficiente espera en la cola de sus prendas,
+# por orden de llegada (registrada_en). Cuando vuelve a haber stock de TODAS
+# (la tienda repone, se aprueba una devolucion, se cancela una reserva...):
+# - si subio el precio, pasa a 'por_pagar' y se le pregunta al cliente;
+# - con PayPal guardado se cobra sola; contra entrega se confirma sola;
+# - si se pagaba en linea sin permiso de cobro, pasa a 'por_pagar' con aviso.
+# A los 7 dias sin stock se cancela sola (no se cobro nada).
+
+DIAS_COLA = 7
+
+
+def atender_cola(db: Session) -> int:
+    """Atiende la cola por orden de llegada. Devuelve cuantas salieron de ella."""
+    ids = db.execute(
+        text("SELECT id FROM operacion_offline WHERE tipo = 'pedido' AND estado = 'en_espera' ORDER BY registrada_en, id")
+    ).scalars().all()
+    db.commit()
+    atendidas = 0
+    for operacion_id in ids:
+        try:
+            atendidas += _atender_en_espera(db, operacion_id)
+        except Exception:
+            db.rollback()
+            logger.exception("Cola de stock: fallo la compra sin conexion %s", operacion_id)
+    return atendidas
+
+
+def _atender_en_espera(db: Session, operacion_id: int) -> int:
+    fila = db.execute(
+        text(
+            """SELECT o.*, (o.registrada_en < (now() AT TIME ZONE 'UTC') - make_interval(days => :d)) AS vencida
+               FROM operacion_offline o WHERE o.id = :i AND o.estado = 'en_espera' FOR UPDATE SKIP LOCKED"""
+        ),
+        {"i": operacion_id, "d": DIAS_COLA},
+    ).mappings().first()
+    if fila is None:
+        db.rollback()
+        return 0
+    datos = OperacionOfflineIn.model_validate(fila["datos"])
+    tienda = db.execute(text("SELECT nombre FROM empresa WHERE id = :e"), {"e": fila["empresa_id"]}).scalar()
+
+    def mover(estado: str, mensaje: str, titulo: str, aviso: str) -> int:
+        db.execute(
+            text("UPDATE operacion_offline SET estado = :e, mensaje = :m, actualizada_en = now() WHERE id = :i"),
+            {"e": estado, "m": mensaje, "i": fila["id"]},
+        )
+        _avisar_cobro(db, fila, titulo, aviso)
+        db.commit()
+        return 1
+
+    if fila["vencida"]:
+        return mover(
+            "cancelada", f"No volvió a haber stock en {DIAS_COLA} días: se canceló sola. No se te cobró nada.",
+            "Compra cancelada",
+            f"Tu compra sin conexión en {tienda} se canceló: no volvió a haber stock en {DIAS_COLA} días. "
+            "No se te cobró nada.",
+        )
+
+    # Sigue esperando hasta que haya stock de TODAS sus prendas.
+    if _faltantes(db, datos.sucursal_id, datos.items):
+        db.rollback()
+        return 0
+
+    subio = False
+    for it in datos.items:
+        actual = db.execute(text("SELECT precio FROM producto WHERE id = :p"), {"p": it.producto_id}).scalar()
+        if it.precio is not None and actual is not None and Decimal(actual) > it.precio:
+            subio = True
+    if subio:
+        return mover(
+            "por_pagar", "Volvió a haber stock, pero subió el precio de alguna prenda: revísalo y págala (o cancélala).",
+            "Volvió a haber stock",
+            f"Volvió a haber stock para tu compra sin conexión en {tienda}, pero subió el precio de alguna prenda. "
+            "No se te cobró: revisa el precio nuevo y decide en Compras por pagar.",
+        )
+
+    if datos.forma_pago == "paypal_guardado":
+        permiso = token_de(db, fila["usuario_id"], datos.metodo_pago_id, fila["empresa_id"])
+        if permiso and _cobro_paypal(db, permiso, fila["empresa_id"]) is not None:
+            db.execute(
+                text("UPDATE operacion_offline SET estado = 'por_cobrar', actualizada_en = now() WHERE id = :i"),
+                {"i": fila["id"]},
+            )
+            db.commit()
+            usuario = db.get(Usuario, fila["usuario_id"])
+            _cobrar(db, usuario, fila["id"], None)
+            return 1
+
+    if datos.forma_pago == "contra_entrega" and (metodo := _metodo_contra_entrega(db, fila["empresa_id"])) is not None:
+        try:
+            venta_id = db.execute(
+                text("SELECT sp_crear_venta_contra_entrega(:c, :s, CAST(:items AS JSONB), :m)"),
+                {"c": fila["usuario_id"], "s": datos.sucursal_id, "items": _items_actuales(datos), "m": metodo.id},
+            ).scalar_one()
+        except DBAPIError:
+            # Otro se llevo el stock justo ahora: sigue en la cola.
+            db.rollback()
+            return 0
+        momento = "al recibirla" if datos.entrega == "envio" else "al recogerla"
+        _marcar_pagada(db, fila, venta_id, datos, f"Volvió el stock y se confirmó sola: pagas {momento} · Venta #{venta_id}")
+        db.add(
+            Bitacora(
+                usuario_id=fila["usuario_id"], accion="CREAR", entidad_afectada="venta", entidad_id=venta_id,
+                detalle="Compra sin conexión confirmada desde la cola de stock (contra entrega)",
+            )
+        )
+        _avisar_cobro(
+            db, fila, "Compra realizada con éxito",
+            f"Volvió a haber stock: tu compra sin conexión en {tienda} se confirmó (venta #{venta_id}). Pagas {momento}.",
+        )
+        db.commit()
+        return 1
+
+    # Se pagaba en linea sin permiso de cobro: se le avisa para que la pague.
+    return mover(
+        "por_pagar", "Volvió a haber stock: lista para pagar.", "Volvió a haber stock",
+        f"Volvió a haber stock para tu compra sin conexión en {tienda}: págala en Compras por pagar.",
+    )

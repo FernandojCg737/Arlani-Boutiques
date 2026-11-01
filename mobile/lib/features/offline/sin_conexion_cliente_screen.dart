@@ -276,12 +276,12 @@ class _SinConexionClienteScreenState extends ConsumerState<SinConexionClienteScr
             sub: '${o.sucursalNombre} · ${fechaCorta(DateTime.parse(o.registradaEn))}',
             estadoTexto: o.formaPago == 'paypal_guardado' && o.estado == 'pagada' ? 'Pago finalizado con éxito' : null,
             extra: [
-              if (o.tipo == 'pedido' && (o.estado == 'por_pagar' || o.estado == 'sin_stock'))
+              if (o.tipo == 'pedido' && (o.estado == 'por_pagar' || o.estado == 'sin_stock' || o.estado == 'en_espera'))
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(
                     onPressed: () => context.push('/pagar-compras'),
-                    child: Text(o.estado == 'por_pagar' ? 'Pagar ahora' : 'Ver'),
+                    child: Text(o.estado == 'por_pagar' ? 'Pagar ahora' : (o.estado == 'en_espera' ? 'Ver o cancelar' : 'Ver')),
                   ),
                 ),
             ],

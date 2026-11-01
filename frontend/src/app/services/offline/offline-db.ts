@@ -83,6 +83,8 @@ export type EstadoOperacion =
   // Compras del cliente sin conexión.
   | 'por_pagar'
   | 'sin_stock'
+  // Sin stock al sincronizar: en la cola, se completa sola cuando vuelva (7 días).
+  | 'en_espera'
   | 'pagada'
   | 'cancelada'
   // Compra con el PayPal guardado: "Pago enviado" hasta que se cobra.

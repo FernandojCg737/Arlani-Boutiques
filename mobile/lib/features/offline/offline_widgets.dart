@@ -174,7 +174,7 @@ class ChipEstado extends StatelessWidget {
       'error' ||
       'por_pagar' ||
       'por_cobrar' ||
-      'pago_parcial' => (const Color(0xFFFFF4E0), ambarOffline),
+      'pago_parcial' || 'en_espera' => (const Color(0xFFFFF4E0), ambarOffline),
       'confirmada' || 'resuelta' || 'pagada' => (const Color(0xFFEEF0F5), marcaOffline),
       'conflicto' || 'sin_stock' || 'no_pagada' => (const Color(0xFFFDECEA), const Color(0xFFB3261E)),
       'rechazada' || 'anulada' || 'cancelada' => (const Color(0xFFEEEEEE), const Color(0xFF666666)),
