@@ -23,7 +23,7 @@ const POR_ENVIAR: EstadoOperacion[] = ['pendiente', 'enviando', 'error'];
 // Estados que el servidor todavía puede cambiar (el encargado resuelve el conflicto).
 // (el encargado resuelve el conflicto; la compra se paga o se queda sin stock).
 // (o la compra con PayPal guardado quedó por cobrar: se cobra al consultar).
-const POR_CONSULTAR: EstadoOperacion[] = ['conflicto', 'por_pagar', 'sin_stock', 'por_cobrar'];
+const POR_CONSULTAR: EstadoOperacion[] = ['conflicto', 'por_pagar', 'sin_stock', 'por_cobrar', 'en_espera'];
 const LOTE = 50;
 // Lo pendiente tiene prioridad: se envía apenas vuelve la conexión y, si el
 // servidor no responde (p. ej. estaba dormido), se reintenta a los 3, 6, 12 y

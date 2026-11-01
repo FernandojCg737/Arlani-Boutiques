@@ -64,6 +64,33 @@ def preparar_modelos_ml() -> None:
     threading.Thread(target=entrenar, daemon=True).start()
 
 
+@app.on_event("startup")
+def atender_cola_de_stock() -> None:
+    # P4 offline: las compras sin conexion que esperan stock ('en_espera') se
+    # completan solas apenas vuelve a haber (la tienda repone, se aprueba una
+    # devolucion, se cancela una reserva...). Se revisa cada minuto, por orden
+    # de llegada; las de mas de 7 dias se cancelan solas.
+    import logging
+    import threading
+    import time
+
+    from app.api.v1.endpoints.offline import atender_cola
+    from app.db.session import SessionLocal
+
+    def bucle() -> None:
+        while True:
+            time.sleep(60)
+            db = SessionLocal()
+            try:
+                atender_cola(db)
+            except Exception:  # noqa: BLE001 - se reintenta en la proxima vuelta
+                logging.getLogger(__name__).exception("No se pudo atender la cola de stock")
+            finally:
+                db.close()
+
+    threading.Thread(target=bucle, daemon=True, name="cola-stock").start()
+
+
 @app.exception_handler(DBAPIError)
 async def datos_de_otra_tienda(request: Request, exc: DBAPIError) -> JSONResponse:
     # Row Level Security (migracion a8d3f1c6e924): el personal de una tienda

@@ -78,7 +78,7 @@ const _sinAviso = {'pendiente', 'enviando', 'error', 'por_cobrar'};
 /// Avisa el resultado si la operacion cambio a un estado que lo amerita.
 Future<void> avisarResultado(OperacionLocal o, {required String antes, required bool personal}) async {
   if (o.estado == antes || _sinAviso.contains(o.estado)) return;
-  final aviso = _aviso(o, personal);
+  final aviso = _aviso(o, personal, antes);
   if (aviso == null) return;
   try {
     await iniciarAvisos();
@@ -94,7 +94,7 @@ Future<void> avisarResultado(OperacionLocal o, {required String antes, required 
   }
 }
 
-({String titulo, String cuerpo, String ruta})? _aviso(OperacionLocal o, bool personal) {
+({String titulo, String cuerpo, String ruta})? _aviso(OperacionLocal o, bool personal, String antes) {
   final que = switch (o.tipo) { 'pedido' => 'Compra', 'venta' => 'Venta', _ => 'Reserva' };
   final prendas = o.items.map((i) => i.texto).join(', ');
   final lugar = '${o.empresaNombre} · ${o.sucursalNombre}';
@@ -117,9 +117,33 @@ Future<void> avisarResultado(OperacionLocal o, {required String antes, required 
     case 'pagada':
       return (
         titulo: 'Compra realizada con éxito',
-        cuerpo: 'Compra${o.ventaId != null ? ' #${o.ventaId}' : ''} en $lugar: $prendas. Pagaste $total'
-            '${o.formaPago == 'paypal_guardado' ? ' con tu PayPal' : ''}.',
+        cuerpo: '${antes == 'en_espera' ? 'Volvió a haber stock. ' : ''}'
+            'Compra${o.ventaId != null ? ' #${o.ventaId}' : ''} en $lugar: $prendas. '
+            '${o.formaPago == 'contra_entrega' ? 'Total $total: pagas ${o.entrega == 'envio' ? 'al recibirla' : 'al recogerla'}.' : 'Pagaste $total${o.formaPago == 'paypal_guardado' ? ' con tu PayPal' : ''}.'}',
         ruta: exitoRuta('compras'),
+      );
+    case 'en_espera':
+      return (
+        titulo: 'Compra en espera de stock',
+        cuerpo: '$lugar: $prendas. No hay stock suficiente por ahora: quedaste en la cola y tu compra se completa '
+            'sola cuando vuelva (hasta 7 días). No se te cobró nada; puedes cancelarla.',
+        ruta: personal ? fallaRuta : '/pagar-compras',
+      );
+    case 'cancelada':
+      // Solo la que se cancelo sola por la cola (la que cancela el cliente no se avisa).
+      if (!motivo.contains('No volvió a haber stock')) return null;
+      return (
+        titulo: 'Tu compra se canceló',
+        cuerpo: '$lugar: $prendas. No volvió a haber stock en 7 días. No se te cobró nada.',
+        ruta: fallaRuta,
+      );
+    case 'por_pagar' when antes == 'en_espera' || antes == 'por_cobrar':
+      return (
+        titulo: motivo.contains('subió el precio') || motivo.contains('Subió el precio')
+            ? 'Volvió el stock, pero subió el precio'
+            : 'Volvió a haber stock',
+        cuerpo: '$lugar: $prendas. ${motivo.isEmpty ? 'Ya puedes pagarla.' : motivo} No se te cobró nada todavía.',
+        ruta: personal ? fallaRuta : '/pagar-compras',
       );
     case 'por_pagar':
       return (

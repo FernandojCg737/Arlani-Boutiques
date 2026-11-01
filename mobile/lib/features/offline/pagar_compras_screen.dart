@@ -190,7 +190,13 @@ class _PagarComprasScreenState extends ConsumerState<PagarComprasScreen> {
               ),
             ]),
             const SizedBox(height: 10),
-            if (c.sinStock)
+            if (c.estado == 'en_espera')
+              const AvisoOffline(
+                'En espera de stock: estás en la cola de estas prendas. Tu compra se completa sola apenas vuelva a haber '
+                'stock de todas (hasta 7 días desde que la hiciste); si sube el precio te preguntamos antes. Puedes '
+                'cancelarla cuando quieras.',
+              )
+            else if (c.sinStock)
               const AvisoOffline('Ya no hay stock suficiente de alguna prenda: no se puede comprar. Puedes cancelarla y elegir otra cosa.',
                   error: true)
             else if (c.precioCambio)

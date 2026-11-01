@@ -20,7 +20,7 @@ const _tareaEnviar = 'arlani-enviar-pendientes';
 const _tareaPeriodica = 'arlani-revisar-pendientes';
 final _conInternet = Constraints(networkType: NetworkType.connected);
 const _porEnviar = {'pendiente', 'enviando', 'error'};
-const _porConsultar = {'conflicto', 'por_pagar', 'sin_stock', 'por_cobrar'};
+const _porConsultar = {'conflicto', 'por_pagar', 'sin_stock', 'por_cobrar', 'en_espera'};
 
 @pragma('vm:entry-point')
 void despacharTareasFondo() {

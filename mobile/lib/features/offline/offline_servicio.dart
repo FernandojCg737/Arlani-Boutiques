@@ -22,7 +22,7 @@ import 'offline_modelos.dart';
 const porEnviar = {'pendiente', 'enviando', 'error'};
 // Estados que el servidor todavia puede cambiar (el encargado resuelve el
 // conflicto, la compra se paga o se queda sin stock, o se cobra el PayPal).
-const _porConsultar = {'conflicto', 'por_pagar', 'sin_stock', 'por_cobrar'};
+const _porConsultar = {'conflicto', 'por_pagar', 'sin_stock', 'por_cobrar', 'en_espera'};
 // Cobro con el PayPal guardado ya resuelto (se avisa una vez).
 const cobroTerminado = {'pagada', 'pago_parcial', 'no_pagada'};
 const _lote = 50;

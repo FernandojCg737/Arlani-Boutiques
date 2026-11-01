@@ -355,6 +355,7 @@ const estadoOperacion = <String, String>{
   'error': 'Se reintentará',
   'por_pagar': 'Por pagar',
   'sin_stock': 'Sin stock',
+  'en_espera': 'En espera de stock',
   'pagada': 'Pagada',
   'cancelada': 'Cancelada',
   'por_cobrar': 'Pago enviado',

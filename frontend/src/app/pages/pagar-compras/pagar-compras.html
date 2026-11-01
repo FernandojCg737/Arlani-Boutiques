@@ -43,7 +43,13 @@
           </div>
         </header>
 
-        @if (c.sin_stock) {
+        @if (c.estado === 'en_espera') {
+          <p class="compra__alerta is-ojo">
+            En espera de stock: estás en la cola de estas prendas. Tu compra se completa sola apenas vuelva a haber
+            stock de todas (hasta 7 días desde que la hiciste); si sube el precio te preguntamos antes. Puedes cancelarla
+            cuando quieras.
+          </p>
+        } @else if (c.sin_stock) {
           <p class="compra__alerta is-mal">
             Ya no hay stock suficiente de alguna prenda: no se puede comprar. Puedes cancelarla y elegir otra cosa.
           </p>
