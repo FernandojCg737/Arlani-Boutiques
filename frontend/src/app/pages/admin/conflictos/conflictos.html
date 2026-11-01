@@ -71,7 +71,7 @@
               <td>Bs {{ o.total | number: '1.2-2' }}</td>
               <td>
                 <span class="offline-chip offline-chip--{{ o.estado }}">{{ estadoLabel[o.estado] ?? o.estado }}</span>
-                @if (o.conflicto && o.estado === 'conflicto') {
+                @if (o.conflicto && (o.estado === 'conflicto' || o.estado === 'en_espera')) {
                   @for (c of o.conflicto; track $index) {
                     <small class="offline-sub conflicto-falta">
                       {{ c.producto }} ({{ c.talla }}, {{ c.color }}): pidió {{ c.pedido }}, hay {{ c.disponible }}
@@ -109,6 +109,61 @@
       </tbody>
     </table>
   </div>
+
+  @if (filtro() === 'conflicto' && !cargando()) {
+    <section class="cola-stock">
+      <h2>Cola de espera de stock</h2>
+      <p>
+        Compras de clientes hechas sin conexión que, al sincronizar, no tenían stock suficiente. No hay que resolverlas:
+        esperan su turno por orden de llegada y se completan solas apenas vuelva el stock de todas sus prendas (si subió
+        el precio, se le pregunta al cliente). Si en {{ diasCola }} días no vuelve, se cancelan solas sin cobrar nada.
+      </p>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Turno</th>
+              <th>Compra</th>
+              <th>Prendas</th>
+              <th>Falta ahora</th>
+              <th>Se cancela sola</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (o of cola(); track o.id; let i = $index) {
+              <tr>
+                <td><span class="cola-stock__turno">{{ i + 1 }}</span></td>
+                <td>
+                  <strong>Compra del cliente #{{ o.id }}</strong>
+                  <small class="offline-sub">{{ o.usuario_nombre ?? '—' }} · {{ o.sucursal_nombre }}</small>
+                  <small class="offline-sub">Hecha {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }} · Bs {{ o.total | number: '1.2-2' }}</small>
+                </td>
+                <td>
+                  @for (it of o.items; track $index) {
+                    <span class="offline-linea">{{ it.cantidad }}× {{ it.producto }} ({{ it.talla }}, {{ it.color }})</span>
+                  }
+                </td>
+                <td>
+                  @for (c of o.conflicto ?? []; track $index) {
+                    <small class="offline-sub conflicto-falta">
+                      {{ c.producto }} ({{ c.talla }}, {{ c.color }}): pidió {{ c.pedido }}, hay {{ c.disponible }}
+                    </small>
+                  } @empty {
+                    <small class="offline-sub">Ya hay stock: se completa en el próximo minuto.</small>
+                  }
+                </td>
+                <td>{{ venceCola(o) | date: 'dd/MM/yyyy HH:mm' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="admin-table__empty">No hay compras esperando stock.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
 </div>
 
 @if (resolviendo(); as o) {
