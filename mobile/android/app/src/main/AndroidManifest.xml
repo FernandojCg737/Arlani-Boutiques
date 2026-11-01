@@ -4,6 +4,8 @@
          ninguna llamada de red (login, catalogo, todo), no solo el
          probador AR. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Avisos de reservas y compras hechas sin conexion (Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Probador de realidad aumentada (CU09): activa la camara frontal
          para detectar el cuerpo del cliente y superponer la prenda. -->
     <uses-permission android:name="android.permission.CAMERA" />

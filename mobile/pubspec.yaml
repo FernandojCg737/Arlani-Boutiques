@@ -101,6 +101,7 @@ dependencies:
   uuid: ^4.6.0
   location: ^10.0.2
   workmanager: ^0.10.10
+  flutter_local_notifications: ^22.3.3
 
 dev_dependencies:
   flutter_test:

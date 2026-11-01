@@ -6,6 +6,7 @@ import 'core/theme.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/chatbot/chatbot_provider.dart';
 import 'features/notificaciones/notificaciones_provider.dart';
+import 'features/offline/offline_avisos.dart';
 import 'features/offline/offline_fondo.dart';
 import 'features/offline/offline_servicio.dart';
 import 'features/storefront/cart_provider.dart';
@@ -37,6 +38,17 @@ class _AtelierAranierAppState extends ConsumerState<AtelierAranierApp> {
   /// sesion se revise al instante (si no, solo se alcanza a ver un parpadeo).
   static const _tiempoLogo = Duration(milliseconds: 1800);
   bool _logoVisto = false;
+
+  String? _rutaPendiente;
+
+  void _abrirRuta(String ruta) {
+    if (!mounted) return;
+    if (ref.read(authProvider).bootstrapping || !_logoVisto) {
+      setState(() => _rutaPendiente = ruta);
+      return;
+    }
+    ref.read(routerProvider).push(ruta);
+  }
 
   @override
   void initState() {
@@ -82,6 +94,13 @@ class _AtelierAranierAppState extends ConsumerState<AtelierAranierApp> {
         ref.read(chatbotProvider.notifier).limpiarLocal();
       }
     });
+
+    // Al tocar una notificacion de lo hecho sin conexion se abre su seccion
+    // (tambien si la notificacion fue la que abrio la app).
+    alTocarNotificacion = _abrirRuta;
+    rutaDeInicio().then((ruta) {
+      if (ruta != null) _abrirRuta(ruta);
+    }).catchError((_) {});
 
     // P4 offline: el servicio arranca con la app (sincroniza y descarga solo).
     // Avisa una vez cuando hay compras sin conexion por pagar y cuando se
@@ -131,6 +150,12 @@ class _AtelierAranierAppState extends ConsumerState<AtelierAranierApp> {
     }
 
     final router = ref.watch(routerProvider);
+    // Ruta de una notificacion que llego mientras la app seguia cargando.
+    final pendiente = _rutaPendiente;
+    if (pendiente != null) {
+      _rutaPendiente = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => router.push(pendiente));
+    }
 
     return MaterialApp.router(
       title: 'Arlani Boutiques',
