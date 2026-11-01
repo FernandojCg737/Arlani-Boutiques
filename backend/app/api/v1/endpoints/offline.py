@@ -330,15 +330,16 @@ def catalogo_cliente(
 # ================================================================== CU12
 
 
-def _faltantes(db: Session, sucursal_id: int, items: list[ItemOfflineIn]) -> list[dict]:
-    """Lineas sin stock suficiente HOY en la sucursal (bloquea las filas)."""
+def _faltantes(db: Session, sucursal_id: int, items: list[ItemOfflineIn], bloquear: bool = True) -> list[dict]:
+    """Lineas sin stock suficiente HOY en la sucursal (bloquea las filas, salvo
+    al solo mirarlas)."""
     faltan = []
     for it in items:
         fila = db.execute(
             text(
-                """SELECT p.nombre AS producto, t.codigo AS talla, c.nombre AS color,
+                f"""SELECT p.nombre AS producto, t.codigo AS talla, c.nombre AS color,
                           (SELECT i.cantidad FROM inventario i WHERE i.producto_id = p.id AND i.talla_id = t.id
-                             AND i.color_id = c.id AND i.sucursal_id = :s FOR UPDATE) AS disponible
+                             AND i.color_id = c.id AND i.sucursal_id = :s{' FOR UPDATE' if bloquear else ''}) AS disponible
                    FROM producto p, talla t, color c WHERE p.id = :p AND t.id = :t AND c.id = :c"""
             ),
             {"s": sucursal_id, "p": it.producto_id, "t": it.talla_id, "c": it.color_id},
@@ -698,6 +699,12 @@ def _to_out(db: Session, f) -> OperacionOfflineOut:
             },
         ).mappings().all()
         nombres = {(n["p"], n["t"], n["c"]): n for n in filas}
+    conflicto = f["conflicto"]
+    if f["estado"] == "en_espera" and f["sucursal_id"] is not None:
+        # En la cola: lo que falta con el stock de AHORA (no el de cuando llego).
+        conflicto = _faltantes(
+            db, f["sucursal_id"], OperacionOfflineIn.model_validate(f["datos"]).items, bloquear=False
+        ) or None
     detalle, total = [], Decimal(0)
     for i in items:
         n = nombres.get((i["producto_id"], i["talla_id"], i["color_id"]))
@@ -715,7 +722,7 @@ def _to_out(db: Session, f) -> OperacionOfflineOut:
         sucursal_id=f["sucursal_id"], sucursal_nombre=f["sucursal_nombre"], usuario_nombre=f["usuario_nombre"],
         usuario_tipo=f["usuario_tipo"], cliente_nombre=f["cliente_nombre"], registrada_en=f["registrada_en"],
         recibida_en=f["recibida_en"], intentos=f["intentos"], total=total, items=detalle,
-        conflicto=[ItemConflictoOut(**c) for c in f["conflicto"]] if f["conflicto"] else None,
+        conflicto=[ItemConflictoOut(**c) for c in conflicto] if conflicto else None,
         venta_id=f["venta_id"], reserva_id=f["reserva_id"], resuelta_por_nombre=f["resuelta_por_nombre"],
         resuelta_en=f["resuelta_en"], resolucion=f["resolucion"],
     )

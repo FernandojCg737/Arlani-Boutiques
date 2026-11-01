@@ -69,6 +69,8 @@ interface LineaAjuste {
   cantidad: number;
 }
 
+const DIAS_COLA = 7;
+
 const TIPO_USUARIO: Record<string, string> = {
   administrador: 'Administrador',
   encargado_sucursal: 'Encargado',
@@ -97,6 +99,9 @@ export class AdminConflictos implements OnInit {
   protected readonly puedeResolver = !this.esPlataforma && (this.auth.isAdmin() || this.auth.hasPermiso('2P-CU14'));
 
   protected readonly operaciones = signal<OperacionServidor[]>([]);
+  // Compras de clientes en la cola de espera de stock, por orden de llegada.
+  protected readonly cola = signal<OperacionServidor[]>([]);
+  protected readonly diasCola = DIAS_COLA;
   protected readonly filtro = signal<string>(inject(ActivatedRoute).snapshot.data['estado'] ?? 'conflicto');
   protected readonly cargando = signal(true);
   protected readonly error = signal('');
@@ -122,7 +127,15 @@ export class AdminConflictos implements OnInit {
     this.error.set('');
     try {
       const params: Record<string, string> = this.filtro() ? { estado: this.filtro() } : {};
-      this.operaciones.set(await firstValueFrom(this.http.get<OperacionServidor[]>(`${this.api}/operaciones`, { params })));
+      const [operaciones, cola] = await Promise.all([
+        firstValueFrom(this.http.get<OperacionServidor[]>(`${this.api}/operaciones`, { params })),
+        // Junto a los conflictos se ve la cola de stock (en "Compras en espera" ya es la lista).
+        this.filtro() === 'conflicto'
+          ? firstValueFrom(this.http.get<OperacionServidor[]>(`${this.api}/operaciones`, { params: { estado: 'en_espera' } }))
+          : Promise.resolve([]),
+      ]);
+      this.operaciones.set(operaciones);
+      this.cola.set([...cola].sort((a, b) => a.registrada_en.localeCompare(b.registrada_en) || a.id - b.id));
     } catch (err) {
       this.error.set(mensajeError(err, 'No pudimos cargar las operaciones sincronizadas.'));
     } finally {
@@ -133,6 +146,11 @@ export class AdminConflictos implements OnInit {
   protected filtrar(valor: string): void {
     this.filtro.set(valor);
     void this.cargar();
+  }
+
+  // Se cancela sola a los DIAS_COLA días de hecha (offline.py: atender_cola).
+  protected venceCola(o: OperacionServidor): Date {
+    return new Date(new Date(o.registrada_en + 'Z').getTime() + DIAS_COLA * 86_400_000);
   }
 
   protected variantesDe(productoId: number): Disponible[] {

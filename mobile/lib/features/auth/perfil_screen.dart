@@ -21,6 +21,7 @@ import '../portada/secciones_cierre.dart';
 import '../storefront/catalogo_provider.dart';
 import '../cuenta/mis_cambios.dart';
 import '../cuenta/mis_devoluciones.dart';
+import '../cuenta/mis_cuentas_paypal.dart';
 import '../cuenta/mis_direcciones.dart';
 import '../storefront/reservas_repository.dart';
 import '../storefront/ventas_repository.dart';
@@ -718,6 +719,11 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const MisCuentasPaypal(),
+        const SizedBox(height: 32),
+        Text('Otros métodos con los que pagaste',
+            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: _tinta)),
+        const SizedBox(height: 6),
         Text(
           'Por tu seguridad no guardamos numeros de tarjeta -- cuando pagas con tarjeta, eso pasa directo por PayPal '
           'y nunca llega a nuestros servidores. Aca ves con que metodos pagaste antes.',

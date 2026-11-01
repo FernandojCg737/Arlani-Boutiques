@@ -52,6 +52,35 @@
   }
 }
 
+.cola-stock {
+  margin-top: 36px;
+
+  h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0 0 14px;
+    max-width: 760px;
+    font-size: 13px;
+    color: #666;
+  }
+
+  &__turno {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 6px;
+    background: #fff4e0;
+    color: #b26a00;
+    font-weight: 700;
+    font-size: 13px;
+  }
+}
+
 .conflicto-devolver {
   color: #b3261e;
 }
