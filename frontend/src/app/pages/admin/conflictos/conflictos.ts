@@ -150,7 +150,9 @@ export class AdminConflictos implements OnInit {
 
   // Se cancela sola a los DIAS_COLA días de hecha (offline.py: atender_cola).
   protected venceCola(o: OperacionServidor): Date {
-    return new Date(new Date(o.registrada_en + 'Z').getTime() + DIAS_COLA * 86_400_000);
+    // registrada_en ya viene con su zona horaria (como la usa el pipe date de la tabla).
+    const hecha = /[zZ]|[+-]\d\d:?\d\d$/.test(o.registrada_en) ? o.registrada_en : o.registrada_en + 'Z';
+    return new Date(new Date(hecha).getTime() + DIAS_COLA * 86_400_000);
   }
 
   protected variantesDe(productoId: number): Disponible[] {
