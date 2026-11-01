@@ -1243,3 +1243,17 @@
     cursor: pointer;
   }
 }
+
+// Compras y reservas hechas en "Sin conexión" (ya sincronizadas).
+.dash-sin-conexion {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  background: #121a2c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}

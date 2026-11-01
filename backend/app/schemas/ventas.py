@@ -86,6 +86,8 @@ class EnvioEstadoIn(BaseModel):
 
 class VentaOut(BaseModel):
     id: int
+    # online | offline (hecha sin conexion y sincronizada despues).
+    origen: str = "online"
     tipo: str
     sucursal_id: int
     sucursal_nombre: str

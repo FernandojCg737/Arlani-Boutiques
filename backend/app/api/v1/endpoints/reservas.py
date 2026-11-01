@@ -79,6 +79,7 @@ def _to_detalle_out(d: DetalleReserva) -> DetalleReservaOut:
 def _to_out(r: Reserva) -> ReservaOut:
     return ReservaOut(
         id=r.id,
+        origen=getattr(r, "origen", None) or "online",
         cliente_id=r.cliente_id,
         sucursal_id=r.sucursal_id,
         sucursal_nombre=r.sucursal.nombre,

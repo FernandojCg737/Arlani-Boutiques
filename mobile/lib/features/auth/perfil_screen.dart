@@ -534,6 +534,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
         for (final r in reservas) ...[
           _DashCard(
             titulo: r.sucursalNombre,
+            sinConexion: r.origen == 'offline',
             subtitulo: _fmtFecha(r.horarioAtencion),
             detalles: [for (final d in r.detalles) '${d.cantidad}x ${d.productoNombre} (${d.tallaCodigo}, ${d.colorNombre})'],
             estado: r.estado,
@@ -573,9 +574,17 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        'Compra #${v.id} · ${v.total.toStringAsFixed(2)} Bs',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _tinta),
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            'Compra #${v.id} · ${v.total.toStringAsFixed(2)} Bs',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _tinta),
+                          ),
+                          if (v.origen == 'offline') const _EtiquetaSinConexion(),
+                        ],
                       ),
                     ),
                     _EstadoBadge(v.estadoPago),
@@ -1145,7 +1154,17 @@ class _EstadoBadge extends StatelessWidget {
 }
 
 class _DashCard extends StatelessWidget {
-  const _DashCard({required this.titulo, required this.subtitulo, required this.detalles, required this.estado, this.accion});
+  const _DashCard({
+    required this.titulo,
+    required this.subtitulo,
+    required this.detalles,
+    required this.estado,
+    this.accion,
+    this.sinConexion = false,
+  });
+
+  // Hecha en "Sin conexion" (ya sincronizada).
+  final bool sinConexion;
 
   final String titulo;
   final String subtitulo;
@@ -1165,7 +1184,15 @@ class _DashCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.brandDark)),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.brandDark)),
+                    if (sinConexion) const _EtiquetaSinConexion(),
+                  ],
+                ),
                 const SizedBox(height: 2),
                 Text(subtitulo, style: const TextStyle(fontSize: 12, color: AppColors.grayText)),
                 const SizedBox(height: 6),
@@ -1737,4 +1764,19 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
       ),
     );
   }
+}
+
+/// Compra o reserva hecha en "Sin conexion" y ya sincronizada.
+class _EtiquetaSinConexion extends StatelessWidget {
+  const _EtiquetaSinConexion();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        color: const Color(0xFF121A2C),
+        child: const Text(
+          'SIN CONEXIÓN',
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: Colors.white),
+        ),
+      );
 }

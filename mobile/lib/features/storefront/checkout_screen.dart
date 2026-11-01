@@ -29,13 +29,15 @@ const _texto = Color(0xFF555555);
 String _bs(double v) => v.toStringAsFixed(2).replaceAll('.', ',');
 
 class _Pagada {
-  const _Pagada(this.tienda, this.color, this.ventas, this.pendiente, this.metodo);
+  const _Pagada(this.tienda, this.color, this.ventas, this.pendiente, this.metodo, this.envio);
 
   final String tienda;
   final Color color;
   final List<VentaCreada> ventas;
   final bool pendiente;
   final String metodo;
+  // Envio a domicilio (si no, retiro en la sucursal).
+  final bool envio;
 }
 
 enum _Estado { cargando, listo, vacio, error }
@@ -60,6 +62,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   List<TiendaCheckout> _tiendas = [];
   List<StockItem>? _stock;
   final List<_Pagada> _pagadas = [];
+  // Tiendas ya pagadas en esta visita: no vuelven a aparecer aunque el
+  // servidor tarde en reflejar el pago.
+  final Set<int> _pagadasIds = {};
   Map<int, EstadoSucursal> _sucursales = {};
 
   // Entrega: recojo en la sucursal o envio a una direccion (vale para todo).
@@ -281,6 +286,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   /// Guarda el resultado arriba, saca lo pagado y refresca el carrito (lo de
   /// las demas tiendas sigue para pagarlo despues).
   Future<void> _registrarPago(int? empresaId, List<VentaCreada> ventas, bool pendiente, String metodo) async {
+    final envio = _entrega == 'envio';
     final porTienda = <String, List<VentaCreada>>{};
     for (final v in ventas) {
       final nombre = v.tiendaNombre ?? _tiendas.where((t) => t.empresaId == empresaId).firstOrNull?.nombre ?? 'Tienda';
@@ -289,13 +295,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     setState(() {
       for (final e in porTienda.entries) {
         final hex = e.value.first.tiendaColor ?? _tiendas.where((t) => t.nombre == e.key).firstOrNull?.colorMarca ?? '#1f2a44';
-        _pagadas.add(_Pagada(e.key, colorDesdeHex(hex), e.value, pendiente, metodo));
+        _pagadas.add(_Pagada(e.key, colorDesdeHex(hex), e.value, pendiente, metodo, envio));
       }
+      // Lo pagado sale ya de la pantalla ("Pagar todo": todas las tiendas).
+      _pagadasIds.addAll(empresaId == null ? _tiendas.map((t) => t.empresaId) : [empresaId]);
+      _tiendas = _tiendas.where((t) => !_pagadasIds.contains(t.empresaId)).toList();
+      if (_tiendas.isEmpty) _estado = _Estado.vacio;
       _cerrarPago();
     });
+    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+    await _refrescarTrasPago();
+    // El servidor a veces tarda un momento en reflejar el pago: otra vuelta.
+    await Future<void>.delayed(const Duration(seconds: 3));
+    if (mounted) await _refrescarTrasPago();
+  }
+
+  Future<void> _refrescarTrasPago() async {
     await ref.read(cartProvider.notifier).cargar();
     try {
-      final tiendas = await _repo.tiendas();
+      final tiendas = (await _repo.tiendas()).where((t) => !_pagadasIds.contains(t.empresaId)).toList();
       if (!mounted) return;
       setState(() {
         _tiendas = tiendas;
@@ -303,9 +321,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       });
       if (tiendas.isNotEmpty) _verificarStock();
     } catch (_) {
-      if (mounted) setState(() => _tiendas = _tiendas.where((t) => t.empresaId != empresaId).toList());
+      // Ya se quito lo pagado de la pantalla.
     }
-    if (_scroll.hasClients) _scroll.animateTo(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
   }
 
   void _volver() => context.canPop() ? context.pop() : context.go('/carrito');
@@ -415,7 +432,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           Text(
             p.pendiente
                 ? 'Recibimos tu comprobante (${p.metodo}). La tienda lo revisa y te avisamos cuando confirme tu pago.'
-                : 'Pagado con ${p.metodo}. Ya puedes recoger tu pedido.',
+                : p.envio
+                    ? 'Pagado con ${p.metodo}. La tienda prepara tu pedido y te lo envía a tu dirección; te avisamos cuando salga.'
+                    : 'Pagado con ${p.metodo}. Ya puedes recoger tu pedido en la sucursal.',
             style: GoogleFonts.inter(fontSize: 13, height: 1.45, color: const Color(0xFF1F5135)),
           ),
           const SizedBox(height: 6),

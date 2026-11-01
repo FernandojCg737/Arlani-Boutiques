@@ -21,6 +21,8 @@ interface DetalleReservaItem {
 
 interface ReservaItem {
   id: number;
+  // offline: hecha en "Sin conexión" y sincronizada despues.
+  origen?: string;
   sucursal_nombre: string;
   horario_atencion: string;
   estado: string;
@@ -39,6 +41,8 @@ interface DetalleVentaItem {
 
 interface VentaItem {
   id: number;
+  // offline: hecha en "Sin conexión" y sincronizada despues.
+  origen?: string;
   tipo: string;
   sucursal_nombre: string;
   fecha: string;

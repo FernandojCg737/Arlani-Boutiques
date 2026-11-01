@@ -6,11 +6,19 @@ import 'core/theme.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/chatbot/chatbot_provider.dart';
 import 'features/notificaciones/notificaciones_provider.dart';
+import 'features/offline/offline_fondo.dart';
 import 'features/offline/offline_servicio.dart';
 import 'features/storefront/cart_provider.dart';
 import 'router.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // P4 offline: envio de lo pendiente en segundo plano (aunque la app este cerrada).
+  try {
+    await iniciarTareasFondo();
+  } catch (_) {
+    // Sin WorkManager: se envia con la app abierta.
+  }
   runApp(const ProviderScope(child: AtelierAranierApp()));
 }
 

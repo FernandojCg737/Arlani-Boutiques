@@ -26,7 +26,13 @@
           @if (p.pendiente) {
             <span>Recibimos tu comprobante ({{ p.metodo }}). La tienda lo revisa y te avisamos cuando confirme tu pago.</span>
           } @else {
-            <span>Pagado con {{ p.metodo }}. Ya puedes recoger tu pedido.</span>
+            <span>
+              @if (p.envio) {
+                Pagado con {{ p.metodo }}. La tienda prepara tu pedido y te lo envía a tu dirección; te avisamos cuando salga.
+              } @else {
+                Pagado con {{ p.metodo }}. Ya puedes recoger tu pedido en la sucursal.
+              }
+            </span>
           }
           <span class="checkout-pagada__ventas">
             @for (v of p.ventas; track v.id) {

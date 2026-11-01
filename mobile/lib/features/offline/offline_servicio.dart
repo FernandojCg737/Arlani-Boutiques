@@ -13,6 +13,7 @@ import '../../core/api_config.dart';
 import '../../models/usuario.dart';
 import '../auth/auth_provider.dart';
 import 'offline_db.dart';
+import 'offline_fondo.dart';
 import 'offline_modelos.dart';
 
 // Estados que todavia hay que mandar al servidor.
@@ -113,8 +114,11 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _aLaVista = state == AppLifecycleState.resumed;
     if (_aLaVista) {
-      sincronizar();
+      // Lo que se envio en segundo plano mientras la app no estaba a la vista.
+      cargar().then((_) => sincronizar());
       revisarCatalogo();
+    } else if (pendientes > 0) {
+      agendarEnvioEnFondo();
     }
   }
 
@@ -146,6 +150,7 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     if (u == null) return;
     await cargar();
+    if (pendientes > 0) agendarEnvioEnFondo();
     if (_esCliente) {
       catalogo = await _db.cliente(u.id);
       notifyListeners();
@@ -207,6 +212,8 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
     );
     await _db.nuevaOperacion(op);
     await cargar();
+    // Aunque cierre la app, Android la envia apenas haya internet.
+    agendarEnvioEnFondo();
     if (enLinea) sincronizar();
     return op;
   }
