@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/api_config.dart';
 import '../../models/usuario.dart';
 import '../auth/auth_provider.dart';
+import 'offline_avisos.dart';
 import 'offline_db.dart';
 import 'offline_fondo.dart';
 import 'offline_modelos.dart';
@@ -219,6 +220,11 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
     await cargar();
     // Aunque cierre la app, Android la envia apenas haya internet.
     agendarEnvioEnFondo();
+    // Para avisar con una notificacion cuando llegue a la tienda (y, sin
+    // internet, que quedo guardada en el telefono).
+    pedirPermisoAvisos().then((_) {
+      if (!enLinea) avisarGuardadaSinConexion(op, personal: _esPersonal);
+    });
     if (enLinea) sincronizar();
     return op;
   }
@@ -340,6 +346,7 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _aplicar(OperacionLocal o, Map r) async {
+    final antes = o.estado;
     o
       ..estado = r['estado'].toString()
       ..mensaje = r['mensaje'] as String?
@@ -348,6 +355,8 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
       ..noPagados = NoPagado.deJson(r['no_pagados'])
       ..totalCobrado = r['total_cobrado']?.toString();
     await _db.actualizarOperacion(o);
+    // Notificacion del telefono con el resultado (exito o falla).
+    await avisarResultado(o, antes: antes, personal: _esPersonal);
   }
 
   String _motivo(Object e) {
