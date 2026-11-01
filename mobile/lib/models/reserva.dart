@@ -29,6 +29,7 @@ class DetalleReserva {
 class Reserva {
   const Reserva({
     required this.id,
+    this.origen = 'online',
     required this.sucursalNombre,
     required this.horarioAtencion,
     required this.estado,
@@ -36,6 +37,8 @@ class Reserva {
   });
 
   final int id;
+  // offline: hecha en "Sin conexion" y sincronizada despues.
+  final String origen;
   final String sucursalNombre;
   final DateTime horarioAtencion;
   final String estado; // pendiente | confirmada | completada | cancelada | vencida
@@ -46,6 +49,7 @@ class Reserva {
   factory Reserva.fromJson(Map<String, dynamic> json) {
     return Reserva(
       id: json['id'] as int,
+      origen: json['origen'] as String? ?? 'online',
       sucursalNombre: json['sucursal_nombre'] as String,
       horarioAtencion: DateTime.parse(json['horario_atencion'] as String),
       estado: json['estado'] as String,

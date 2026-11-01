@@ -85,6 +85,8 @@ interface Pagada {
   ventas: VentaCreada[];
   pendiente: boolean;
   metodo: string;
+  // Envio a domicilio (si no, retiro en la sucursal).
+  envio?: boolean;
 }
 
 type Estado = 'cargando' | 'listo' | 'vacio' | 'error';
@@ -361,6 +363,7 @@ export class Checkout implements OnInit, OnDestroy {
         ventas: [],
         pendiente: false,
         metodo: 'Pagar todo (PayPal)',
+        envio: this.entrega() === 'envio',
       };
       p.ventas.push(v);
       porTienda.set(nombre, p);
@@ -477,7 +480,14 @@ export class Checkout implements OnInit, OnDestroy {
     const tienda = this.tiendas().find((t) => t.empresa_id === empresaId);
     this.pagadas.update((p) => [
       ...p,
-      { tienda: tienda?.nombre ?? 'Tienda', color: tienda?.color_marca ?? '#1f2a44', ventas, pendiente, metodo },
+      {
+        tienda: tienda?.nombre ?? 'Tienda',
+        color: tienda?.color_marca ?? '#1f2a44',
+        ventas,
+        pendiente,
+        metodo,
+        envio: this.entrega() === 'envio',
+      },
     ]);
     this.tiendaActiva.set(null);
     this.metodoActivo.set(null);

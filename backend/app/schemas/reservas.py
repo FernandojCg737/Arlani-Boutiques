@@ -36,6 +36,8 @@ class DetalleReservaOut(BaseModel):
 
 class ReservaOut(BaseModel):
     id: int
+    # online | offline (hecha sin conexion y sincronizada despues).
+    origen: str = "online"
     cliente_id: int
     sucursal_id: int
     sucursal_nombre: str

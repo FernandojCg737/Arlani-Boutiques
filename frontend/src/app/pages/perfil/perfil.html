@@ -116,7 +116,12 @@
             @for (r of reservas(); track r.id) {
               <li class="dash-card">
                 <div class="dash-card__info">
-                  <strong>{{ r.sucursal_nombre }}</strong>
+                  <strong>
+                    {{ r.sucursal_nombre }}
+                    @if (r.origen === 'offline') {
+                      <span class="dash-sin-conexion">Sin conexión</span>
+                    }
+                  </strong>
                   <span>{{ r.horario_atencion | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }}</span>
                   <ul class="dash-card__detalles">
                     @for (d of r.detalles; track d.id) {
@@ -205,7 +210,12 @@
               <li class="dash-card dash-card--compra">
                 <div class="dash-card__fila">
                   <div class="dash-card__info">
-                    <strong>Compra #{{ v.id }} · {{ v.total }} Bs</strong>
+                    <strong>
+                      Compra #{{ v.id }} · {{ v.total }} Bs
+                      @if (v.origen === 'offline') {
+                        <span class="dash-sin-conexion">Sin conexión</span>
+                      }
+                    </strong>
                     <span>
                       {{ v.fecha | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
                       {{ v.tienda ? v.tienda.nombre + ', ' : '' }}{{ v.sucursal_nombre }}
