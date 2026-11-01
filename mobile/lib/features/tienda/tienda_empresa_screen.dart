@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../models/producto_publico.dart';
 import '../../widgets/whatsapp_float_button.dart';
@@ -391,44 +394,100 @@ class _EncabezadoTiendaState extends ConsumerState<EncabezadoTienda> {
 
 // ============================================================ portada
 
-class _PortadaTienda extends StatelessWidget {
+/// Portada del catalogo de la tienda: el mismo hero de la web (`pages/tienda`,
+/// `size="half"`): video de fondo en silencio y en bucle, "CATÁLOGO", el
+/// nombre de la tienda y de donde es.
+class _PortadaTienda extends StatefulWidget {
   const _PortadaTienda({required this.tienda, required this.marca});
 
   final TiendaResumen tienda;
   final Color marca;
 
   @override
+  State<_PortadaTienda> createState() => _PortadaTiendaState();
+}
+
+class _PortadaTiendaState extends State<_PortadaTienda> {
+  late final VideoPlayerController _video;
+  bool _listo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _video = VideoPlayerController.asset('assets/video/tienda-hero.mp4', videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true))
+      ..setLooping(true)
+      ..setVolume(0)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _listo = true);
+        _video.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _video.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final logo = tienda.logoUrl;
-    final tam = (MediaQuery.sizeOf(context).width * 0.06).clamp(32.0, 56.0);
-    return Container(
+    final pantalla = MediaQuery.sizeOf(context);
+    final tamTitulo = (pantalla.width * 0.09).clamp(30.0, 64.0);
+    final ciudad = widget.tienda.ciudad;
+    return SizedBox(
+      height: math.max(380.0, pantalla.height * 0.5),
       width: double.infinity,
-      color: marca,
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + EncabezadoTienda.alto + 40, 16, 56),
-      child: Column(
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          if (logo != null && logo.isNotEmpty)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 240, maxHeight: 110),
-              child: ImagenTienda(logo, contorno: logo.startsWith('http')),
-            )
-          else
-            Container(
-              width: 72,
-              height: 72,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2)),
-              child: Text(tienda.nombre.isEmpty ? '?' : tienda.nombre[0].toUpperCase(),
-                  style: GoogleFonts.inter(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800)),
+          // Mientras carga el video: el color de la tienda.
+          ColoredBox(color: widget.marca),
+          if (_listo)
+            ClipRect(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(width: _video.value.size.width, height: _video.value.size.height, child: VideoPlayer(_video)),
+              ),
             ),
-          const SizedBox(height: 12),
-          Text(tienda.nombre,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(color: Colors.white, fontSize: tam, fontWeight: FontWeight.w800, height: 1)),
-          if (tienda.ciudad != null && tienda.ciudad!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(tienda.ciudad!, style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
-          ],
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x73000000), Color(0x59000000), Color(0x8C000000)],
+                stops: [0, 0.4, 1],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + EncabezadoTienda.alto + 16, 20, 20),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                      color: Colors.black.withValues(alpha: 0.12),
+                    ),
+                    child: Text('CATÁLOGO',
+                        style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.9)),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(widget.tienda.nombre.toUpperCase(), textAlign: TextAlign.center, style: tituloPlataforma(size: tamTitulo)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Prendas elegidas para ti${ciudad != null && ciudad.isNotEmpty ? ' desde $ciudad' : ''}. '
+                    'Compra en línea o reserva y retira en nuestras sucursales.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api_client.dart';
 import 'cuenta_repository.dart';
 import 'estilo_cuenta.dart';
+import '../../core/ubicacion.dart';
 
 /// Centro por defecto del mapa: Santa Cruz (igual que `CENTRO_POR_DEFECTO`).
 const _centro = LatLng(-17.7833, -63.1821);
@@ -280,14 +280,10 @@ class _FormularioDireccionState extends ConsumerState<FormularioDireccion> {
       _error = null;
     });
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) throw 'Activa la ubicación del teléfono o mueve el pin en el mapa.';
-      var permiso = await Geolocator.checkPermission();
-      if (permiso == LocationPermission.denied) permiso = await Geolocator.requestPermission();
-      if (permiso == LocationPermission.denied || permiso == LocationPermission.deniedForever) {
-        throw 'No diste permiso para usar tu ubicación. Toca el mapa para marcarla.';
-      }
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 12)),
+      // Pide permiso y, si el GPS esta apagado, ofrece encenderlo.
+      final pos = await ubicacionActual(
+        sinPermiso: 'No diste permiso para usar tu ubicación. Toca el mapa para marcarla.',
+        gpsApagado: 'No activaste la ubicación del teléfono. Toca el mapa para marcarla.',
       );
       final p = LatLng(pos.latitude, pos.longitude);
       _mapa.move(p, 17);

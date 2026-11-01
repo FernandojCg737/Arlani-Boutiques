@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/api_client.dart';
@@ -14,6 +13,7 @@ import '../../auth/auth_provider.dart';
 import '../admin_provider.dart';
 import '../widgets/admin_widgets.dart';
 import 'asistencia_provider.dart';
+import '../../../core/ubicacion.dart';
 
 const _diasSemana = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
 
@@ -164,20 +164,9 @@ class _SesionesScreenState extends ConsumerState<SesionesScreen> {
       _errorMensaje = '';
     });
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw 'Activa la ubicacion (GPS) de tu dispositivo para marcar asistencia.';
-      }
-      var permiso = await Geolocator.checkPermission();
-      if (permiso == LocationPermission.denied) {
-        permiso = await Geolocator.requestPermission();
-      }
-      if (permiso == LocationPermission.denied || permiso == LocationPermission.deniedForever) {
-        throw 'Necesitamos permiso de ubicacion para marcar tu asistencia.';
-      }
-
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      final pos = await ubicacionActual(
+        sinPermiso: 'Necesitamos permiso de ubicacion para marcar tu asistencia.',
+        gpsApagado: 'Activa la ubicacion (GPS) de tu dispositivo para marcar asistencia.',
       );
 
       await ref.read(asistenciaRepositoryProvider).marcar(

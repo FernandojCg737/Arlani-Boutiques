@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../../../core/theme.dart';
 import '../../../models/sucursal_admin.dart';
 import '../admin_provider.dart';
 import '../widgets/admin_widgets.dart';
+import '../../../core/ubicacion.dart';
 
 /// CU04 — Administrar Ciudades y Sucursales. Unica CU (junto a
 /// temporadas/colecciones) que usa DELETE real; ademas usa el enum
@@ -107,17 +107,9 @@ class _SucursalesScreenState extends ConsumerState<SucursalesScreen> {
                     : () async {
                         setSheetState(() => ubicando = true);
                         try {
-                          final servicio = await Geolocator.isLocationServiceEnabled();
-                          if (!servicio) throw 'Activa el GPS del dispositivo.';
-                          var permiso = await Geolocator.checkPermission();
-                          if (permiso == LocationPermission.denied) {
-                            permiso = await Geolocator.requestPermission();
-                          }
-                          if (permiso == LocationPermission.denied || permiso == LocationPermission.deniedForever) {
-                            throw 'Necesitamos permiso de ubicacion.';
-                          }
-                          final pos = await Geolocator.getCurrentPosition(
-                            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+                          final pos = await ubicacionActual(
+                            sinPermiso: 'Necesitamos permiso de ubicacion.',
+                            gpsApagado: 'Activa el GPS del dispositivo.',
                           );
                           setSheetState(() {
                             latitud = pos.latitude;
