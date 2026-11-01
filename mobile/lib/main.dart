@@ -11,15 +11,16 @@ import 'features/offline/offline_servicio.dart';
 import 'features/storefront/cart_provider.dart';
 import 'router.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // P4 offline: envio de lo pendiente en segundo plano (aunque la app este cerrada).
-  try {
-    await iniciarTareasFondo();
-  } catch (_) {
-    // Sin WorkManager: se envia con la app abierta.
-  }
   runApp(const ProviderScope(child: AtelierAranierApp()));
+  // P4 offline: envio de lo pendiente en segundo plano (aunque la app este
+  // cerrada). Se configura despues de abrir, sin demorar la primera pantalla.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    iniciarTareasFondo().timeout(const Duration(seconds: 10)).catchError((_) {
+      // Sin WorkManager: se envia con la app abierta.
+    });
+  });
 }
 
 class AtelierAranierApp extends ConsumerStatefulWidget {
