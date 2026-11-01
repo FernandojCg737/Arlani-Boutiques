@@ -33,18 +33,32 @@ class CartNotifier extends StateNotifier<CartState> {
 
   final CarritoRepository _repo;
 
+  // Sube con cada cambio del carrito. Al iniciar sesion se carga el carrito
+  // y, si el cliente agrega su primera prenda mientras esa respuesta viene en
+  // camino, la respuesta vieja (sin la prenda) ya no pisa la nueva.
+  int _cambios = 0;
+
   Future<void> cargar() async {
+    final inicio = _cambios;
     state = state.copyWith(loading: true, clearError: true);
     try {
       final carrito = await _repo.obtener();
+      if (_cambios != inicio) return;
       state = state.copyWith(carrito: carrito, loading: false);
     } catch (_) {
+      if (_cambios != inicio) return;
       // Sin sesion (401) u otro error de red: el carrito se ve vacio.
       state = const CartState();
     }
   }
 
+  void _aplicar(Carrito carrito) {
+    _cambios++;
+    state = state.copyWith(carrito: carrito, loading: false);
+  }
+
   void limpiarLocal() {
+    _cambios++;
     state = const CartState();
   }
 
@@ -62,7 +76,7 @@ class CartNotifier extends StateNotifier<CartState> {
       sucursalId: sucursalId,
       cantidad: cantidad,
     );
-    state = state.copyWith(carrito: carrito);
+    _aplicar(carrito);
   }
 
   Future<void> actualizarCantidad(int detalleId, int cantidad) async {
@@ -71,17 +85,17 @@ class CartNotifier extends StateNotifier<CartState> {
       return;
     }
     final carrito = await _repo.actualizarCantidad(detalleId, cantidad);
-    state = state.copyWith(carrito: carrito);
+    _aplicar(carrito);
   }
 
   Future<void> eliminar(int detalleId) async {
     final carrito = await _repo.eliminar(detalleId);
-    state = state.copyWith(carrito: carrito);
+    _aplicar(carrito);
   }
 
   Future<void> vaciar() async {
     final carrito = await _repo.vaciar();
-    state = state.copyWith(carrito: carrito);
+    _aplicar(carrito);
   }
 }
 
