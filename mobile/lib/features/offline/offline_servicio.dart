@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/api_config.dart';
@@ -153,11 +154,15 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
     if (pendientes > 0) agendarEnvioEnFondo();
     if (_esCliente) {
       catalogo = await _db.cliente(u.id);
+      // La huella del catalogo guardado: si no cambio, no se vuelve a bajar.
+      _version = catalogo == null ? null : (await SharedPreferences.getInstance()).getString(_claveVersion(u.id));
       notifyListeners();
     }
     await sincronizar();
     descargarPersonal();
-    revisarCatalogo(forzar: true);
+    // Si ya hay catalogo guardado, solo se compara la huella (pocos bytes);
+    // la descarga completa al abrir demoraba el inicio de la app.
+    revisarCatalogo(forzar: catalogo == null);
   }
 
   Future<void> cargar() async {
@@ -428,6 +433,8 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Catalogo del cliente: pregunta la huella y solo si cambio lo descarga.
   /// `forzar`: el boton "Actualizar catalogo" (descarga aunque no cambie).
+  String _claveVersion(int usuarioId) => 'offline_catalogo_version_$usuarioId';
+
   Future<void> revisarCatalogo({bool forzar = false}) async {
     final u = _usuario;
     if (!_esCliente || u == null || descargandoCatalogo || !enLinea || !_aLaVista) return;
@@ -451,6 +458,7 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
       }
       await _db.guardarCliente(u.id, c);
       _version = version;
+      if (version != null) await (await SharedPreferences.getInstance()).setString(_claveVersion(u.id), version);
       catalogo = c;
       _descargarFotos(c.tiendas.expand((t) => t.productos).map((x) => x.imagenUrl));
     } catch (e) {
