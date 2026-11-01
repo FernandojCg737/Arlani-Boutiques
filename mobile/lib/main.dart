@@ -6,6 +6,7 @@ import 'core/theme.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/chatbot/chatbot_provider.dart';
 import 'features/notificaciones/notificaciones_provider.dart';
+import 'features/offline/offline_servicio.dart';
 import 'features/storefront/cart_provider.dart';
 import 'router.dart';
 
@@ -72,6 +73,35 @@ class _AtelierAranierAppState extends ConsumerState<AtelierAranierApp> {
         ref.read(chatbotProvider.notifier).limpiarLocal();
       }
     });
+
+    // P4 offline: el servicio arranca con la app (sincroniza y descarga solo).
+    // Avisa una vez cuando hay compras sin conexion por pagar y cuando se
+    // cobro (o no) una compra con el PayPal guardado (`aviso-compras` de la web).
+    var porPagarAvisadas = 0;
+    ref.listenManual(offlineProvider, (_, s) {
+      final porPagar = s.porPagar.where((o) => o.estado == 'por_pagar').length;
+      if (porPagar > porPagarAvisadas) {
+        _messengerKey.currentState?.showSnackBar(SnackBar(
+          content: Text(porPagar == 1
+              ? 'Tienes una compra hecha sin conexión por pagar.'
+              : 'Tienes $porPagar compras hechas sin conexión por pagar.'),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(label: 'Pagar', onPressed: () => ref.read(routerProvider).push('/pagar-compras')),
+        ));
+      }
+      porPagarAvisadas = porPagar;
+      final cobros = s.cobros;
+      if (cobros.isNotEmpty) {
+        final texto = [
+          for (final o in cobros)
+            o.estado == 'pagada'
+                ? '${o.empresaNombre}: pago finalizado con éxito (Bs ${o.totalCobrado ?? o.total.toStringAsFixed(2)}).'
+                : '${o.empresaNombre}: pago no finalizado. ${o.estado == 'pago_parcial' ? 'Se cobró solo lo disponible.' : 'No se te cobró nada.'}',
+        ].join('\n');
+        _messengerKey.currentState?.showSnackBar(SnackBar(content: Text(texto), duration: const Duration(seconds: 8)));
+        s.marcarCobrosVistos();
+      }
+    }, fireImmediately: true);
   }
 
   @override

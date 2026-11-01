@@ -31,6 +31,9 @@ import 'features/cuenta/comprobante_cambio_screen.dart';
 import 'features/cuenta/comprobante_screen.dart';
 import 'features/empezar/empezar_screen.dart';
 import 'features/chatbot/chatbot_screen.dart';
+import 'features/offline/pagar_compras_screen.dart';
+import 'features/offline/sin_conexion_cliente_screen.dart';
+import 'features/offline/sin_conexion_personal_screen.dart';
 import 'features/portada/portada_screen.dart';
 import 'features/tienda/tienda_empresa_screen.dart';
 import 'features/storefront/carrito_screen.dart';
@@ -44,7 +47,7 @@ import 'features/storefront/producto_detalle_screen.dart';
 final Map<String, String> _rutaAdminPorCodigo = {
   for (final paquete in adminMenu)
     for (final cu in paquete.useCases)
-      if (cu.route != null && cu.route!.startsWith('/admin/')) cu.route!: cu.code,
+      if (cu.route != null && cu.route!.startsWith('/admin/')) cu.route!: cu.permiso ?? cu.code,
 };
 
 // Rutas del lado del cliente que dependen de un CU habilitado para el rol
@@ -66,7 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/registro' || loc == '/recuperar';
-      final requiresAuth = loc == '/perfil' || loc.startsWith('/mis-compras/') || loc.startsWith('/mis-cambios/') || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar';
+      final requiresAuth = loc == '/perfil' || loc.startsWith('/mis-compras/') || loc.startsWith('/mis-cambios/') || loc == '/sin-conexion' || loc == '/pagar-compras' || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar';
       final isAdminArea = loc == '/admin' || loc.startsWith('/admin/');
 
       if (requiresAuth && !auth.isAuthenticated) return '/login';
@@ -141,6 +144,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PerfilScreen(tabInicial: state.uri.queryParameters['tab']),
       ),
       GoRoute(path: '/admin', builder: (context, state) => const AdminShell()),
+      // P4 offline: el cliente guarda el catalogo y reserva o compra sin internet.
+      GoRoute(path: '/sin-conexion', builder: (context, state) => const SinConexionClienteScreen()),
+      GoRoute(path: '/pagar-compras', builder: (context, state) => const PagarComprasScreen()),
+      GoRoute(path: '/admin/sin-conexion', builder: (context, state) => const SinConexionPersonalScreen()),
       GoRoute(path: '/admin/sesiones', builder: (context, state) => const SesionesScreen()),
       GoRoute(path: '/admin/usuarios', builder: (context, state) => const UsuariosScreen()),
       GoRoute(path: '/admin/bitacora', builder: (context, state) => const BitacoraScreen()),

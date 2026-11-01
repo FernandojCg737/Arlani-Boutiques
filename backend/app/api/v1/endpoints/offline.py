@@ -1131,7 +1131,9 @@ def pedido_paypal_orden(
         return_url=f"{base}/paypal-embed/retorno", cancel_url=f"{base}/paypal-embed/cancelado", cuenta=cuenta,
         guardar_paypal=bool(payload and payload.guardar_paypal),
     )
-    return {"order_id": orden["id"], "total": revisado.total_usd}
+    # approve_url: la app movil abre la aprobacion en su panel incrustado.
+    approve = next((l["href"] for l in orden.get("links", []) if l.get("rel") in ("approve", "payer-action")), None)
+    return {"order_id": orden["id"], "total": revisado.total_usd, "approve_url": approve}
 
 
 @router.post("/pedidos/{uuid}/paypal/capturar/{order_id}", response_model=PedidoOfflineOut)
