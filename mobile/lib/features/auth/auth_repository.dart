@@ -59,11 +59,25 @@ class AuthRepository {
     return TokenResponse.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<Usuario> updateProfile({required String nombre, String? telefono, String? direccion}) async {
+  Future<Usuario> updateProfile({required String nombre, String? apellidos, String? telefono, String? direccion}) async {
     final res = await _dio.put(
       '/perfil',
-      data: {'nombre': nombre, 'telefono': telefono, 'direccion': direccion},
+      data: {'nombre': nombre, 'apellidos': apellidos, 'telefono': telefono, 'direccion': direccion},
     );
+    return Usuario.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// CU15: sube (o quita) la foto de perfil.
+  Future<Usuario> subirFoto(String ruta, String nombreArchivo) async {
+    final res = await _dio.post(
+      '/perfil/foto',
+      data: FormData.fromMap({'file': await MultipartFile.fromFile(ruta, filename: nombreArchivo)}),
+    );
+    return Usuario.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<Usuario> quitarFoto() async {
+    final res = await _dio.delete('/perfil/foto');
     return Usuario.fromJson(res.data as Map<String, dynamic>);
   }
 

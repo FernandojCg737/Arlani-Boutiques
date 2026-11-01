@@ -87,6 +87,17 @@ interface MetodoPagoCliente {
   tiendas: string[];
 }
 
+// Nombres y apellidos de la cuenta: los apellidos guardados, o (cuentas
+// viejas) las ultimas 2 palabras si son 3 o mas, o la ultima si son 2.
+function separarNombre(u: { nombre: string; apellidos?: string | null } | null): { nombres: string; apellidos: string } {
+  const completo = (u?.nombre ?? '').trim();
+  const ap = (u?.apellidos ?? '').trim();
+  if (ap && completo.endsWith(ap)) return { nombres: completo.slice(0, -ap.length).trim(), apellidos: ap };
+  const p = completo.split(/\s+/).filter(Boolean);
+  const n = p.length >= 3 ? 2 : p.length === 2 ? 1 : 0;
+  return { nombres: p.slice(0, p.length - n).join(' '), apellidos: p.slice(p.length - n).join(' ') };
+}
+
 type Tab =
   | 'resumen'
   | 'reservas'
@@ -187,7 +198,11 @@ export class Perfil implements OnInit {
   });
 
   // ---------- Datos personales ----------
-  protected readonly nombre = signal(this.auth.currentUser()?.nombre ?? '');
+  // Nombres y apellidos por separado (el backend guarda el nombre completo y
+  // los apellidos aparte; las cuentas viejas se separan por las palabras).
+  protected readonly nombre = signal(separarNombre(this.auth.currentUser()).nombres);
+  protected readonly apellidos = signal(separarNombre(this.auth.currentUser()).apellidos);
+  protected readonly fotoSubiendo = signal(false);
   protected readonly telefono = signal(this.auth.currentUser()?.telefono ?? '');
   protected readonly direccion = signal(this.auth.currentUser()?.direccion ?? '');
   protected readonly profileError = signal('');
@@ -300,6 +315,8 @@ export class Perfil implements OnInit {
   }
 
   protected setTab(t: Tab): void {
+    // "Seguridad" ahora es parte de "Actualizar Perfil".
+    if (t === 'seguridad') t = 'datos';
     this.tab.set(t);
     if (t === 'devoluciones') void this.cargarDevoluciones();
     if (t === 'compras') void this.cargarCambios();
@@ -634,7 +651,8 @@ export class Perfil implements OnInit {
     this.profileSaving.set(true);
     try {
       await this.auth.updateProfile({
-        nombre: this.nombre(),
+        nombre: this.nombre().trim(),
+        apellidos: this.apellidos().trim() || null,
         telefono: this.telefono() || null,
         direccion: this.direccion() || null,
       });
@@ -644,6 +662,36 @@ export class Perfil implements OnInit {
     } finally {
       this.profileSaving.set(false);
     }
+  }
+
+  protected async elegirFoto(ev: Event): Promise<void> {
+    const archivo = (ev.target as HTMLInputElement).files?.[0];
+    (ev.target as HTMLInputElement).value = '';
+    if (!archivo) return;
+    await this.cambiarFoto(() => this.auth.subirFoto(archivo), 'Tu foto de perfil se actualizó.');
+  }
+
+  protected async quitarFoto(): Promise<void> {
+    await this.cambiarFoto(() => this.auth.quitarFoto(), 'Quitamos tu foto de perfil.');
+  }
+
+  private async cambiarFoto(accion: () => Promise<unknown>, ok: string): Promise<void> {
+    this.profileError.set('');
+    this.profileSuccess.set('');
+    this.fotoSubiendo.set(true);
+    try {
+      await accion();
+      this.profileSuccess.set(ok);
+    } catch (err) {
+      this.profileError.set(this.extractError(err));
+    } finally {
+      this.fotoSubiendo.set(false);
+    }
+  }
+
+  protected iniciales(): string {
+    const partes = `${this.nombre()} ${this.apellidos()}`.trim().split(/\s+/);
+    return ((partes[0]?.[0] ?? '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
   }
 
   protected async submitPassword(): Promise<void> {

@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.api.deps import require_permiso_cliente
 from app.core.audit import log_bitacora
 from app.core.config import settings
 from app.core.email import send_email
+from app.core.storage import upload_foto_perfil
 from app.core.security import create_access_token, vigencia_sesion, hash_password, verify_password
 from app.db.session import get_db
 from app.models import Cliente, Usuario
@@ -28,20 +29,52 @@ def actualizar_perfil(
     usuario: Usuario = Depends(require_permiso_cliente("CU15")),
     db: Session = Depends(get_db),
 ) -> UsuarioOut:
+    # `nombre` guarda el nombre completo; los apellidos tambien van aparte.
+    apellidos = (payload.apellidos or "").strip() or None
+    nombre = " ".join(x for x in (payload.nombre.strip(), apellidos) if x)
     if isinstance(usuario, Cliente):
         db.execute(
             text("SELECT sp_actualizar_cliente_perfil(:id, :nombre, :telefono, :direccion)"),
-            {"id": usuario.id, "nombre": payload.nombre, "telefono": payload.telefono, "direccion": payload.direccion},
+            {"id": usuario.id, "nombre": nombre, "telefono": payload.telefono, "direccion": payload.direccion},
         )
     else:
         db.execute(
             text("SELECT sp_actualizar_usuario_nombre(:id, :nombre)"),
-            {"id": usuario.id, "nombre": payload.nombre},
+            {"id": usuario.id, "nombre": nombre},
         )
+    db.execute(text("UPDATE usuario SET apellidos = :a WHERE id = :id"), {"a": apellidos, "id": usuario.id})
     db.commit()
 
     usuario = db.query(Usuario).filter(Usuario.id == usuario.id).first()
     log_bitacora(db, usuario, "ACTUALIZAR", "usuario", usuario.id, f"Edicion de perfil: {usuario.email}", request)
+    return to_usuario_out(usuario)
+
+
+@router.post("/foto", response_model=UsuarioOut)
+async def subir_foto(
+    request: Request,
+    file: UploadFile = File(...),
+    usuario: Usuario = Depends(require_permiso_cliente("CU15")),
+    db: Session = Depends(get_db),
+) -> UsuarioOut:
+    url = upload_foto_perfil(usuario.id, await file.read(), file.content_type or "")
+    db.execute(text("UPDATE usuario SET foto_url = :u WHERE id = :id"), {"u": url, "id": usuario.id})
+    db.commit()
+    usuario = db.query(Usuario).filter(Usuario.id == usuario.id).first()
+    log_bitacora(db, usuario, "ACTUALIZAR", "usuario", usuario.id, f"Foto de perfil: {usuario.email}", request)
+    return to_usuario_out(usuario)
+
+
+@router.delete("/foto", response_model=UsuarioOut)
+def quitar_foto(
+    request: Request,
+    usuario: Usuario = Depends(require_permiso_cliente("CU15")),
+    db: Session = Depends(get_db),
+) -> UsuarioOut:
+    db.execute(text("UPDATE usuario SET foto_url = NULL WHERE id = :id"), {"id": usuario.id})
+    db.commit()
+    usuario = db.query(Usuario).filter(Usuario.id == usuario.id).first()
+    log_bitacora(db, usuario, "ACTUALIZAR", "usuario", usuario.id, f"Quito su foto de perfil: {usuario.email}", request)
     return to_usuario_out(usuario)
 
 

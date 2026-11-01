@@ -407,7 +407,7 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
         final pq = PaquetePersonal.fromJson(r.data as Map<String, dynamic>);
         _descontar(pq.productos, operaciones.where((o) => o.sucursalId == s.id));
         await _db.guardarPersonal(u.id, pq);
-        await _descargarFotos(pq.productos.map((x) => x.imagenUrl));
+        _descargarFotos(pq.productos.map((x) => x.imagenUrl));
       }
       ultimaDescargaPersonal = DateTime.now();
     } catch (e) {
@@ -431,7 +431,11 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
       final v = await _dio.get('/offline/catalogo-cliente/version');
       revisadoEn = DateTime.now();
       final version = (v.data as Map)['version']?.toString();
-      if (!forzar && version == _version && catalogo != null) return;
+      if (!forzar && version == _version && catalogo != null) {
+        // Sin cambios: solo se completan las fotos que no se alcanzaron a bajar.
+        _descargarFotos(catalogo!.tiendas.expand((t) => t.productos).map((x) => x.imagenUrl));
+        return;
+      }
       final r = await _dio.get('/offline/catalogo-cliente', queryParameters: {'automatica': !forzar});
       if (_usuario?.id != u.id) return;
       final c = CatalogoCliente.fromJson(r.data as Map<String, dynamic>);
@@ -450,22 +454,37 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  bool _bajandoFotos = false;
+
+  /// Baja de a 4 las fotos que faltan; las que fallan se reintentan en la
+  /// proxima revision.
   Future<void> _descargarFotos(Iterable<String?> urls) async {
-    final faltan = urls.whereType<String>().where((u) => u.isNotEmpty && !_imagenes.containsKey(u)).toSet();
+    if (_bajandoFotos) return;
+    final faltan = urls.whereType<String>().where((u) => u.isNotEmpty && !_imagenes.containsKey(u)).toList();
     if (faltan.isEmpty) return;
-    final carpeta = Directory(p.join((await getApplicationSupportDirectory()).path, 'offline_fotos'));
-    await carpeta.create(recursive: true);
-    for (final url in faltan) {
-      try {
-        final ruta = p.join(carpeta.path, '${url.hashCode.toUnsigned(32)}${p.extension(Uri.parse(url).path)}');
-        await Dio().download(resolveImageUrl(url), ruta);
-        await _db.guardarImagen(url, ruta);
-        _imagenes[url] = ruta;
-      } catch (_) {
-        // Se intenta en la proxima descarga.
+    _bajandoFotos = true;
+    try {
+      final carpeta = Directory(p.join((await getApplicationSupportDirectory()).path, 'offline_fotos'));
+      await carpeta.create(recursive: true);
+      Future<void> bajar(String url) async {
+        try {
+          final ruta = p.join(carpeta.path, '${url.hashCode.toUnsigned(32)}${p.extension(Uri.parse(url).path)}');
+          await Dio().download(resolveImageUrl(url), ruta);
+          await _db.guardarImagen(url, ruta);
+          _imagenes[url] = ruta;
+        } catch (_) {
+          // Se intenta en la proxima revision.
+        }
       }
+
+      for (var i = 0; i < faltan.length; i += 4) {
+        if (!enLinea) break;
+        await Future.wait(faltan.skip(i).take(4).map(bajar));
+      }
+    } finally {
+      _bajandoFotos = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   @override

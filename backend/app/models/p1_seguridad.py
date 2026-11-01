@@ -39,6 +39,9 @@ class Usuario(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(150))
+    # CU15: la parte de apellidos del nombre completo y la foto de perfil.
+    apellidos: Mapped[str | None] = mapped_column(String(100))
+    foto_url: Mapped[str | None] = mapped_column(String(500))
     email: Mapped[str] = mapped_column(String(150), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     estado: Mapped[str] = mapped_column(String(20), default="activo")

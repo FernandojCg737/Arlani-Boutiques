@@ -1155,3 +1155,91 @@
     overflow-wrap: anywhere;
   }
 }
+
+// CU15 "Actualizar Perfil": botones y acentos en el azul oscuro del SaaS.
+.perfil-card--saas {
+  --brand-dark: #121a2c;
+
+  h2 {
+    color: #121a2c;
+  }
+}
+
+.perfil-card--contrasena {
+  margin-top: 20px;
+}
+
+.perfil-fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.perfil-foto {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 24px;
+
+  &__img {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+
+    &--vacia {
+      display: grid;
+      place-items: center;
+      background: #121a2c;
+      color: #fff;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+  }
+
+  &__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+
+    small {
+      flex-basis: 100%;
+      color: #999;
+      font-size: 12px;
+    }
+  }
+
+  &__btn {
+    background: #121a2c;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    &.is-disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+
+  &__quitar {
+    border: none;
+    background: none;
+    padding: 0;
+    color: #b3261e;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}

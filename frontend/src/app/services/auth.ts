@@ -11,6 +11,9 @@ const STAFF_TIPOS = new Set([...ADMIN_TIPOS, 'encargado_sucursal', 'cajero']);
 export interface Cliente {
   id: number;
   nombre: string;
+  // CU15: parte de apellidos del nombre completo y foto de perfil.
+  apellidos?: string | null;
+  foto_url?: string | null;
   email: string;
   telefono: string | null;
   direccion: string | null;
@@ -22,6 +25,7 @@ export interface Cliente {
 
 export interface PerfilUpdatePayload {
   nombre: string;
+  apellidos?: string | null;
   telefono?: string | null;
   direccion?: string | null;
 }
@@ -139,7 +143,21 @@ export class Auth {
   }
 
   async updateProfile(payload: PerfilUpdatePayload): Promise<Cliente> {
-    const res = await firstValueFrom(this.http.put<Cliente>(`${environment.apiUrl}/perfil`, payload));
+    return this.guardarUsuario(await firstValueFrom(this.http.put<Cliente>(`${environment.apiUrl}/perfil`, payload)));
+  }
+
+  // CU15: foto de perfil (subir o quitar).
+  async subirFoto(archivo: File): Promise<Cliente> {
+    const datos = new FormData();
+    datos.append('file', archivo);
+    return this.guardarUsuario(await firstValueFrom(this.http.post<Cliente>(`${environment.apiUrl}/perfil/foto`, datos)));
+  }
+
+  async quitarFoto(): Promise<Cliente> {
+    return this.guardarUsuario(await firstValueFrom(this.http.delete<Cliente>(`${environment.apiUrl}/perfil/foto`)));
+  }
+
+  private guardarUsuario(res: Cliente): Cliente {
     this.currentUser.set(res);
     try {
       localStorage.setItem(CLIENTE_KEY, JSON.stringify(res));
