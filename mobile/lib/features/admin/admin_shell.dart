@@ -95,7 +95,7 @@ class _UseCaseTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final permitido = auth.isAdministrador || auth.hasPermiso(cu.code);
+    final permitido = auth.isAdministrador || auth.hasPermiso(cu.permiso ?? cu.code);
 
     return ListTile(
       dense: true,

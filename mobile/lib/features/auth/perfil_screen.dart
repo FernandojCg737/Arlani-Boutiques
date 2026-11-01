@@ -885,6 +885,8 @@ class _TabsBar extends StatelessWidget {
               badge: t == _Tab.notificaciones && noLeidas > 0 ? noLeidas : null,
               onTap: () => onSelect(t),
             ),
+          // P4 offline (`.dash__tabs-enlace` de la web): catalogo guardado en el telefono.
+          _TabButton(label: 'Sin conexión', selected: false, onTap: () => context.push('/sin-conexion')),
         ],
       ),
     );

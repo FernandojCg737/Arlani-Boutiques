@@ -2,11 +2,13 @@
 /// sus CUs. Solo los CUs con `route` no nulo estan implementados (los demas
 /// -CU09,10,11,13,14,16,18,19,20- no existen ni en la web ni en el backend).
 class AdminUseCase {
-  const AdminUseCase({required this.code, required this.label, this.route});
+  const AdminUseCase({required this.code, required this.label, this.route, this.permiso});
 
   final String code;
   final String label;
   final String? route;
+  // Permiso que exige (si no es el mismo codigo del CU), como en la web.
+  final String? permiso;
 }
 
 class AdminPackage {
@@ -55,6 +57,7 @@ const adminMenu = <AdminPackage>[
       AdminUseCase(code: 'CU10', label: 'Gestion de Reservas', route: '/admin/reservas'),
       AdminUseCase(code: 'CU11', label: 'Gestion de Ventas', route: '/admin/ventas'),
       AdminUseCase(code: 'CU13', label: 'Administrar Carrito de Compras', route: '/admin/carritos'),
+      AdminUseCase(code: 'CU23', label: 'Trabajar sin Conexion', route: '/admin/sin-conexion', permiso: '2P-CU12'),
     ],
   ),
   AdminPackage(
