@@ -206,7 +206,7 @@ class _LiveAdminScreenState extends ConsumerState<LiveAdminScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     'Al iniciar, el teléfono te pedirá permiso para la cámara y el micrófono. Los clientes reciben una notificación '
-                    '(y un correo los que ya compraron en tu tienda). Si sales del live y no vuelves en 5 minutos, termina solo.',
+                    'en la app. Si sales del live y no vuelves en 5 minutos, termina solo.',
                     style: TextStyle(fontSize: 12.5, color: Colors.black54),
                   ),
                   const SizedBox(height: 12),

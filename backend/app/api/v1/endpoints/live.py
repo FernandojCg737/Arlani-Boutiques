@@ -283,8 +283,8 @@ def _avisar(sala: str, mensaje: dict) -> None:
 
 
 def _notificar_inicio(live_id: int) -> None:
-    """Notificacion a todos los clientes y, a los que ya compraron en la tienda,
-    tambien por correo."""
+    """Notificacion en la app a todos los clientes. Sin correo: cada live
+    gastaria el cupo diario de correos."""
     db = SessionLocal()
     try:
         live = db.execute(
@@ -303,18 +303,6 @@ def _notificar_inicio(live_id: int) -> None:
             ),
             {"m": mensaje, "l": live.id, "e": live.empresa_id},
         )
-        compradores = db.execute(
-            text(
-                """SELECT DISTINCT v.cliente_id FROM venta v JOIN sucursal s ON s.id = v.sucursal_id
-                   JOIN usuario u ON u.id = v.cliente_id
-                   WHERE s.empresa_id = :e AND v.cliente_id IS NOT NULL AND u.estado = 'activo' LIMIT 300"""
-            ),
-            {"e": live.empresa_id},
-        ).scalars().all()
-        for cliente_id in compradores:
-            programar_correo(db, cliente_id, live.empresa_id, f"{live.nombre} está en vivo",
-                             f"{live.titulo}. Como ya compraste en {live.nombre}, te avisamos primero: entra a Arlani "
-                             "Boutiques y toca el botón LIVE para verlo y comprar en directo.")
         db.commit()
     except Exception:  # noqa: BLE001 - el aviso nunca hace fallar el live
         db.rollback()
