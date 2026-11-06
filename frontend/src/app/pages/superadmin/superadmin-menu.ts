@@ -199,6 +199,14 @@ export const PARCIALES: ParcialMenu[] = [
             descripcion:
               'Caja física por sucursal (se abre con fondo inicial y se cierra contando el efectivo) y caja online diaria automática; historial de cajas con todas sus ventas.',
           },
+          {
+            codigo: 'CU22', permisos: ['2P-CU22'],
+            nombre: 'Gestionar live commerce',
+            ruta: 'live',
+            plataformas: ['WEB'],
+            descripcion:
+              'Lives de venta como en TikTok (plan Profesional): la tienda transmite, muestra y fija prendas para comprarlas en directo, ve quién mira y comenta, y modera; quedan grabados. El SuperAdministrador puede cortar un live que incumple los términos.',
+          },
         ],
       },
       {

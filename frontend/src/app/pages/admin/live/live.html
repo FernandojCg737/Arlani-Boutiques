@@ -1,0 +1,213 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P3 · CU22 · Operación de Tiendas</span>
+      <h1>Live commerce</h1>
+      <p>
+        @if (esSuper) {
+          Los lives en curso de todas las tiendas y sus grabaciones. Puedes entrar a cualquiera y cortarlo si incumple los
+          términos y condiciones.
+        } @else {
+          Vende en vivo como en TikTok: transmite con tu cámara, muestra tus prendas y fija una en pantalla para que la agreguen
+          al carrito. Ves quién está conectado y quién comenta. Al terminar, el live queda grabado.
+        }
+      </p>
+    </div>
+    @if (esSuper) {
+      <div class="admin-filtros">
+        <select [value]="tiendaFiltro() ?? ''" (change)="filtrarTienda($any($event.target).value)" aria-label="Tienda">
+          <option value="">Todas las tiendas</option>
+          @for (t of tiendas(); track t.id) {
+            <option [value]="t.id">{{ t.nombre }}</option>
+          }
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+
+  @if (cargando() && !historial().length && !actual()) {
+    <p class="backups-vacio">Cargando...</p>
+  } @else if (esSuper) {
+    <section class="backups-crear">
+      <h2>En vivo ahora ({{ enVivo().length }})</h2>
+      @if (enVivo().length) {
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Tienda</th><th>Live</th><th>Desde</th><th>Viendo</th><th></th></tr>
+            </thead>
+            <tbody>
+              @for (l of enVivo(); track l.id) {
+                <tr>
+                  <td><strong>{{ l.tienda }}</strong></td>
+                  <td>{{ l.titulo }}<small class="backups-sub">{{ l.iniciado_por }}</small></td>
+                  <td>{{ fechaUtc(l.inicio) | date: 'dd/MM HH:mm' }}</td>
+                  <td>{{ l.espectadores }} <small class="backups-sub">máx. {{ l.espectadores_max }} · {{ l.comentarios }} comentarios</small></td>
+                  <td>
+                    <div class="ventas-acciones">
+                      <a [routerLink]="['/live', l.id]" target="_blank">Ver</a>
+                      <button type="button" class="is-danger" (click)="abrirCorte(l)">Cortar</button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="backups-nota">Ninguna tienda está en vivo ahora.</p>
+      }
+    </section>
+  } @else if (!configurado()) {
+    <div class="backups-plan">El live todavía no está configurado en el servidor (faltan las credenciales de LiveKit).</div>
+  } @else if (!disponible()) {
+    <div class="backups-plan">
+      <strong>El live commerce es del plan Profesional.</strong> Tu tienda tiene el plan {{ plan() ?? 'actual' }}.
+      <a routerLink="/admin/suscripcion">Ver planes</a>
+    </div>
+  } @else if (actual(); as l) {
+    <app-live-sala [liveId]="l.id" (terminado)="terminado()" />
+  } @else {
+    <section class="backups-crear live-nuevo">
+      <h2>Iniciar un live</h2>
+      <label class="ventas-campo">
+        <span>Título</span>
+        <input type="text" maxlength="120" placeholder="Ej.: Nueva colección de verano" [value]="titulo()"
+               (input)="titulo.set($any($event.target).value)" />
+      </label>
+      <label class="ventas-campo">
+        <span>Descripción (opcional)</span>
+        <input type="text" maxlength="500" [value]="descripcion()" (input)="descripcion.set($any($event.target).value)" />
+      </label>
+      <span class="backups-etiqueta">Prendas que vas a mostrar ({{ elegidos().length }})</span>
+      <input class="live-buscar" type="search" placeholder="Buscar prenda…" [value]="buscar()"
+             (input)="buscar.set($any($event.target).value)" />
+      <div class="live-prendas">
+        @for (p of productosFiltrados(); track p.id) {
+          <button type="button" class="live-prenda" [class.is-elegida]="elegidos().includes(p.id)" (click)="alternar(p.id)">
+            @if (p.imagen) {
+              <img [src]="p.imagen" [alt]="p.nombre" />
+            }
+            <strong>{{ p.nombre }}</strong>
+            <small>Bs {{ p.precio | number: '1.2-2' }} · stock {{ p.stock }}</small>
+          </button>
+        } @empty {
+          <p class="backups-nota">No hay prendas activas.</p>
+        }
+      </div>
+      <p class="backups-nota">
+        Al iniciar, el navegador te pedirá permiso para la cámara y el micrófono. Los clientes reciben una notificación (y un
+        correo los que ya compraron en tu tienda). Si cierras la página y no vuelves en 5 minutos, el live termina solo.
+      </p>
+      <button type="button" class="backups-btn live-iniciar" [disabled]="iniciando()" (click)="iniciar()">
+        {{ iniciando() ? 'Iniciando…' : '● Iniciar live' }}
+      </button>
+    </section>
+  }
+
+  @if (!cargando() || historial().length) {
+    <h2 class="live-subtitulo">Lives anteriores y grabaciones</h2>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Live</th>
+            <th>Duración</th>
+            <th>Público</th>
+            <th>Estado</th>
+            <th>Grabación</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (l of historial(); track l.id) {
+            <tr>
+              <td>
+                <strong>{{ l.titulo }}</strong>
+                <small class="backups-sub">
+                  @if (esSuper) {
+                    {{ l.tienda }} ·
+                  }
+                  {{ fechaUtc(l.inicio) | date: 'dd/MM/yyyy HH:mm' }}{{ l.iniciado_por ? ' · ' + l.iniciado_por : '' }}
+                </small>
+              </td>
+              <td>{{ duracion(l) }}</td>
+              <td>{{ l.espectadores_max }} máx. <small class="backups-sub">{{ l.comentarios }} comentarios</small></td>
+              <td>
+                <span class="backups-estado" [class.backups-estado--fallido]="l.estado === 'cortado'">
+                  {{ l.estado === 'cortado' ? 'Cortado' : 'Finalizado' }}
+                </span>
+                @if (l.motivo_corte) {
+                  <small class="backups-sub backups-error">{{ l.motivo_corte }}{{ l.cortado_por ? ' — ' + l.cortado_por : '' }}</small>
+                }
+              </td>
+              <td>
+                <span class="backups-estado"
+                      [class.backups-estado--en_proceso]="l.grabacion_estado === 'procesando' || l.grabacion_estado === 'grabando'"
+                      [class.backups-estado--fallido]="l.grabacion_estado === 'fallida'"
+                      [class.backups-estado--pausada]="l.grabacion_estado === 'borrada' || l.grabacion_estado === 'pendiente'">
+                  {{ estadoGrabacion(l) }}
+                </span>
+                @if (l.grabacion_bytes) {
+                  <small class="backups-sub">{{ l.grabacion_bytes / 1048576 | number: '1.0-1' }} MB</small>
+                }
+                @if (l.grabacion_error) {
+                  <small class="backups-sub backups-error">{{ l.grabacion_error }}</small>
+                }
+              </td>
+              <td>
+                <div class="ventas-acciones">
+                  @if (l.grabacion_estado === 'lista') {
+                    <button type="button" (click)="verGrabacion(l)">Ver</button>
+                  }
+                  @if (l.grabacion_estado === 'lista' || l.grabacion_estado === 'fallida') {
+                    <button type="button" class="is-danger" (click)="borrarGrabacion(l)">Borrar</button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="admin-table__empty">Todavía no hay lives anteriores.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+@if (video(); as v) {
+  <div class="ventas-overlay" (click)="video.set(null)">
+    <div class="ventas-modal ventas-modal--wide live-video" (click)="$event.stopPropagation()">
+      <h2>{{ v.live.titulo }}</h2>
+      <p class="ventas-modal__subtitulo">{{ fechaUtc(v.live.inicio) | date: 'dd/MM/yyyy HH:mm' }} · {{ duracion(v.live) }}</p>
+      <video [src]="v.url" controls autoplay playsinline></video>
+      <div class="ventas-modal__acciones">
+        <a class="live-descargar" [href]="v.url" target="_blank" rel="noopener">Descargar</a>
+        <button type="button" class="is-secondary" (click)="video.set(null)">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (cortando(); as l) {
+  <div class="ventas-overlay" (click)="cortando.set(null)">
+    <div class="ventas-modal" (click)="$event.stopPropagation()">
+      <h2>Cortar el live</h2>
+      <p class="ventas-modal__subtitulo">«{{ l.titulo }}» de {{ l.tienda }}. Se cierra para todos y queda grabado; la tienda recibe el motivo.</p>
+      <label class="ventas-campo">
+        <span>Motivo (términos y condiciones incumplidos)</span>
+        <input type="text" maxlength="500" [value]="motivo()" (input)="motivo.set($any($event.target).value)" />
+      </label>
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" (click)="cortando.set(null)">Cancelar</button>
+        <button type="button" class="is-danger-solid" (click)="cortar()">Cortar live</button>
+      </div>
+    </div>
+  </div>
+}

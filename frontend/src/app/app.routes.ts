@@ -15,6 +15,9 @@ import { AdminCaja } from './pages/admin/caja/caja';
 import { AdminCambios } from './pages/admin/cambios/cambios';
 import { AdminConflictos } from './pages/admin/conflictos/conflictos';
 import { AdminBackups } from './pages/admin/backups/backups';
+import { AdminLive } from './pages/admin/live/live';
+import { LiveLista } from './pages/live/live-lista';
+import { LiveVer } from './pages/live/live-ver';
 import { AdminSinConexion } from './pages/admin/sin-conexion/sin-conexion';
 import { SinConexionCliente } from './pages/sin-conexion/sin-conexion-cliente';
 import { PagarCompras } from './pages/pagar-compras/pagar-compras';
@@ -128,6 +131,9 @@ export const routes: Routes = [
     canActivate: [authGuard],
     data: { header: 'plataforma', encabezadoSolido: true },
   },
+  // CU22: lives en curso de todas las boutiques (botón LIVE de la portada), con sesión.
+  { path: 'live', component: LiveLista, canActivate: [authGuard], data: { header: 'plataforma', encabezadoSolido: true } },
+  { path: 'live/:id', component: LiveVer, canActivate: [authGuard], data: { header: 'plataforma', encabezadoSolido: true } },
   // Mi cuenta es de la plataforma (una cuenta sirve para todas las boutiques).
   {
     path: 'perfil',
@@ -200,6 +206,7 @@ export const routes: Routes = [
       { path: 'calificaciones', component: AdminCalificaciones, canActivate: [permisoGuard('CU20')] },
       { path: 'reporte-voz', component: AdminReporteVoz, canActivate: [permisoGuard('2P-CU17')] },
       { path: 'backups', component: AdminBackups, canActivate: [permisoGuard('2P-CU21')] },
+      { path: 'live', component: AdminLive, canActivate: [permisoGuard('2P-CU22')] },
     ],
   },
   // Panel del SuperAdministrador: mismo esquema que el panel de una tienda,
@@ -221,6 +228,8 @@ export const routes: Routes = [
       { path: 'comisiones', component: SuperadminComisiones },
       // CU21: backups del sistema completo o de una tienda (se elige en la pantalla).
       { path: 'backups', component: AdminBackups },
+      // CU22: lives en curso de todas las tiendas (cortar) y sus grabaciones.
+      { path: 'live', component: AdminLive },
       // CU03 y CU04: primero se elige la tienda (tiendas/:codigo) y la
       // pantalla muestra solo lo de esa tienda (?empresa=<id>).
       { path: 'tiendas/:codigo', component: SuperadminElegirEmpresa, data: { parcial: 'p2' } },

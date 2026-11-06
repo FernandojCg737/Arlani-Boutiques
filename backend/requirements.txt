@@ -21,3 +21,5 @@ simplemma==1.1.2
 onnxruntime==1.31.0
 sentencepiece==0.2.0
 huggingface_hub==0.36.2
+livekit-api==1.2.2
+boto3==1.43.125

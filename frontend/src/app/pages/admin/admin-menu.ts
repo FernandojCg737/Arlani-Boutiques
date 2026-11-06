@@ -55,6 +55,7 @@ export const ADMIN_MENU: AdminPackage[] = [
       { code: 'CU22', label: 'Arqueo y Cierre de Caja', route: '/admin/caja', permiso: '2P-CU16' },
       { code: 'CU23', label: 'Trabajar sin Conexion', route: '/admin/sin-conexion', permiso: '2P-CU12' },
       { code: 'CU24', label: 'Operaciones Offline y Conflictos', route: '/admin/conflictos', permiso: '2P-CU13' },
+      { code: 'CU27', label: 'Live Commerce', route: '/admin/live', permiso: '2P-CU22' },
     ],
   },
   {

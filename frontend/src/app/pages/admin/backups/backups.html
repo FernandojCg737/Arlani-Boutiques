@@ -401,7 +401,7 @@
 
       <div class="backups-fila">
         <label class="ventas-campo">
-          <span>Guardar los últimos</span>
+          <span>Cuántos backups guardar</span>
           <input type="number" min="1" max="60" [value]="f.retener" (input)="cambiarForm({ retener: +$any($event.target).value })" />
         </label>
         <label class="backups-check">
@@ -409,6 +409,10 @@
           Activa
         </label>
       </div>
+      <small class="backups-ayuda">
+        Se conservan los {{ f.retener }} backups más recientes de esta programación: al hacerse uno nuevo, se borra solo el más
+        viejo. Los manuales y los de antes de restaurar no se borran.
+      </small>
 
       @if (errorModal()) {
         <div class="admin-error">{{ errorModal() }}</div>
