@@ -26,6 +26,7 @@ import '../cuenta/mis_direcciones.dart';
 import '../storefront/reservas_repository.dart';
 import '../storefront/ventas_repository.dart';
 import 'auth_provider.dart';
+import 'perfil_personal.dart';
 
 enum _Tab { resumen, reservas, compras, cambios, devoluciones, direcciones, pagos, notificaciones, datos }
 
@@ -316,24 +317,8 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     final usuario = ref.watch(authProvider).usuario;
     final isCliente = usuario?.isCliente ?? false;
     if (isCliente) return _buildPaginaCliente(usuario!);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('MI PERFIL'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesion',
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-              if (context.mounted) context.go('/');
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(child: _buildStaff(usuario)),
-    );
+    // Personal y SuperAdministrador: con los colores de su tienda o del SaaS.
+    return const PerfilPersonal();
   }
 
   // ---------------------------------------------------------- Pagina del cliente
@@ -902,59 +887,6 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             child: Text(_savingPassword ? 'ACTUALIZANDO...' : 'CAMBIAR CONTRASEÑA'),
           ),
         ]),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------- Staff (simple)
-
-  Widget _buildStaff(Usuario? usuario) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        TextButton.icon(
-          onPressed: () => context.go('/admin'),
-          icon: const Icon(Icons.arrow_back, size: 16),
-          label: const Text('VOLVER AL PANEL'),
-          style: TextButton.styleFrom(foregroundColor: AppColors.brandDark, padding: EdgeInsets.zero),
-        ),
-        const SizedBox(height: 8),
-        const Text('Actualiza tus datos personales y tu contrasena.', style: TextStyle(fontSize: 13, color: AppColors.grayTextDark)),
-        const SizedBox(height: 24),
-        const EyebrowText('Datos personales'),
-        const SizedBox(height: 12),
-        if (_errorPerfil != null) _ErrorBanner(_errorPerfil!),
-        if (_successPerfil != null) _SuccessBanner(_successPerfil!),
-        TextField(controller: _nombreCtrl, decoration: const InputDecoration(labelText: 'NOMBRES')),
-        const SizedBox(height: 14),
-        TextField(controller: _apellidosCtrl, decoration: const InputDecoration(labelText: 'APELLIDOS')),
-        const SizedBox(height: 14),
-        TextFormField(initialValue: usuario?.email, enabled: false, decoration: const InputDecoration(labelText: 'CORREO')),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: _savingPerfil ? null : _guardarPerfil,
-          child: Text(_savingPerfil ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'),
-        ),
-        const SizedBox(height: 36),
-        const EyebrowText('Cambiar contrasena'),
-        const SizedBox(height: 12),
-        if (_errorPassword != null) _ErrorBanner(_errorPassword!),
-        if (_successPassword != null) _SuccessBanner(_successPassword!),
-        TextField(controller: _actualCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'CONTRASENA ACTUAL')),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _nuevaCtrl,
-          obscureText: true,
-          onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(labelText: 'NUEVA CONTRASENA'),
-        ),
-        const SizedBox(height: 10),
-        PasswordStrengthChecklist(password: _nuevaCtrl.text),
-        const SizedBox(height: 20),
-        OutlinedButton(
-          onPressed: _savingPassword ? null : _cambiarPassword,
-          child: Text(_savingPassword ? 'GUARDANDO...' : 'ACTUALIZAR CONTRASENA'),
-        ),
       ],
     );
   }
