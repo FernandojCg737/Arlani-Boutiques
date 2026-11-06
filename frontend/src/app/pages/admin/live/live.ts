@@ -3,7 +3,7 @@ import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular
 import { RouterLink } from '@angular/router';
 import { LiveSala } from '../../../components/live-sala/live-sala';
 import { Auth } from '../../../services/auth';
-import { LiveApi, LiveResumen, fechaUtc } from '../../../services/live';
+import { ComentarioRepeticion, LiveApi, LiveResumen, fechaUtc } from '../../../services/live';
 import { EmpresaTenant, PlataformaApi, mensajeError } from '../../../services/plataforma';
 
 interface ProductoTienda {
@@ -57,6 +57,18 @@ export class AdminLive implements OnInit, OnDestroy {
   // Historial y grabaciones
   protected readonly historial = signal<LiveResumen[]>([]);
   protected readonly video = signal<{ live: LiveResumen; url: string } | null>(null);
+  // Repetición con chat: los comentarios del live y el segundo que se está viendo.
+  protected readonly repeticion = signal<ComentarioRepeticion[]>([]);
+  protected readonly segundo = signal(0);
+  protected readonly comentarioActual = computed(() => {
+    let id: number | null = null;
+    for (const c of this.repeticion()) {
+      if (c.segundo > this.segundo()) break;
+      id = c.id;
+    }
+    return id;
+  });
+  private ultimoActual: number | null = null;
 
   protected readonly productosFiltrados = computed(() => {
     const q = this.buscar().trim().toLowerCase();
@@ -150,11 +162,58 @@ export class AdminLive implements OnInit, OnDestroy {
 
   protected async verGrabacion(l: LiveResumen): Promise<void> {
     try {
-      const { url } = await this.api.grabacion(l.id);
+      const [{ url }, comentarios] = await Promise.all([this.api.grabacion(l.id), this.api.comentariosDelLive(l.id)]);
+      this.repeticion.set(comentarios);
+      this.segundo.set(0);
+      this.ultimoActual = null;
       this.video.set({ live: l, url });
     } catch (err) {
       this.error.set(mensajeError(err, 'No se pudo abrir la grabación.'));
     }
+  }
+
+  // El chat acompaña al video: se resalta y se muestra el comentario de ese momento.
+  protected alAvanzar(tiempo: number): void {
+    this.segundo.set(tiempo);
+    const actual = this.comentarioActual();
+    if (actual !== null && actual !== this.ultimoActual) {
+      this.ultimoActual = actual;
+      document.getElementById(`rc-${actual}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  protected irA(video: HTMLVideoElement, c: ComentarioRepeticion): void {
+    video.currentTime = c.segundo;
+    void video.play();
+  }
+
+  protected minuto(segundos: number): string {
+    const h = Math.floor(segundos / 3600);
+    const m = Math.floor((segundos % 3600) / 60);
+    const s = segundos % 60;
+    const mmss = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return h ? `${h}:${mmss}` : mmss;
+  }
+
+  protected descargarComentarios(l: LiveResumen): void {
+    const celda = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const filas = [
+      ['Minuto del video', 'Hora', 'Usuario', 'Comentario', 'Estado'],
+      ...this.repeticion().map((c) => [
+        this.minuto(c.segundo),
+        new Date(fechaUtc(c.fecha)!).toLocaleString('es-BO'),
+        c.usuario + (c.es_tienda ? ' (tienda)' : ''),
+        c.texto,
+        c.oculto ? 'Oculto' : 'Visible',
+      ]),
+    ];
+    // Con BOM para que Excel lea bien las tildes y los emojis.
+    const csv = '\ufeff' + filas.map((f) => f.map(celda).join(';')).join('\r\n');
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    enlace.download = `comentarios-live-${l.id}.csv`;
+    enlace.click();
+    URL.revokeObjectURL(enlace.href);
   }
 
   protected async borrarGrabacion(l: LiveResumen): Promise<void> {

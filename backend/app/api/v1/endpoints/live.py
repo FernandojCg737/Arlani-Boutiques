@@ -60,6 +60,7 @@ class LiveOut(BaseModel):
     grabacion_segundos: int | None
     grabacion_bytes: int | None
     grabacion_error: str | None
+    grabacion_inicio: datetime | None = None
     motivo_corte: str | None
     cortado_por: str | None
 
@@ -93,6 +94,11 @@ class ComentarioOut(BaseModel):
     fecha: datetime
     oculto: bool
     es_tienda: bool
+
+
+class ComentarioRepeticionOut(ComentarioOut):
+    # Segundo del video en que se escribio (repeticion con chat).
+    segundo: int
 
 
 class EspectadorOut(BaseModel):
@@ -454,7 +460,7 @@ def grabar(live_id: int, db: Session = Depends(get_db), usuario: Usuario = Depen
         db.commit()
         return _live(db, live_id)
     db.execute(
-        text("UPDATE live SET egress_id = :g, grabacion_clave = :c, grabacion_estado = :s WHERE id = :i"),
+        text("UPDATE live SET egress_id = :g, grabacion_clave = :c, grabacion_estado = :s, grabacion_inicio = now() WHERE id = :i"),
         {"g": egress_id, "c": clave, "s": "grabando" if egress_id else "fallida", "i": live_id},
     )
     if not egress_id:
@@ -591,6 +597,20 @@ def ver_grabacion(live_id: int, request: Request, db: Session = Depends(get_db),
     return {"url": lk.enlace_grabacion(clave)}
 
 
+@router.get("/{live_id}/comentarios", response_model=list[ComentarioRepeticionOut])
+def comentarios_del_live(live_id: int, db: Session = Depends(get_db),
+                         usuario: Usuario = Depends(get_current_user)) -> list[ComentarioRepeticionOut]:
+    """Todos los comentarios del live (tambien los ocultos), cada uno con su
+    segundo en la grabacion: la repeticion con chat."""
+    live = _live(db, live_id)
+    _puede_gestionar(db, usuario, live)
+    inicio = live.grabacion_inicio or live.inicio
+    return [
+        ComentarioRepeticionOut(**c.model_dump(), segundo=max(0, round((c.fecha - inicio).total_seconds())))
+        for c in _comentarios(db, live, con_ocultos=True, limite=20000)
+    ]
+
+
 @router.delete("/{live_id}/grabacion", response_model=LiveOut)
 def borrar_grabacion(live_id: int, request: Request, db: Session = Depends(get_db),
                      usuario: Usuario = Depends(get_current_user)) -> LiveOut:
@@ -638,8 +658,9 @@ def cortar(live_id: int, payload: CortarIn, request: Request, db: Session = Depe
 
 
 @router.get("/en-vivo", response_model=list[LiveOut])
-def en_vivo(db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)) -> list[LiveOut]:
-    """Lives en curso de todas las tiendas (el boton LIVE de la portada)."""
+def en_vivo(db: Session = Depends(get_db)) -> list[LiveOut]:
+    """Lives en curso de todas las tiendas (el boton LIVE de la portada). Es
+    publico: muestra solo titulos y tiendas; para entrar a ver hace falta sesion."""
     return _lives(db, "l.estado = 'en_vivo'", {})
 
 
