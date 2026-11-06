@@ -17,6 +17,7 @@ class AuthState {
   bool get isAuthenticated => usuario != null;
   bool get isStaff => usuario?.isStaff ?? false;
   bool get isAdministrador => usuario?.isAdministrador ?? false;
+  bool get isSuperAdmin => usuario?.isSuperAdmin ?? false;
 
   bool hasPermiso(String codigo) => usuario?.hasPermiso(codigo) ?? false;
 

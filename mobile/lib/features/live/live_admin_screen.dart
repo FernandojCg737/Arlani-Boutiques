@@ -236,7 +236,7 @@ class _LiveAdminScreenState extends ConsumerState<LiveAdminScreen> {
                           IconButton(
                             tooltip: 'Ver grabación',
                             icon: const Icon(Icons.play_circle_fill, color: _tinta),
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _GrabacionScreen(live: l))),
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GrabacionLiveScreen(live: l))),
                           ),
                         if (l.grabacion == 'lista' || l.grabacion == 'fallida')
                           IconButton(
@@ -275,15 +275,15 @@ class _Aviso extends StatelessWidget {
 
 /// La grabacion y, debajo, los comentarios del live con su minuto, fecha y
 /// hora y quien los escribio (tocarlos lleva el video a ese minuto).
-class _GrabacionScreen extends ConsumerStatefulWidget {
-  const _GrabacionScreen({required this.live});
+class GrabacionLiveScreen extends ConsumerStatefulWidget {
+  const GrabacionLiveScreen({super.key, required this.live});
   final LiveResumen live;
 
   @override
-  ConsumerState<_GrabacionScreen> createState() => _GrabacionScreenState();
+  ConsumerState<GrabacionLiveScreen> createState() => _GrabacionLiveScreenState();
 }
 
-class _GrabacionScreenState extends ConsumerState<_GrabacionScreen> {
+class _GrabacionLiveScreenState extends ConsumerState<GrabacionLiveScreen> {
   VideoPlayerController? _video;
   List<ComentarioLive> _comentarios = [];
   String? _error;

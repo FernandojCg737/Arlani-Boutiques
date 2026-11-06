@@ -166,6 +166,9 @@ class LiveApi {
       [for (final c in (await _dio.get('/live/$id/comentarios')).data as List) ComentarioLive(c as Map<String, dynamic>)];
 
   Future<void> borrarGrabacion(int id) => _dio.delete('/live/$id/grabacion');
+
+  /// SuperAdministrador: corta un live que incumple los terminos (queda grabado).
+  Future<void> cortar(int id, String motivo) => _dio.post('/live/$id/cortar', data: {'motivo': motivo});
 }
 
 final liveApiProvider = Provider<LiveApi>((ref) => LiveApi(ref.watch(apiClientProvider).dio));

@@ -29,6 +29,7 @@ class Usuario {
 
   bool get isCliente => tipo == 'cliente';
   bool get isAdministrador => tipo == 'administrador';
+  bool get isSuperAdmin => tipo == 'superadministrador';
   bool get isStaff => tipo != 'cliente';
 
   bool hasPermiso(String codigo) => isAdministrador || permisos.contains(codigo);
