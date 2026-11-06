@@ -156,6 +156,13 @@
     font-weight: 700;
   }
 
+  &__fecha {
+    display: block;
+    margin-top: 1px;
+    font-size: 11px;
+    color: #999;
+  }
+
   &__oculto {
     margin-left: 4px;
     font-size: 10px;

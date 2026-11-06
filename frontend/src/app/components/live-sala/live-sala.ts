@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, ElementRef, OnDestroy, OnInit, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -22,6 +22,7 @@ import {
   ProductoLive,
   SalaLive,
   VarianteLive,
+  fechaUtc,
 } from '../../services/live';
 import { mensajeError } from '../../services/plataforma';
 
@@ -41,7 +42,7 @@ interface Conectado {
 // comenta, reacciona y agrega la prenda fijada al carrito.
 @Component({
   selector: 'app-live-sala',
-  imports: [DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink],
   templateUrl: './live-sala.html',
   styleUrl: './live-sala.scss',
 })
@@ -59,6 +60,7 @@ export class LiveSala implements OnInit, OnDestroy {
   private siguienteReaccion = 0;
 
   protected readonly emojis = EMOJIS_LIVE;
+  protected readonly fechaUtc = fechaUtc;
   protected readonly sala = signal<SalaLive | null>(null);
   protected readonly comentarios = signal<ComentarioLive[]>([]);
   protected readonly productos = signal<ProductoLive[]>([]);
@@ -82,8 +84,8 @@ export class LiveSala implements OnInit, OnDestroy {
   protected readonly terminando = signal(false);
 
   protected readonly vendedor = computed(() => this.sala()?.vendedor ?? false);
-  // El SuperAdministrador y el vendedor moderan.
-  protected readonly modera = computed(() => this.vendedor() || this.auth.isSuperAdmin());
+  // Quien transmite, el resto del personal con permiso y el SuperAdministrador moderan.
+  protected readonly modera = computed(() => this.sala()?.moderador ?? false);
   protected readonly fijado = computed(() => this.productos().find((p) => p.fijado) ?? null);
   protected readonly puedeComprar = computed(() => !!this.auth.currentUser() && !this.auth.isStaff());
   protected readonly bloqueoDe = computed(() => {
@@ -341,7 +343,10 @@ export class LiveSala implements OnInit, OnDestroy {
   }
 
   protected async bloquear(usuarioId: number, nombre: string, tipo: 'silenciado' | 'expulsado'): Promise<void> {
-    const texto = tipo === 'expulsado' ? `¿Sacar a ${nombre} del live? No podrá volver a entrar.` : `¿Silenciar a ${nombre}? No podrá comentar.`;
+    const texto =
+      tipo === 'expulsado'
+        ? `¿Sacar a ${nombre} del live? No podrá volver a entrar.`
+        : `¿Bloquear los comentarios de ${nombre}? Seguirá viendo el live, pero no podrá comentar.`;
     if (!confirm(texto)) return;
     try {
       this.espectadores.set(await this.api.bloquear(this.liveId(), usuarioId, tipo));

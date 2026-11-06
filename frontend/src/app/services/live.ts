@@ -81,6 +81,7 @@ export interface SalaLive {
   url: string;
   token: string;
   vendedor: boolean;
+  moderador: boolean;
   silenciado: boolean;
   productos: ProductoLive[];
   comentarios: ComentarioLive[];

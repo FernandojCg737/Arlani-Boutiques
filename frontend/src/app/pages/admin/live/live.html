@@ -214,6 +214,7 @@
                   @if (c.oculto) {
                     <small class="live-chat__oculto">Oculto</small>
                   }
+                  <small class="live-chat__fecha">{{ fechaUtc(c.fecha) | date: 'dd/MM/yyyy HH:mm:ss' }}</small>
                 </span>
               </button>
             } @empty {
