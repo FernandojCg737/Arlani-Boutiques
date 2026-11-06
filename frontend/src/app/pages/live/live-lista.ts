@@ -1,6 +1,6 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, Location } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { LiveApi, LiveResumen, fechaUtc } from '../../services/live';
 
 // CU22: los lives en curso de todas las tiendas (botón LIVE de la portada).
@@ -9,6 +9,7 @@ import { LiveApi, LiveResumen, fechaUtc } from '../../services/live';
   imports: [DatePipe, RouterLink],
   template: `
     <section class="lives">
+      <button type="button" class="lives__volver" (click)="volver()">← Volver</button>
       <header>
         <span class="lives__eyebrow">Arlani Live</span>
         <h1>Compra en vivo</h1>
@@ -44,6 +45,9 @@ import { LiveApi, LiveResumen, fechaUtc } from '../../services/live';
   styles: `
     .lives { max-width: 1100px; margin: 0 auto; padding: 120px 20px 80px; color: #121a2c; }
     header { margin-bottom: 28px; }
+    .lives__volver { display: inline-flex; align-items: center; margin: 0 0 18px; padding: 4px 0; border: none; background: none;
+      font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #121a2c; cursor: pointer; }
+    .lives__volver:hover { text-decoration: underline; }
     .lives__eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #e5292f; }
     h1 { margin: 6px 0 8px; font-size: clamp(28px, 4vw, 40px); }
     header p { margin: 0; max-width: 620px; color: #5f6779; line-height: 1.5; }
@@ -65,6 +69,8 @@ import { LiveApi, LiveResumen, fechaUtc } from '../../services/live';
 })
 export class LiveLista implements OnInit, OnDestroy {
   private readonly api = inject(LiveApi);
+  private readonly location = inject(Location);
+  private readonly router = inject(Router);
   private intervalo: ReturnType<typeof setInterval> | null = null;
   protected readonly fechaUtc = fechaUtc;
   protected readonly lives = signal<LiveResumen[]>([]);
@@ -74,6 +80,12 @@ export class LiveLista implements OnInit, OnDestroy {
     this.lives.set(await this.api.revisarEnVivo());
     this.cargando.set(false);
     this.intervalo = setInterval(async () => this.lives.set(await this.api.revisarEnVivo()), 20000);
+  }
+
+  // A la página anterior; si se entró directo a los lives, al inicio.
+  protected volver(): void {
+    if (window.history.length > 1) this.location.back();
+    else void this.router.navigateByUrl('/');
   }
 
   ngOnDestroy(): void {
