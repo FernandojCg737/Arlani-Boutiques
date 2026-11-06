@@ -75,6 +75,7 @@ def atender_cola_de_stock() -> None:
     import time
 
     from app.api.v1.endpoints.offline import atender_cola
+    from app.core.backups import ejecutar_programados
     from app.db.session import SessionLocal
 
     def bucle() -> None:
@@ -87,6 +88,12 @@ def atender_cola_de_stock() -> None:
                 logging.getLogger(__name__).exception("No se pudo atender la cola de stock")
             finally:
                 db.close()
+            # CU21: los backups programados que ya tocan (o que quedaron
+            # atrasados porque el servidor estaba dormido).
+            try:
+                ejecutar_programados()
+            except Exception:  # noqa: BLE001 - se reintenta en la proxima vuelta
+                logging.getLogger(__name__).exception("No se pudieron hacer los backups programados")
 
     threading.Thread(target=bucle, daemon=True, name="cola-stock").start()
 

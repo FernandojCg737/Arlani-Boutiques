@@ -1,0 +1,424 @@
+<div class="admin-content">
+  <div class="admin-content__header">
+    <div>
+      <span class="admin-content__eyebrow">P1 · CU21 · Seguridad y Acceso</span>
+      <h1>Backups y restauración</h1>
+      <p>
+        Copias de seguridad de {{ estado()?.sistema ? 'todo el sistema (todas las tiendas y la plataforma)' : 'los datos de la tienda' }}:
+        catálogo con sus imágenes, inventario, sucursales, ajustes, personal y permisos, y todo el historial de ventas, pagos y
+        cajas. Restaurar nunca borra lo que hay hoy: vuelve lo que falta y lo que cambió regresa a como estaba.
+      </p>
+    </div>
+    @if (esSuper) {
+      <div class="admin-filtros">
+        <select [value]="empresaId() ?? ''" (change)="elegirAmbito($any($event.target).value)" aria-label="Qué respaldar">
+          <option value="">Sistema completo</option>
+          @for (t of tiendas(); track t.id) {
+            <option [value]="t.id">{{ t.nombre }}</option>
+          }
+        </select>
+      </div>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="admin-error">{{ error() }}</div>
+  }
+  @if (aviso()) {
+    <div class="backups-aviso">{{ aviso() }}</div>
+  }
+
+  @if (cargando() && !estado()) {
+    <p class="backups-vacio">Cargando...</p>
+  } @else if (estado(); as e) {
+    @if (!e.disponible) {
+      <div class="backups-plan">
+        <strong>Los backups son de los planes Básico y Profesional.</strong>
+        Tu tienda tiene el plan {{ e.plan ?? 'actual' }}. Los backups que ya tengas se conservan, pero para crear nuevos o restaurar
+        sube de plan.
+        @if (!esSuper) {
+          <a routerLink="/admin/suscripcion">Ver planes</a>
+        }
+      </div>
+    }
+
+    <nav class="backups-pestanas">
+      <button type="button" [class.is-activa]="pestana() === 'backups'" (click)="pestana.set('backups')">
+        Backups ({{ backups().length }})
+      </button>
+      <button type="button" [class.is-activa]="pestana() === 'programacion'" (click)="pestana.set('programacion')">
+        Programación ({{ programaciones().length }})
+      </button>
+      <button type="button" [class.is-activa]="pestana() === 'restauraciones'" (click)="pestana.set('restauraciones')">
+        Restauraciones ({{ restauraciones().length }})
+      </button>
+    </nav>
+
+    @switch (pestana()) {
+      @case ('backups') {
+        @if (e.disponible) {
+          <section class="backups-crear">
+            <h2>Crear backup ahora</h2>
+            <div class="backups-secciones">
+              @for (s of e.secciones; track s.codigo) {
+                <label>
+                  <input type="checkbox" [checked]="seleccion().includes(s.codigo)"
+                         (change)="seleccion.set(alternar(seleccion(), s.codigo))" />
+                  {{ s.nombre }}
+                </label>
+              }
+            </div>
+            <button type="button" class="backups-btn" [disabled]="creando()" (click)="crear()">
+              {{ creando() ? 'Iniciando…' : 'Crear backup' }}
+            </button>
+          </section>
+        }
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Backup</th>
+                <th>Contenido</th>
+                <th>Tamaño</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of backups(); track b.id) {
+                <tr>
+                  <td>
+                    <strong>#{{ b.id }} · {{ utc(b.creado_en) | date: 'dd/MM/yyyy HH:mm' }}</strong>
+                    <small class="backups-sub">{{ origen(b) }}{{ b.creado_por ? ' · ' + b.creado_por : '' }}</small>
+                    @if (b.atrasado) {
+                      <small class="backups-sub backups-atrasado">Corrió tarde: el servidor estaba dormido a esa hora</small>
+                    }
+                  </td>
+                  <td>
+                    <div class="backups-chips">
+                      @for (s of b.secciones; track s) {
+                        <span>{{ nombreSeccion()[s] ?? s }}</span>
+                      }
+                    </div>
+                    @if (b.estado === 'completado') {
+                      <small class="backups-sub">{{ contenido(b) }}</small>
+                    }
+                  </td>
+                  <td>{{ tamano(b.tamano_bytes) }}</td>
+                  <td>
+                    <span class="backups-estado backups-estado--{{ b.estado }}">
+                      {{ b.estado === 'en_proceso' ? 'En proceso…' : b.estado === 'completado' ? 'Completado' : 'Falló' }}
+                    </span>
+                    @if (b.error) {
+                      <small class="backups-sub backups-error">{{ b.error }}</small>
+                    }
+                  </td>
+                  <td>
+                    <div class="ventas-acciones">
+                      @if (b.estado === 'completado') {
+                        <button type="button" (click)="descargar(b)">Descargar</button>
+                        @if (e.disponible) {
+                          <button type="button" class="is-warning" (click)="abrirRestaurar(b)">Restaurar</button>
+                        }
+                      }
+                      @if (b.estado !== 'en_proceso') {
+                        <button type="button" class="is-danger" (click)="borrar(b)">Borrar</button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="admin-table__empty">Todavía no hay backups.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @case ('programacion') {
+        <section class="backups-crear">
+          <h2>Backups automáticos</h2>
+          <p class="backups-nota">
+            Se hacen solos en la fecha y hora que elijas (hora de Bolivia), una vez o cada día, semana o mes. Cada programación
+            guarda sus últimos backups y borra los más viejos. Si a esa hora el servidor estaba dormido, el backup se hace apenas
+            despierte y queda marcado como atrasado.
+          </p>
+          @if (e.disponible) {
+            <button type="button" class="backups-btn" (click)="nuevaProgramacion()">Nueva programación</button>
+          }
+        </section>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Programación</th>
+                <th>Cuándo</th>
+                <th>Próximo backup</th>
+                <th>Guarda</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of programaciones(); track p.id) {
+                <tr>
+                  <td>
+                    <strong>{{ p.nombre }}</strong>
+                    <div class="backups-chips">
+                      @for (s of p.secciones; track s) {
+                        <span>{{ nombreSeccion()[s] ?? s }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td>{{ cuando(p) }}</td>
+                  <td>
+                    @if (p.activa && p.proxima_ejecucion) {
+                      {{ utc(p.proxima_ejecucion) | date: 'dd/MM/yyyy HH:mm' }}
+                    } @else {
+                      <span class="backups-estado backups-estado--pausada">{{ p.frecuencia === 'una_vez' && p.ultima_ejecucion ? 'Ya se hizo' : 'Pausada' }}</span>
+                    }
+                    @if (p.ultima_ejecucion) {
+                      <small class="backups-sub">Último: {{ utc(p.ultima_ejecucion) | date: 'dd/MM HH:mm' }}</small>
+                    }
+                  </td>
+                  <td>Últimos {{ p.retener }} <small class="backups-sub">Tiene {{ p.backups }}</small></td>
+                  <td>
+                    @if (e.disponible) {
+                      <div class="ventas-acciones">
+                        <button type="button" (click)="editarProgramacion(p)">Editar</button>
+                        @if (p.frecuencia !== 'una_vez' || !p.ultima_ejecucion) {
+                          <button type="button" class="is-warning" (click)="pausar(p)">{{ p.activa ? 'Pausar' : 'Reanudar' }}</button>
+                        }
+                        <button type="button" class="is-danger" (click)="borrarProgramacion(p)">Borrar</button>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="admin-table__empty">No hay backups programados.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @case ('restauraciones') {
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Restauración</th>
+                <th>Desde el backup</th>
+                <th>Secciones</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of restauraciones(); track r.id) {
+                <tr>
+                  <td>
+                    <strong>{{ utc(r.creado_en) | date: 'dd/MM/yyyy HH:mm' }}</strong>
+                    <small class="backups-sub">{{ r.hecho_por ?? '—' }}</small>
+                  </td>
+                  <td>
+                    @if (r.backup_id) {
+                      #{{ r.backup_id }} · {{ utc(r.backup_creado_en) | date: 'dd/MM/yyyy HH:mm' }}
+                    } @else {
+                      Backup borrado
+                    }
+                    @if (r.backup_previo_id) {
+                      <small class="backups-sub">Para volver atrás: backup #{{ r.backup_previo_id }}</small>
+                    }
+                  </td>
+                  <td>
+                    <div class="backups-chips">
+                      @for (s of r.secciones; track s) {
+                        <span>{{ nombreSeccion()[s] ?? s }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    <span class="backups-estado backups-estado--{{ r.estado }}">
+                      {{ r.estado === 'en_proceso' ? 'En proceso…' : r.estado === 'completada' ? 'Completada' : 'Falló' }}
+                    </span>
+                    @if (r.estado === 'completada') {
+                      @let t = totales(r);
+                      <small class="backups-sub">
+                        Volvieron {{ t.volvieron | number }} · se restauraron {{ t.actualizadas | number }}
+                        @if (r.resumen?.imagenes) {
+                          · {{ r.resumen?.imagenes }} imágenes repuestas
+                        }
+                      </small>
+                      @for (o of omitidas(r); track o) {
+                        <small class="backups-sub backups-error">No volvieron: {{ o }}</small>
+                      }
+                    }
+                    @if (r.error) {
+                      <small class="backups-sub backups-error">{{ r.error }}</small>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="4" class="admin-table__empty">Todavía no se restauró ningún backup.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+</div>
+
+@if (restaurando(); as b) {
+  <div class="ventas-overlay" (click)="cerrarRestaurar()">
+    <div class="ventas-modal ventas-modal--wide" (click)="$event.stopPropagation()">
+      <h2>Restaurar backup #{{ b.id }}</h2>
+      <p class="ventas-modal__subtitulo">
+        Del {{ utc(b.creado_en) | date: 'dd/MM/yyyy HH:mm' }}. Antes de restaurar se hace un backup automático de cómo está todo
+        ahora, por si quieres volver atrás.
+      </p>
+
+      <div class="backups-secciones backups-secciones--lista">
+        @for (s of b.secciones; track s) {
+          @if (s !== 'historial') {
+            <label>
+              <input type="checkbox" [checked]="seccionesRestaurar().includes(s)"
+                     (change)="seccionesRestaurar.set(alternar(seccionesRestaurar(), s))" />
+              {{ nombreSeccion()[s] ?? s }}
+            </label>
+            @if (s === 'inventario' && seccionesRestaurar().includes(s)) {
+              <small class="backups-advertencia">El stock de cada prenda vuelve a la cantidad que tenía en el backup.</small>
+            }
+          }
+        }
+      </div>
+
+      @if (b.secciones.includes('historial')) {
+        <div class="backups-historial">
+          <label>
+            <input type="checkbox" [checked]="seccionesRestaurar().includes('historial')"
+                   (change)="seccionesRestaurar.set(alternar(seccionesRestaurar(), 'historial'))" />
+            <strong>¿Restaurar también el historial de ventas, reservas, pagos, cajas y devoluciones?</strong>
+          </label>
+          <p>
+            Se combina con el de hoy: vuelven las ventas, pagos y cajas del backup que ya no existen, y
+            <strong>todo lo que se hizo después del backup se queda como está</strong>. No se vuelve a cobrar ni a devolver
+            dinero, y el stock no cambia (para eso marca Inventario).
+          </p>
+        </div>
+      }
+
+      @if (estado()?.sistema) {
+        <label class="ventas-campo">
+          <span>Es el sistema completo: escribe RESTAURAR para confirmar</span>
+          <input type="text" [value]="confirmacion()" (input)="confirmacion.set($any($event.target).value)" />
+        </label>
+      }
+
+      @if (errorModal()) {
+        <div class="admin-error">{{ errorModal() }}</div>
+      }
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" [disabled]="guardando()" (click)="cerrarRestaurar()">Cancelar</button>
+        <button type="button" class="is-danger-solid" [disabled]="guardando()" (click)="confirmarRestaurar()">
+          {{ guardando() ? 'Iniciando…' : 'Restaurar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (form(); as f) {
+  <div class="ventas-overlay" (click)="form.set(null)">
+    <div class="ventas-modal ventas-modal--wide" (click)="$event.stopPropagation()">
+      <h2>{{ f.id === null ? 'Nueva programación' : 'Editar programación' }}</h2>
+      <p class="ventas-modal__subtitulo">Hora de Bolivia.</p>
+
+      <label class="ventas-campo">
+        <span>Nombre</span>
+        <input type="text" maxlength="80" [value]="f.nombre" (input)="cambiarForm({ nombre: $any($event.target).value })" />
+      </label>
+      <div class="backups-fila">
+        <label class="ventas-campo">
+          <span>Frecuencia</span>
+          <select [value]="f.frecuencia" (change)="cambiarForm({ frecuencia: $any($event.target).value })">
+            <option value="una_vez">Una vez</option>
+            <option value="diaria">Todos los días</option>
+            <option value="semanal">Cada semana</option>
+            <option value="mensual">Cada mes</option>
+          </select>
+        </label>
+        @switch (f.frecuencia) {
+          @case ('una_vez') {
+            <label class="ventas-campo">
+              <span>Fecha</span>
+              <input type="date" [value]="f.fecha" (input)="cambiarForm({ fecha: $any($event.target).value })" />
+            </label>
+          }
+          @case ('semanal') {
+            <label class="ventas-campo">
+              <span>Día</span>
+              <select [value]="f.dia_semana" (change)="cambiarForm({ dia_semana: +$any($event.target).value })">
+                @for (d of diasSemana; track $index) {
+                  <option [value]="$index">{{ d }}</option>
+                }
+              </select>
+            </label>
+          }
+          @case ('mensual') {
+            <label class="ventas-campo">
+              <span>Día del mes</span>
+              <input type="number" min="1" max="31" [value]="f.dia_mes" (input)="cambiarForm({ dia_mes: +$any($event.target).value })" />
+            </label>
+          }
+        }
+        <label class="ventas-campo">
+          <span>Hora</span>
+          <input type="time" [value]="f.hora" (input)="cambiarForm({ hora: $any($event.target).value })" />
+        </label>
+      </div>
+      @if (f.frecuencia === 'mensual' && f.dia_mes > 28) {
+        <small class="backups-advertencia">En los meses que no tienen ese día, se hace el último día del mes.</small>
+      }
+
+      <span class="backups-etiqueta">Qué respaldar</span>
+      <div class="backups-secciones backups-secciones--lista">
+        @for (s of estado()?.secciones ?? []; track s.codigo) {
+          <label>
+            <input type="checkbox" [checked]="f.secciones.includes(s.codigo)"
+                   (change)="cambiarForm({ secciones: alternar(f.secciones, s.codigo) })" />
+            {{ s.nombre }}
+          </label>
+        }
+      </div>
+
+      <div class="backups-fila">
+        <label class="ventas-campo">
+          <span>Guardar los últimos</span>
+          <input type="number" min="1" max="60" [value]="f.retener" (input)="cambiarForm({ retener: +$any($event.target).value })" />
+        </label>
+        <label class="backups-check">
+          <input type="checkbox" [checked]="f.activa" (change)="cambiarForm({ activa: $any($event.target).checked })" />
+          Activa
+        </label>
+      </div>
+
+      @if (errorModal()) {
+        <div class="admin-error">{{ errorModal() }}</div>
+      }
+      <div class="ventas-modal__acciones">
+        <button type="button" class="is-secondary" [disabled]="guardando()" (click)="form.set(null)">Cancelar</button>
+        <button type="button" [disabled]="guardando()" (click)="guardarProgramacion()">
+          {{ guardando() ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

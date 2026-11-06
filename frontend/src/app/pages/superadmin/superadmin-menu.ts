@@ -125,6 +125,14 @@ export const PARCIALES: ParcialMenu[] = [
           { codigo: 'CU01', nombre: 'Gestionar inicio y cierre de sesión', ruta: 'sesiones', antes: 'CU01', plataformas: ['WEB', 'MÓVIL'] },
           { codigo: 'CU02', nombre: 'Administrar usuarios, roles y permisos', ruta: 'usuarios', antes: 'CU02', plataformas: ['WEB', 'MÓVIL'] },
           { codigo: 'CU08', permisos: ['CU17'], nombre: 'Auditar operaciones (bitácora)', ruta: 'bitacora', antes: 'CU17', plataformas: ['WEB'] },
+          {
+            codigo: 'CU21', permisos: ['2P-CU21'],
+            nombre: 'Gestionar backups y restauración',
+            ruta: 'backups',
+            plataformas: ['WEB'],
+            descripcion:
+              'Copias de seguridad manuales o programadas (una vez, diaria, semanal o mensual) de una tienda o del sistema completo, con imágenes, y restauración por secciones que combina con lo actual sin borrar nada. Planes Básico y Profesional.',
+          },
         ],
       },
       {

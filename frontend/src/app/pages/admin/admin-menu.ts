@@ -20,6 +20,7 @@ export const ADMIN_MENU: AdminPackage[] = [
       { code: 'CU01', label: 'Gestionar Inicio y Cierre de Sesion', route: '/admin/sesiones' },
       { code: 'CU02', label: 'Administrar Usuarios, Roles y Permisos', route: '/admin/usuarios' },
       { code: 'CU17', label: 'Auditar Operaciones (Bitacora)', route: '/admin/bitacora' },
+      { code: 'CU26', label: 'Backups y Restauracion', route: '/admin/backups', permiso: '2P-CU21' },
     ],
   },
   {

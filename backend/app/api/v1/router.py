@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.ar_uso import router as ar_uso_router
 from app.api.v1.endpoints.asistencia import router as asistencia_router
 from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.backups import router as backups_router
 from app.api.v1.endpoints.bitacora import router as bitacora_router
 from app.api.v1.endpoints.carrito import admin_router as carritos_admin_router
 from app.api.v1.endpoints.carrito import router as carrito_router
@@ -86,6 +87,8 @@ api_router.include_router(registro_empresa_router, prefix="/empresas", tags=["pl
 api_router.include_router(mi_empresa_router, prefix="/mi-empresa", tags=["plataforma"])
 api_router.include_router(tiendas_router, prefix="/tiendas", tags=["plataforma"])
 api_router.include_router(metodos_pago_router, prefix="/metodos-pago", tags=["metodos-pago"])
+# CU21: backups y restauracion (de una tienda o del sistema completo).
+api_router.include_router(backups_router, prefix="/backups", tags=["backups"])
 
 
 @api_router.get("/ping", tags=["health"])

@@ -14,6 +14,7 @@ import { AdminCarritos } from './pages/admin/carritos/carritos';
 import { AdminCaja } from './pages/admin/caja/caja';
 import { AdminCambios } from './pages/admin/cambios/cambios';
 import { AdminConflictos } from './pages/admin/conflictos/conflictos';
+import { AdminBackups } from './pages/admin/backups/backups';
 import { AdminSinConexion } from './pages/admin/sin-conexion/sin-conexion';
 import { SinConexionCliente } from './pages/sin-conexion/sin-conexion-cliente';
 import { PagarCompras } from './pages/pagar-compras/pagar-compras';
@@ -198,6 +199,7 @@ export const routes: Routes = [
       { path: 'chatbot/:clienteId', component: AdminChatbotDetalle, canActivate: [permisoGuard('CU19')] },
       { path: 'calificaciones', component: AdminCalificaciones, canActivate: [permisoGuard('CU20')] },
       { path: 'reporte-voz', component: AdminReporteVoz, canActivate: [permisoGuard('2P-CU17')] },
+      { path: 'backups', component: AdminBackups, canActivate: [permisoGuard('2P-CU21')] },
     ],
   },
   // Panel del SuperAdministrador: mismo esquema que el panel de una tienda,
@@ -217,6 +219,8 @@ export const routes: Routes = [
       { path: 'empresas', component: SuperadminEmpresas },
       { path: 'planes', component: SuperadminPlanes },
       { path: 'comisiones', component: SuperadminComisiones },
+      // CU21: backups del sistema completo o de una tienda (se elige en la pantalla).
+      { path: 'backups', component: AdminBackups },
       // CU03 y CU04: primero se elige la tienda (tiendas/:codigo) y la
       // pantalla muestra solo lo de esa tienda (?empresa=<id>).
       { path: 'tiendas/:codigo', component: SuperadminElegirEmpresa, data: { parcial: 'p2' } },

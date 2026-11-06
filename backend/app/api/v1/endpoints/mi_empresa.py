@@ -156,7 +156,7 @@ def mi_suscripcion(db: Session = Depends(get_db), admin: Usuario = Depends(_admi
     historial = db.execute(text("SELECT * FROM fn_historial_suscripciones(:e)"), {"e": admin.empresa_id}).mappings().all()
     planes = db.execute(
         text(
-            "SELECT codigo, nombre, precio_mensual, max_sucursales, dias_prueba, ia_generativa, operacion_offline, "
+            "SELECT codigo, nombre, precio_mensual, max_sucursales, dias_prueba, ia_generativa, operacion_offline, backups, live_commerce, "
             "comision_pct FROM plan_suscripcion WHERE activo ORDER BY orden"
         )
     ).mappings().all()
