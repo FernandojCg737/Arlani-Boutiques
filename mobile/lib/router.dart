@@ -40,6 +40,9 @@ import 'features/storefront/carrito_screen.dart';
 import 'features/storefront/checkout_screen.dart';
 import 'features/storefront/cotizaciones_screen.dart';
 import 'features/storefront/producto_detalle_screen.dart';
+import 'features/live/live_admin_screen.dart';
+import 'features/live/live_lista_screen.dart';
+import 'features/live/live_sala_screen.dart';
 
 /// Mapa ruta admin -> codigo CU requerido, derivado de `admin_menu.dart`
 /// (misma fuente que el sidebar) — equivalente a `permisoGuard('CUxx')` en
@@ -69,7 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/registro' || loc == '/recuperar';
-      final requiresAuth = loc == '/perfil' || loc.startsWith('/mis-compras/') || loc.startsWith('/mis-cambios/') || loc == '/sin-conexion' || loc == '/pagar-compras' || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar';
+      final requiresAuth = loc == '/perfil' || loc.startsWith('/mis-compras/') || loc.startsWith('/mis-cambios/') || loc == '/sin-conexion' || loc == '/pagar-compras' || loc == '/checkout' || loc == '/chatbot' || loc == '/empezar' || loc == '/live' || loc.startsWith('/live/');
       final isAdminArea = loc == '/admin' || loc.startsWith('/admin/');
 
       if (requiresAuth && !auth.isAuthenticated) return '/login';
@@ -144,6 +147,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PerfilScreen(tabInicial: state.uri.queryParameters['tab']),
       ),
       GoRoute(path: '/admin', builder: (context, state) => const AdminShell()),
+      // CU22 live commerce: lives en curso, la sala (ver, comentar, comprar o
+      // transmitir) y, para la tienda, iniciar y ver sus grabaciones.
+      GoRoute(path: '/live', builder: (context, state) => const LiveListaScreen()),
+      GoRoute(path: '/live/:id', builder: (context, state) => LiveSalaScreen(liveId: int.parse(state.pathParameters['id']!))),
+      GoRoute(path: '/admin/live', builder: (context, state) => const LiveAdminScreen()),
       // P4 offline: el cliente guarda el catalogo y reserva o compra sin internet.
       GoRoute(path: '/sin-conexion', builder: (context, state) => const SinConexionClienteScreen()),
       GoRoute(path: '/pagar-compras', builder: (context, state) => const PagarComprasScreen()),

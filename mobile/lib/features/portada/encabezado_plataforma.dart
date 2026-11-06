@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,13 +7,14 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../auth/auth_provider.dart';
+import '../live/live_api.dart';
 import '../notificaciones/notificaciones_provider.dart';
 import '../storefront/cart_provider.dart';
 import 'estilo_plataforma.dart';
 import 'plataforma_data.dart';
 
 /// Encabezado de la portada (`header-plataforma` de la web, version celular):
-/// logo, carrito y hamburguesa. Va transparente sobre el video del hero y
+/// logo, LIVE (CU22), notificaciones (CU14), carrito y hamburguesa. Va transparente sobre el video del hero y
 /// pasa a "vidrio" (azul noche translucido y desenfocado) al bajar o al abrir
 /// el menu.
 class EncabezadoPlataforma extends ConsumerStatefulWidget {
@@ -41,9 +43,31 @@ class EncabezadoPlataforma extends ConsumerStatefulWidget {
 class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
   bool _menuAbierto = false;
   final _busqueda = TextEditingController();
+  Timer? _timerLive;
+  Timer? _timerNotif;
+
+  @override
+  void initState() {
+    super.initState();
+    // LIVE se pone rojo si alguna tienda esta en vivo; la campanita cuenta las
+    // notificaciones sin leer (igual que la web, que las revisa cada 30 s).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(enVivoProvider.notifier).revisar();
+      _revisarNotificaciones();
+    });
+    _timerLive = Timer.periodic(const Duration(seconds: 60), (_) => ref.read(enVivoProvider.notifier).revisar());
+    _timerNotif = Timer.periodic(const Duration(seconds: 30), (_) => _revisarNotificaciones());
+  }
+
+  void _revisarNotificaciones() {
+    final auth = ref.read(authProvider);
+    if (auth.isAuthenticated && !auth.isStaff) ref.read(notificacionesProvider.notifier).cargar();
+  }
 
   @override
   void dispose() {
+    _timerLive?.cancel();
+    _timerNotif?.cancel();
     _busqueda.dispose();
     super.dispose();
   }
@@ -70,6 +94,8 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final enCarrito = ref.watch(cartTotalItemsProvider);
+    final enVivo = ref.watch(enVivoProvider).length;
+    final noLeidas = ref.watch(notificacionesNoLeidasProvider);
     final arriba = MediaQuery.paddingOf(context).top;
     final vidrio = widget.solido || _menuAbierto;
 
@@ -91,6 +117,14 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
                   child: Image.asset('assets/portada/arlani-logo-encabezado.png', height: 46),
                 ),
                 const Spacer(),
+                _BotonLive(enVivo: enVivo, onTap: () => _navegar('/live')),
+                if (auth.isAuthenticated && !auth.isStaff && auth.hasPermiso('CU14'))
+                  _BotonIcono(
+                    icono: Icons.notifications_none,
+                    globo: noLeidas,
+                    descripcion: 'Notificaciones',
+                    onTap: () => _navegar('/perfil?tab=notificaciones'),
+                  ),
                 if (auth.mostrarAccionCliente('CU13') && !auth.isStaff)
                   _BotonIcono(
                     icono: Icons.shopping_cart_outlined,
@@ -137,6 +171,63 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
               child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14), child: contenido),
             )
           : contenido,
+    );
+  }
+}
+
+/// Boton LIVE: recuadro discreto; rojo lleno con un punto que late cuando
+/// alguna tienda esta en vivo. Sin sesion, el router manda al login.
+class _BotonLive extends StatefulWidget {
+  const _BotonLive({required this.enVivo, required this.onTap});
+
+  final int enVivo;
+  final VoidCallback onTap;
+
+  @override
+  State<_BotonLive> createState() => _BotonLiveState();
+}
+
+class _BotonLiveState extends State<_BotonLive> with SingleTickerProviderStateMixin {
+  late final AnimationController _latido = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _latido.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activo = widget.enVivo > 0;
+    return Semantics(
+      button: true,
+      label: activo ? '${widget.enVivo} tiendas en vivo ahora' : 'Compra en vivo',
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: activo ? const Color(0xFFE5292F) : Colors.transparent,
+              border: Border.all(color: activo ? const Color(0xFFE5292F) : Colors.white, width: 1.5),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (activo) ...[
+                FadeTransition(
+                  opacity: Tween(begin: 1.0, end: 0.35).animate(_latido),
+                  child: Container(width: 7, height: 7, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text('LIVE', style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.9)),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }

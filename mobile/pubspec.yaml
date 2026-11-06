@@ -102,6 +102,7 @@ dependencies:
   location: ^10.0.2
   workmanager: ^0.10.10
   flutter_local_notifications: ^22.3.3
+  livekit_client: ^2.13.2
 
 dev_dependencies:
   flutter_test:

@@ -488,6 +488,17 @@ $escritorio: 1024px;
 .menu-icono--notif {
   width: 340px;
   max-width: 88vw;
+
+  // En celular la campanita no está en la esquina: el panel ocupa el ancho de
+  // la pantalla para no salirse por la izquierda.
+  @media (max-width: $escritorio - 1px) {
+    position: fixed;
+    top: 72px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .menu-icono__cabecera {
