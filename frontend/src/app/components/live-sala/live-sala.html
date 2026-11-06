@@ -93,7 +93,7 @@
         @if (!vendedor() && !fin()) {
           <div class="live__escribir">
             @if (silenciado()) {
-              <span class="live__silenciado">La tienda te silenció en este live.</span>
+              <span class="live__silenciado">La tienda bloqueó tus comentarios en este live.</span>
             } @else {
               <input
                 type="text"
@@ -158,6 +158,10 @@
                     @if (c.es_tienda) {
                       <small class="live__chip">Tienda</small>
                     }
+                    @if (bloqueoDe()[c.usuario_id]; as b) {
+                      <small class="live__chip live__chip--alerta">{{ b === 'expulsado' ? 'Expulsado' : 'Bloqueado' }}</small>
+                    }
+                    <small>{{ fechaUtc(c.fecha) | date: 'HH:mm:ss' }}</small>
                     <p>{{ c.texto }}</p>
                     @if (c.oculto) {
                       <small>Oculto</small>
@@ -167,7 +171,9 @@
                     <div class="live__acciones">
                       <button type="button" (click)="ocultar(c)">Ocultar</button>
                       @if (!bloqueoDe()[c.usuario_id]) {
-                        <button type="button" (click)="bloquear(c.usuario_id, c.usuario, 'silenciado')">Silenciar</button>
+                        <button type="button" class="is-peligro" (click)="bloquear(c.usuario_id, c.usuario, 'silenciado')">
+                          Bloquear comentarios
+                        </button>
                       }
                     </div>
                   }
@@ -185,14 +191,14 @@
                     <strong>{{ e.nombre }}</strong>
                     <small>{{ e.conectado ? 'Viendo ahora' : 'Salió' }} · {{ e.comentarios }} comentarios</small>
                     @if (e.bloqueo) {
-                      <small class="live__chip live__chip--alerta">{{ e.bloqueo === 'expulsado' ? 'Expulsado' : 'Silenciado' }}</small>
+                      <small class="live__chip live__chip--alerta">{{ e.bloqueo === 'expulsado' ? 'Expulsado' : 'Comentarios bloqueados' }}</small>
                     }
                   </div>
                   <div class="live__acciones">
                     @if (e.bloqueo) {
-                      <button type="button" (click)="desbloquear(e.usuario_id)">Quitar bloqueo</button>
+                      <button type="button" (click)="desbloquear(e.usuario_id)">Desbloquear</button>
                     } @else {
-                      <button type="button" (click)="bloquear(e.usuario_id, e.nombre, 'silenciado')">Silenciar</button>
+                      <button type="button" (click)="bloquear(e.usuario_id, e.nombre, 'silenciado')">Bloquear comentarios</button>
                       <button type="button" class="is-peligro" (click)="bloquear(e.usuario_id, e.nombre, 'expulsado')">Expulsar</button>
                     }
                   </div>

@@ -115,7 +115,10 @@ class SalaOut(BaseModel):
     live: LiveOut
     url: str
     token: str
+    # Transmite solo quien inicio el live; el resto del personal con permiso y
+    # el SuperAdministrador moderan (ven el video y bloquean, sin camara).
     vendedor: bool
+    moderador: bool
     silenciado: bool
     productos: list[ProductoLiveOut]
     comentarios: list[ComentarioOut]
@@ -565,8 +568,9 @@ def bloquear(live_id: int, payload: BloqueoIn, request: Request, db: Session = D
         {"l": live_id, "u": payload.usuario_id, "t": payload.tipo, "p": usuario.id},
     )
     expulsado = payload.tipo == "expulsado"
-    _bitacora(db, usuario, "EXPULSAR" if expulsado else "SILENCIAR", live_id,
-              f"{'Expulsó' if expulsado else 'Silenció'} a {nombre} del live «{live.titulo}»", live.empresa_id, request)
+    _bitacora(db, usuario, "EXPULSAR" if expulsado else "BLOQUEAR", live_id,
+              f"{'Expulsó' if expulsado else 'Bloqueó los comentarios de'} {nombre} del live «{live.titulo}»"
+              if not expulsado else f"Expulsó a {nombre} del live «{live.titulo}»", live.empresa_id, request)
     db.commit()
     sala = _sala(db, live_id)
     _avisar(sala, {"tipo": "bloqueo", "usuario_id": payload.usuario_id, "bloqueo": payload.tipo})
@@ -675,31 +679,36 @@ def sala_live(live_id: int, db: Session = Depends(get_db), usuario: Usuario = De
     live = _live(db, live_id)
     if live.estado != "en_vivo":
         raise HTTPException(status.HTTP_410_GONE, "Este live ya terminó.")
-    vendedor = False
-    if _es_de_la_tienda(usuario, live) and usuario.tipo != "superadministrador":
+    moderador = usuario.tipo == "superadministrador"
+    if not moderador and _es_de_la_tienda(usuario, live):
         try:
             require_permiso(PERMISO)(usuario)
-            vendedor = True
+            moderador = True
         except HTTPException:
-            vendedor = False
+            moderador = False
+    iniciador = db.execute(text("SELECT iniciado_por_id FROM live WHERE id = :i"), {"i": live_id}).scalar()
+    vendedor = moderador and usuario.tipo != "superadministrador" and usuario.id == iniciador
     bloqueo = db.execute(text("SELECT tipo FROM live_bloqueo WHERE live_id = :l AND usuario_id = :u"),
                          {"l": live_id, "u": usuario.id}).scalar()
     if bloqueo == "expulsado":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "La tienda te sacó de este live.")
-    if not vendedor:
+    # El personal que modera no cuenta como espectador.
+    if not moderador:
         db.execute(
             text("""INSERT INTO live_espectador (live_id, usuario_id) VALUES (:l, :u)
                     ON CONFLICT (live_id, usuario_id) DO UPDATE SET salio_en = NULL, veces = live_espectador.veces + 1"""),
             {"l": live_id, "u": usuario.id},
         )
         db.commit()
-    gestiona = vendedor or usuario.tipo == "superadministrador"
+    gestiona = moderador
+    rol = "vendedor" if vendedor else "moderador" if moderador else "espectador"
     return SalaOut(
         live=_live(db, live_id),
         url=settings.LIVEKIT_URL,
         token=lk.token(_sala(db, live_id), f"u{usuario.id}", usuario.nombre, vendedor,
-                       {"usuario_id": usuario.id, "rol": "vendedor" if vendedor else "espectador"}),
+                       {"usuario_id": usuario.id, "rol": rol}),
         vendedor=vendedor,
+        moderador=moderador,
         silenciado=bloqueo == "silenciado",
         productos=_productos(db, live_id),
         comentarios=_comentarios(db, live, con_ocultos=gestiona),
@@ -723,7 +732,7 @@ def comentar(live_id: int, payload: ComentarIn, db: Session = Depends(get_db),
     bloqueo = db.execute(text("SELECT tipo FROM live_bloqueo WHERE live_id = :l AND usuario_id = :u"),
                          {"l": live_id, "u": usuario.id}).scalar()
     if bloqueo:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "La tienda te silenció en este live.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "La tienda bloqueó tus comentarios en este live.")
     # Un comentario cada 2 segundos por persona.
     if db.execute(text("SELECT 1 FROM live_comentario WHERE live_id = :l AND usuario_id = :u AND fecha > now() - interval '2 seconds'"),
                   {"l": live_id, "u": usuario.id}).first():
