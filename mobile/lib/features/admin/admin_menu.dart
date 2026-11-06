@@ -1,6 +1,6 @@
 /// Espejo exacto de `pages/admin/admin-menu.ts` en la web: 5 paquetes con
-/// sus CUs. Solo los CUs con `route` no nulo estan implementados (los demas
-/// -CU09,10,11,13,14,16,18,19,20- no existen ni en la web ni en el backend).
+/// sus CUs. Los que aun no tienen pantalla en la app (sin `route`) se ven
+/// como "Proximamente", igual que en la web.
 class AdminUseCase {
   const AdminUseCase({required this.code, required this.label, this.route, this.permiso});
 
@@ -27,6 +27,7 @@ const adminMenu = <AdminPackage>[
       AdminUseCase(code: 'CU01', label: 'Gestionar Inicio y Cierre de Sesion', route: '/admin/sesiones'),
       AdminUseCase(code: 'CU02', label: 'Administrar Usuarios, Roles y Permisos', route: '/admin/usuarios'),
       AdminUseCase(code: 'CU17', label: 'Auditar Operaciones (Bitacora)', route: '/admin/bitacora'),
+      AdminUseCase(code: 'CU26', label: 'Backups y Restauracion', permiso: '2P-CU21'),
     ],
   ),
   AdminPackage(
@@ -57,7 +58,10 @@ const adminMenu = <AdminPackage>[
       AdminUseCase(code: 'CU10', label: 'Gestion de Reservas', route: '/admin/reservas'),
       AdminUseCase(code: 'CU11', label: 'Gestion de Ventas', route: '/admin/ventas'),
       AdminUseCase(code: 'CU13', label: 'Administrar Carrito de Compras', route: '/admin/carritos'),
+      AdminUseCase(code: 'CU21', label: 'Gestionar Metodos de Pago'),
+      AdminUseCase(code: 'CU22', label: 'Arqueo y Cierre de Caja', permiso: '2P-CU16'),
       AdminUseCase(code: 'CU23', label: 'Trabajar sin Conexion', route: '/admin/sin-conexion', permiso: '2P-CU12'),
+      AdminUseCase(code: 'CU24', label: 'Operaciones Offline y Conflictos', permiso: '2P-CU13'),
       AdminUseCase(code: 'CU27', label: 'Live Commerce', route: '/admin/live', permiso: '2P-CU22'),
     ],
   ),
@@ -66,13 +70,11 @@ const adminMenu = <AdminPackage>[
     label: 'Gestion de Experiencia y Analitica',
     useCases: [
       AdminUseCase(code: 'CU14', label: 'Enviar Notificaciones', route: '/admin/notificaciones'),
-      // CU16 (Reportes y Dashboards con graficos/exportar) se dejo fuera de
-      // mobile a proposito -- esa tarea es mucho mas comoda en pantalla
-      // grande, sigue disponible en la web.
       AdminUseCase(code: 'CU16', label: 'Gestion Reportes y Dashboards'),
       AdminUseCase(code: 'CU18', label: 'Recomendar Prendas por IA', route: '/admin/recomendaciones'),
       AdminUseCase(code: 'CU19', label: 'Atender Cliente con Chatbot', route: '/admin/chatbot'),
       AdminUseCase(code: 'CU20', label: 'Reputacion y Calificaciones', route: '/admin/calificaciones'),
+      AdminUseCase(code: 'CU25', label: 'Reportes por Voz (IA)', permiso: '2P-CU17'),
     ],
   ),
 ];

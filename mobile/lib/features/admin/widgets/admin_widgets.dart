@@ -1,13 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme.dart';
+import '../../auth/perfil_personal.dart' show marcaPersonalProvider;
+import '../../portada/plataforma_data.dart' show colorMarca;
 
 /// AppBar consistente para toda pantalla de admin: titulo mayuscula/negrita
 /// (mismo estilo que ya define `AppBarTheme` en `theme.dart`), back
 /// automatico (go_router lo provee al ser rutas empujadas, no tabs).
-class AdminScaffold extends StatelessWidget {
+/// Pantalla de un CU del panel, con el color de la tienda (como --brand-dark
+/// en la web): barra, botones, cargas y boton flotante.
+class AdminScaffold extends ConsumerWidget {
   const AdminScaffold({super.key, required this.title, required this.body, this.actions, this.floatingActionButton});
 
   final String title;
@@ -16,11 +21,26 @@ class AdminScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title), actions: actions),
-      body: body,
-      floatingActionButton: floatingActionButton,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final marca = ref.watch(marcaPersonalProvider).valueOrNull;
+    final color = marca == null ? Theme.of(context).colorScheme.primary : colorMarca(marca['color_marca'] as String?);
+    final base = Theme.of(context);
+    return Theme(
+      data: base.copyWith(
+        colorScheme: base.colorScheme.copyWith(primary: color, secondary: color),
+        appBarTheme: base.appBarTheme.copyWith(backgroundColor: color, foregroundColor: Colors.white),
+        progressIndicatorTheme: ProgressIndicatorThemeData(color: color),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(backgroundColor: color, foregroundColor: Colors.white),
+        filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(backgroundColor: color)),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: Colors.white),
+        ),
+      ),
+      child: Scaffold(
+        appBar: AppBar(title: Text(title), actions: actions),
+        body: body,
+        floatingActionButton: floatingActionButton,
+      ),
     );
   }
 }
