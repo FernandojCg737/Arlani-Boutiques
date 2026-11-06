@@ -2,15 +2,26 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api_config.dart';
-import '../portada/plataforma_data.dart' show colorMarca;
+import '../../widgets/whatsapp_float_button.dart';
+import '../portada/encabezado_plataforma.dart';
+import '../portada/plataforma_data.dart';
+import '../portada/secciones_cierre.dart';
+import '../storefront/catalogo_provider.dart';
 import 'live_api.dart';
 
+const _rojo = Color(0xFFE5292F);
+const _tinta = Color(0xFF121A2C);
+const _gris = Color(0xFF5F6779);
+
 /// CU22: lives en curso de todas las boutiques (boton LIVE del encabezado).
+/// Igual que `/live` de la web en celular: encabezado de Arlani, "Arlani Live"
+/// en rojo, el titulo, la grilla de lives y el pie de la plataforma.
 class LiveListaScreen extends ConsumerStatefulWidget {
   const LiveListaScreen({super.key});
 
@@ -43,44 +54,80 @@ class _LiveListaScreenState extends ConsumerState<LiveListaScreen> {
   @override
   Widget build(BuildContext context) {
     final lives = ref.watch(enVivoProvider);
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F4F2),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121A2C),
-        foregroundColor: Colors.white,
-        title: Text('Compra en vivo', style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _revisar,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+    final arriba = MediaQuery.paddingOf(context).top + EncabezadoPlataforma.alto;
+    void irA(SeccionPortada s) => context.go(s == SeccionPortada.inicio ? '/' : '/?seccion=${s.name}');
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
           children: [
-            Text(
-              'Las boutiques muestran sus prendas en directo: mira, pregunta en los comentarios y agrégalas a tu carrito sin salir del live.',
-              style: GoogleFonts.inter(fontSize: 13.5, height: 1.5, color: const Color(0xFF5F6779)),
-            ),
-            const SizedBox(height: 16),
-            if (_cargando)
-              const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
-            else if (lives.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: Text(
-                  'Ninguna boutique está en vivo ahora. Te avisaremos en tus notificaciones cuando alguna empiece.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(color: const Color(0xFF5F6779)),
+            RefreshIndicator(
+              edgeOffset: arriba,
+              onRefresh: _revisar,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(20, arriba + 36, 20, 72),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ARLANI LIVE',
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.4, color: _rojo)),
+                          const SizedBox(height: 6),
+                          Text('Compra en vivo',
+                              style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, height: 1.15, color: _tinta)),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Las boutiques muestran sus prendas en directo: mira, pregunta en los comentarios y agrégalas a tu '
+                            'carrito sin salir del live.',
+                            style: GoogleFonts.inter(fontSize: 15.5, height: 1.55, color: _gris),
+                          ),
+                          const SizedBox(height: 28),
+                          if (_cargando)
+                            const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()))
+                          else if (lives.isEmpty)
+                            Text(
+                              'Ninguna boutique está en vivo ahora. Te avisaremos en tus notificaciones cuando alguna empiece.',
+                              style: GoogleFonts.inter(fontSize: 15, height: 1.5, color: _gris),
+                            )
+                          else
+                            GridView.count(
+                              crossAxisCount: 2,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 0.66,
+                              children: [for (final l in lives) _Tarjeta(live: l)],
+                            ),
+                        ],
+                      ),
+                    ),
+                    PiePlataforma(onIrA: irA),
+                  ],
                 ),
-              )
-            else
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 14,
-                childAspectRatio: 0.68,
-                children: [for (final l in lives) _Tarjeta(live: l)],
               ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: EncabezadoPlataforma(
+                solido: true,
+                pleno: true,
+                onIrA: irA,
+                onBuscar: (texto) {
+                  ref.read(tiendaFiltrosProvider.notifier).setBusqueda(texto.trim());
+                  context.go('/catalogo');
+                },
+              ),
+            ),
+            Positioned(right: 16, bottom: 16 + MediaQuery.paddingOf(context).bottom, child: const WhatsappFloatButton()),
           ],
         ),
       ),
@@ -97,6 +144,8 @@ class _Tarjeta extends StatelessWidget {
     final desde = '${live.inicio.hour.toString().padLeft(2, '0')}:${live.inicio.minute.toString().padLeft(2, '0')}';
     return Material(
       color: Colors.white,
+      elevation: 1,
+      shadowColor: const Color(0x2212182C),
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -120,7 +169,7 @@ class _Tarjeta extends StatelessWidget {
                   left: 8,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(color: const Color(0xFFE5292F), borderRadius: BorderRadius.circular(4)),
+                    decoration: BoxDecoration(color: _rojo, borderRadius: BorderRadius.circular(4)),
                     child: const Text('EN VIVO', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
                   ),
                 ),
@@ -139,10 +188,11 @@ class _Tarjeta extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(live.titulo, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(live.titulo,
+                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, color: _tinta)),
               const SizedBox(height: 2),
               Text('${live.tienda} · desde las $desde',
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFF5F6779))),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: _gris)),
             ]),
           ),
         ]),

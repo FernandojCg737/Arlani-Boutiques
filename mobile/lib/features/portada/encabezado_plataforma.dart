@@ -109,14 +109,21 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
             padding: const EdgeInsets.symmetric(horizontal: Plataforma.margen),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () {
-                    _cerrar();
-                    widget.onIrA(SeccionPortada.inicio);
-                  },
-                  child: Image.asset('assets/portada/arlani-logo-encabezado.png', height: 46),
+                // Si no entra todo (celular angosto), se achica el logo, nunca
+                // los iconos: la hamburguesa del menu siempre se ve.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      onTap: () {
+                        _cerrar();
+                        widget.onIrA(SeccionPortada.inicio);
+                      },
+                      child: Image.asset('assets/portada/arlani-logo-encabezado.png', height: 46, fit: BoxFit.contain),
+                    ),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 _BotonLive(enVivo: enVivo, onTap: () => _navegar('/live')),
                 if (auth.isAuthenticated && !auth.isStaff && auth.hasPermiso('CU14'))
                   _BotonIcono(
@@ -132,7 +139,6 @@ class _EncabezadoPlataformaState extends ConsumerState<EncabezadoPlataforma> {
                     descripcion: 'Carrito',
                     onTap: () => _navegar('/carrito'),
                   ),
-                const SizedBox(width: 4),
                 _BotonIcono(
                   icono: _menuAbierto ? Icons.close : Icons.menu,
                   descripcion: _menuAbierto ? 'Cerrar menú' : 'Abrir menú',
@@ -245,6 +251,7 @@ class _BotonIcono extends StatelessWidget {
     return IconButton(
       onPressed: onTap,
       tooltip: descripcion,
+      visualDensity: VisualDensity.compact,
       icon: Badge(
         isLabelVisible: globo > 0,
         backgroundColor: const Color(0xFFD32F2F),

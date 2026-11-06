@@ -761,3 +761,36 @@ $escritorio: 1024px;
     transition: none;
   }
 }
+
+// Celular: logo, campanita, LIVE, carrito y hamburguesa en una sola fila. Se
+// acortan los espacios y, si aun no entra, se achica el logo (nunca los iconos,
+// para que la hamburguesa del menú siempre se vea).
+@media (max-width: $escritorio - 1px) {
+  .encabezado__fila {
+    gap: 12px;
+  }
+
+  .encabezado__logo {
+    min-width: 0;
+    flex-shrink: 1;
+
+    img {
+      height: auto;
+      max-height: 42px;
+      max-width: 100%;
+    }
+  }
+
+  .encabezado__acciones {
+    flex-shrink: 0;
+    gap: 2px;
+  }
+
+  .icono:not(.icono--live) {
+    width: 36px;
+  }
+
+  .encabezado__hamburguesa {
+    width: 40px;
+  }
+}
