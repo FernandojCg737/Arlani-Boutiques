@@ -13,6 +13,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../services/auth';
 import { Cart } from '../../services/cart';
+import { LiveApi } from '../../services/live';
 import { LoginRequerido } from '../../services/login-requerido';
 import { Notificaciones, type Notificacion } from '../../services/notificaciones';
 
@@ -45,6 +46,9 @@ const INTERVALO_NOTIFICACIONES_MS = 30000;
 export class HeaderPlataforma implements OnDestroy {
   protected readonly auth = inject(Auth);
   protected readonly cart = inject(Cart);
+  // CU22: botón LIVE (con punto rojo si alguna tienda está en vivo).
+  protected readonly live = inject(LiveApi);
+  private intervaloLive?: ReturnType<typeof setInterval>;
   protected readonly notificaciones = inject(Notificaciones);
   private readonly loginRequerido = inject(LoginRequerido);
   private readonly router = inject(Router);
@@ -109,8 +113,12 @@ export class HeaderPlataforma implements OnDestroy {
     effect(() => {
       if (this.auth.currentUser()) {
         void this.cart.cargar();
+        void this.live.revisarEnVivo();
+        this.intervaloLive ??= setInterval(() => void this.live.revisarEnVivo(), 60000);
       } else {
         this.cart.limpiarLocal();
+        clearInterval(this.intervaloLive);
+        this.intervaloLive = undefined;
       }
 
       if (this.esClienteConSesion()) {
@@ -130,6 +138,7 @@ export class HeaderPlataforma implements OnDestroy {
 
   ngOnDestroy(): void {
     clearInterval(this.intervaloNotificaciones);
+    clearInterval(this.intervaloLive);
     clearTimeout(this.cierreDiferido);
   }
 

@@ -1,0 +1,234 @@
+@if (cargando()) {
+  <p class="live-cargando">Entrando al live…</p>
+} @else if (!sala()) {
+  <div class="live-error">{{ error() || 'No se pudo entrar al live.' }}</div>
+} @else {
+  @let s = sala()!;
+  <div class="live" [class.live--modera]="modera()">
+    <div class="live__escenario">
+      <video #video autoplay playsinline [muted]="vendedor()" [class.espejo]="vendedor()"></video>
+      @if (sinVideo() && !fin()) {
+        <div class="live__espera">{{ vendedor() ? 'Encendiendo tu cámara…' : 'Esperando la transmisión…' }}</div>
+      }
+
+      <div class="live__arriba">
+        <div class="live__tienda">
+          @if (s.live.logo_url) {
+            <img [src]="s.live.logo_url" alt="" />
+          }
+          <div>
+            <strong>{{ s.live.tienda }}</strong>
+            <span>{{ s.live.titulo }}</span>
+          </div>
+        </div>
+        <span class="live__en-vivo">EN VIVO</span>
+        <span class="live__vistas" title="Viendo ahora">👁 {{ conectados().length }}</span>
+      </div>
+
+      @if (vendedor()) {
+        <div class="live__controles">
+          <button type="button" (click)="alternarMic()">{{ micActivo() ? '🎙️ Silenciar' : '🔇 Activar micrófono' }}</button>
+          <button type="button" (click)="alternarCam()">{{ camActiva() ? '📷 Apagar cámara' : '📷 Encender cámara' }}</button>
+          <button type="button" class="live__terminar" [disabled]="terminando()" (click)="terminar()">
+            {{ terminando() ? 'Terminando…' : 'Terminar live' }}
+          </button>
+        </div>
+      }
+
+      <div class="live__reacciones" aria-hidden="true">
+        @for (r of reacciones(); track r.id) {
+          <span [style.left.%]="r.izquierda">{{ r.emoji }}</span>
+        }
+      </div>
+
+      <div class="live__abajo">
+        @if (!modera()) {
+          <div class="live__comentarios" #lista>
+            @for (c of comentarios(); track c.id) {
+              <p [class.es-tienda]="c.es_tienda"><strong>{{ c.usuario }}</strong> {{ c.texto }}</p>
+            }
+          </div>
+        }
+
+        @if (fijado(); as p) {
+          <div class="live__prenda">
+            @if (p.imagen) {
+              <img [src]="p.imagen" [alt]="p.nombre" />
+            }
+            <div class="live__prenda-info">
+              <strong>{{ p.nombre }}</strong>
+              <span>
+                Bs {{ p.precio | number: '1.2-2' }}
+                @if (p.precio_original && p.precio_original > p.precio) {
+                  <s>Bs {{ p.precio_original | number: '1.2-2' }}</s>
+                }
+              </span>
+              @if (puedeComprar()) {
+                @if (p.variantes.length) {
+                  <select [value]="variante()" (change)="variante.set($any($event.target).value)" aria-label="Talla y color">
+                    <option value="">Elige talla y color</option>
+                    @for (v of p.variantes; track claveVariante(v)) {
+                      <option [value]="claveVariante(v)">{{ v.talla }} · {{ v.color }} · {{ v.sucursal }} ({{ v.stock }})</option>
+                    }
+                  </select>
+                  <button type="button" [disabled]="agregando()" (click)="agregarAlCarrito(p)">
+                    {{ agregando() ? 'Agregando…' : 'Agregar al carrito' }}
+                  </button>
+                } @else {
+                  <small>Sin stock por ahora</small>
+                }
+                @if (avisoCarrito()) {
+                  <small class="live__aviso">
+                    {{ avisoCarrito() }}
+                    @if (avisoCarrito().startsWith('¡')) {
+                      <a routerLink="/carrito">Ver carrito</a>
+                    }
+                  </small>
+                }
+              }
+            </div>
+          </div>
+        }
+
+        @if (!vendedor() && !fin()) {
+          <div class="live__escribir">
+            @if (silenciado()) {
+              <span class="live__silenciado">La tienda te silenció en este live.</span>
+            } @else {
+              <input
+                type="text"
+                maxlength="300"
+                placeholder="Escribe un comentario…"
+                [value]="texto()"
+                (input)="texto.set($any($event.target).value)"
+                (keydown.enter)="comentar()"
+              />
+              <button type="button" class="live__enviar" [disabled]="enviando() || !texto().trim()" (click)="comentar()">➤</button>
+            }
+          </div>
+          <div class="live__emojis">
+            @for (e of emojis; track e) {
+              <button type="button" [attr.aria-label]="'Reaccionar ' + e" (click)="reaccionar(e)" (contextmenu)="$event.preventDefault(); agregarEmoji(e)">
+                {{ e }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (sinSonido() && !vendedor() && !fin()) {
+        <button type="button" class="live__sonido" (click)="activarSonido()">🔊 Toca para activar el sonido</button>
+      }
+      @if (error()) {
+        <div class="live__toast">{{ error() }}</div>
+      }
+      @if (fin()) {
+        <div class="live__fin">
+          <p>{{ fin() }}</p>
+          @if (!vendedor()) {
+            <a routerLink="/live">Ver otros lives</a>
+          }
+        </div>
+      }
+    </div>
+
+    @if (modera()) {
+      <aside class="live__panel">
+        <nav>
+          <button type="button" [class.is-activa]="panel() === 'comentarios'" (click)="panel.set('comentarios')">
+            Comentarios ({{ comentarios().length }})
+          </button>
+          <button type="button" [class.is-activa]="panel() === 'espectadores'" (click)="panel.set('espectadores')">
+            Espectadores ({{ conectados().length }})
+          </button>
+          @if (vendedor()) {
+            <button type="button" [class.is-activa]="panel() === 'prendas'" (click)="panel.set('prendas')">
+              Prendas ({{ productos().length }})
+            </button>
+          }
+        </nav>
+
+        @switch (panel()) {
+          @case ('comentarios') {
+            <div class="live__lista" #lista>
+              @for (c of comentarios(); track c.id) {
+                <div class="live__item" [class.is-oculto]="c.oculto">
+                  <div>
+                    <strong>{{ c.usuario }}</strong>
+                    @if (c.es_tienda) {
+                      <small class="live__chip">Tienda</small>
+                    }
+                    <p>{{ c.texto }}</p>
+                    @if (c.oculto) {
+                      <small>Oculto</small>
+                    }
+                  </div>
+                  @if (!c.oculto && !c.es_tienda) {
+                    <div class="live__acciones">
+                      <button type="button" (click)="ocultar(c)">Ocultar</button>
+                      @if (!bloqueoDe()[c.usuario_id]) {
+                        <button type="button" (click)="bloquear(c.usuario_id, c.usuario, 'silenciado')">Silenciar</button>
+                      }
+                    </div>
+                  }
+                </div>
+              } @empty {
+                <p class="live__vacio">Todavía no hay comentarios.</p>
+              }
+            </div>
+          }
+          @case ('espectadores') {
+            <div class="live__lista">
+              @for (e of espectadores(); track e.usuario_id) {
+                <div class="live__item">
+                  <div>
+                    <strong>{{ e.nombre }}</strong>
+                    <small>{{ e.conectado ? 'Viendo ahora' : 'Salió' }} · {{ e.comentarios }} comentarios</small>
+                    @if (e.bloqueo) {
+                      <small class="live__chip live__chip--alerta">{{ e.bloqueo === 'expulsado' ? 'Expulsado' : 'Silenciado' }}</small>
+                    }
+                  </div>
+                  <div class="live__acciones">
+                    @if (e.bloqueo) {
+                      <button type="button" (click)="desbloquear(e.usuario_id)">Quitar bloqueo</button>
+                    } @else {
+                      <button type="button" (click)="bloquear(e.usuario_id, e.nombre, 'silenciado')">Silenciar</button>
+                      <button type="button" class="is-peligro" (click)="bloquear(e.usuario_id, e.nombre, 'expulsado')">Expulsar</button>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="live__vacio">Todavía no entró nadie.</p>
+              }
+            </div>
+          }
+          @case ('prendas') {
+            <div class="live__lista">
+              @for (p of productos(); track p.id) {
+                <div class="live__item live__item--prenda" [class.is-fijada]="p.fijado">
+                  @if (p.imagen) {
+                    <img [src]="p.imagen" [alt]="p.nombre" />
+                  }
+                  <div>
+                    <strong>{{ p.nombre }}</strong>
+                    <small>Bs {{ p.precio | number: '1.2-2' }} · {{ p.variantes.length }} variantes con stock</small>
+                  </div>
+                  <div class="live__acciones">
+                    @if (p.fijado) {
+                      <button type="button" (click)="fijar(null)">Quitar de pantalla</button>
+                    } @else {
+                      <button type="button" class="is-principal" (click)="fijar(p)">Mostrar en pantalla</button>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <p class="live__vacio">No elegiste prendas para este live.</p>
+              }
+            </div>
+          }
+        }
+      </aside>
+    }
+  </div>
+  <div #audios hidden></div>
+}

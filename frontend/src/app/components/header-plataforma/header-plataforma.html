@@ -158,6 +158,15 @@
         </div>
       }
 
+      @if (auth.currentUser()) {
+        <a class="icono icono--live" routerLink="/live" aria-label="Lives de compra en vivo" title="Compra en vivo">
+          <span class="icono__live">LIVE</span>
+          @if (live.enVivo().length > 0) {
+            <span class="icono__live-punto" aria-hidden="true"></span>
+          }
+        </a>
+      }
+
       <div class="cuenta solo-escritorio">
         <button
           type="button"

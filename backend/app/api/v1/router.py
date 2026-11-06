@@ -11,6 +11,7 @@ from app.api.v1.endpoints.calificaciones import router as calificaciones_router
 from app.api.v1.endpoints.catalogo import router as catalogo_router
 from app.api.v1.endpoints.chatbot import router as chatbot_router
 from app.api.v1.endpoints.clientes import router as clientes_router
+from app.api.v1.endpoints.live import router as live_router
 from app.api.v1.endpoints.colecciones import router as colecciones_router
 from app.api.v1.endpoints.cajas import publico_router as cajas_publico_router
 from app.api.v1.endpoints.cajas import router as cajas_router
@@ -89,6 +90,8 @@ api_router.include_router(tiendas_router, prefix="/tiendas", tags=["plataforma"]
 api_router.include_router(metodos_pago_router, prefix="/metodos-pago", tags=["metodos-pago"])
 # CU21: backups y restauracion (de una tienda o del sistema completo).
 api_router.include_router(backups_router, prefix="/backups", tags=["backups"])
+# CU22: live commerce (LiveKit) y su webhook.
+api_router.include_router(live_router, prefix="/live", tags=["live"])
 
 
 @api_router.get("/ping", tags=["health"])

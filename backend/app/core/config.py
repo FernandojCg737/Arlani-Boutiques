@@ -46,6 +46,17 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "productos"
 
+    # CU22 Live commerce: el video en vivo va por LiveKit Cloud y las
+    # grabaciones (MP4) a un bucket privado de Backblaze B2 (compatible con S3).
+    LIVEKIT_URL: str = ""
+    LIVEKIT_API_KEY: str = ""
+    LIVEKIT_API_SECRET: str = ""
+    B2_ENDPOINT: str = ""
+    B2_REGION: str = ""
+    B2_BUCKET: str = ""
+    B2_KEY_ID: str = ""
+    B2_APPLICATION_KEY: str = ""
+
     # CU09: probador de realidad aumentada (Decart lucy-vton). La key
     # permanente vive solo en el backend; el frontend solo recibe tokens
     # de cliente de corta duracion (10 min) generados a partir de ella.

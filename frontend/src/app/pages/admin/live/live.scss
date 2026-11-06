@@ -1,0 +1,90 @@
+.live-nuevo {
+  max-width: 900px;
+}
+
+.live-buscar {
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  font-size: 13px;
+}
+
+.live-prendas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.live-prenda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #eee;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--brand-dark);
+
+  img {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+  }
+
+  strong {
+    font-size: 12px;
+  }
+
+  small {
+    font-size: 11px;
+    color: #888;
+  }
+
+  &.is-elegida {
+    border-color: #e5292f;
+    box-shadow: inset 0 0 0 1px #e5292f;
+  }
+}
+
+.live-iniciar {
+  background: #e5292f;
+}
+
+.live-subtitulo {
+  margin: 32px 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-dark);
+}
+
+.live-video video {
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+}
+
+.live-descargar {
+  margin-right: auto;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+
+.ventas-acciones a {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-dark);
+  text-decoration: none;
+  text-transform: uppercase;
+}

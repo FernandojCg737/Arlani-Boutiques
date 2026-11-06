@@ -298,6 +298,45 @@ $escritorio: 1024px;
   }
 }
 
+// CU22: botón LIVE.
+.icono--live {
+  width: auto;
+  padding: 0 4px;
+}
+
+.icono__live {
+  padding: 3px 7px;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.icono__live-punto {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e5292f;
+  box-shadow: 0 0 0 2px rgba(229, 41, 47, 0.25);
+  animation: latido-live 1.6s ease-in-out infinite;
+}
+
+@keyframes latido-live {
+  50% {
+    box-shadow: 0 0 0 5px rgba(229, 41, 47, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icono__live-punto {
+    animation: none;
+  }
+}
+
 .icono__globo {
   position: absolute;
   top: 2px;
