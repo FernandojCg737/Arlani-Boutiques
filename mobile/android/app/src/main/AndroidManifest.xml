@@ -16,6 +16,12 @@
     <!-- CU01: ubicacion al marcar asistencia. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- CU22 live commerce (LiveKit/WebRTC): audio del live, auriculares
+         bluetooth y estado de la red para reconectarse. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <application
         android:label="Arlani Boutiques"
         android:name="${applicationName}"

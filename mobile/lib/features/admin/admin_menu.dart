@@ -58,6 +58,7 @@ const adminMenu = <AdminPackage>[
       AdminUseCase(code: 'CU11', label: 'Gestion de Ventas', route: '/admin/ventas'),
       AdminUseCase(code: 'CU13', label: 'Administrar Carrito de Compras', route: '/admin/carritos'),
       AdminUseCase(code: 'CU23', label: 'Trabajar sin Conexion', route: '/admin/sin-conexion', permiso: '2P-CU12'),
+      AdminUseCase(code: 'CU27', label: 'Live Commerce', route: '/admin/live', permiso: '2P-CU22'),
     ],
   ),
   AdminPackage(
