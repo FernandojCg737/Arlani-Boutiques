@@ -41,6 +41,7 @@ import 'features/storefront/checkout_screen.dart';
 import 'features/storefront/cotizaciones_screen.dart';
 import 'features/storefront/producto_detalle_screen.dart';
 import 'features/live/live_admin_screen.dart';
+import 'features/superadmin/superadmin_shell.dart';
 import 'features/live/live_lista_screen.dart';
 import 'features/live/live_sala_screen.dart';
 
@@ -76,8 +77,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAdminArea = loc == '/admin' || loc.startsWith('/admin/');
 
       if (requiresAuth && !auth.isAuthenticated) return '/login';
+      // El SuperAdministrador tiene su propio panel (parciales y paquetes,
+      // como en la web): /admin lo lleva ahi.
+      if (loc == '/superadmin' && !auth.isSuperAdmin) return auth.isAuthenticated ? '/' : '/login';
+      if (isAdminArea && auth.isSuperAdmin) return '/superadmin';
       if (isAdminArea && !auth.isStaff) return '/login';
-      if (isAuthRoute && auth.isAuthenticated) return auth.isStaff ? '/admin' : '/';
+      if (isAuthRoute && auth.isAuthenticated) return auth.isSuperAdmin ? '/superadmin' : (auth.isStaff ? '/admin' : '/');
 
       final codigoRequerido = _rutaAdminPorCodigo[loc];
       if (codigoRequerido != null && !auth.isAdministrador && !auth.hasPermiso(codigoRequerido)) {
@@ -147,6 +152,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PerfilScreen(tabInicial: state.uri.queryParameters['tab']),
       ),
       GoRoute(path: '/admin', builder: (context, state) => const AdminShell()),
+      GoRoute(path: '/superadmin', builder: (context, state) => const SuperadminShell()),
       // CU22 live commerce: lives en curso, la sala (ver, comentar, comprar o
       // transmitir) y, para la tienda, iniciar y ver sus grabaciones.
       GoRoute(path: '/live', builder: (context, state) => const LiveListaScreen()),
