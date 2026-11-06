@@ -202,6 +202,40 @@ def seccion_de(t: Tabla, sistema: bool) -> str | None:
     return t.seccion_sistema if sistema else t.seccion_tienda
 
 
+# ==================================================================== bitacora
+
+
+def registrar_bitacora(conn: Connection, usuario_id: int | None, accion: str, entidad: str, entidad_id: int | None,
+                       detalle: str, empresa_id: int | None, ip: str | None = None, plataforma: str | None = "servidor") -> None:
+    """CU08: deja constancia de cada backup y restauracion, con la tienda a la
+    que pertenece (tambien cuando lo hace el SuperAdministrador o es
+    automatico). Sin usuario (lo automatico), firma quien lo programo o, si ya
+    no existe, el dueño de la tienda."""
+    if usuario_id is None:
+        usuario_id = conn.execute(
+            text("""SELECT coalesce((SELECT propietario_id FROM empresa WHERE id = :e),
+                                    (SELECT id FROM usuario WHERE tipo = 'superadministrador' ORDER BY id LIMIT 1))"""),
+            {"e": empresa_id},
+        ).scalar()
+    if usuario_id is None:
+        return
+    conn.execute(
+        text(
+            """INSERT INTO bitacora (usuario_id, accion, entidad_afectada, entidad_id, detalle, ip_address, plataforma, empresa_id, fecha)
+               VALUES (:u, :a, :en, :id, :d, :ip, :p, :e, now())"""
+        ),
+        {"u": usuario_id, "a": accion, "en": entidad, "id": entidad_id, "d": detalle[:1000], "ip": ip, "p": plataforma,
+         "e": empresa_id},
+    )
+
+
+def _tamano(bytes_: int) -> str:
+    return f"{bytes_ / 1024:.0f} KB" if bytes_ < 1024 * 1024 else f"{bytes_ / 1024 / 1024:.1f} MB"
+
+
+_ORIGEN = {"manual": "Backup manual", "programado": "Backup programado", "antes_de_restaurar": "Backup automático antes de restaurar"}
+
+
 # ================================================================ almacenamiento
 
 
@@ -336,6 +370,18 @@ def generar_backup(backup_id: int) -> None:
                 {"a": json.dumps(archivos), "t": len(contenido), "c": json.dumps(meta["conteos"]), "im": imagenes,
                  "i": backup_id},
             )
+            donde = "del sistema completo" if fila["empresa_id"] is None else "de la tienda"
+            programa = conn.execute(
+                text("SELECT nombre FROM backup_programacion WHERE id = :p"), {"p": fila["programacion_id"]}
+            ).scalar() if fila["programacion_id"] else None
+            registrar_bitacora(
+                conn, fila["creado_por_id"], "COMPLETAR", "backup", backup_id,
+                f"{_ORIGEN[fila['origen']]}{' «' + programa + '»' if programa else ''} #{backup_id} {donde} completado"
+                f"{' (atrasado: el servidor estaba dormido)' if fila['atrasado'] else ''}: "
+                f"{sum(meta['conteos'].values())} registros, {imagenes} imágenes, {_tamano(len(contenido))}. "
+                f"Secciones: {', '.join(sorted(secciones))}.",
+                fila["empresa_id"],
+            )
     except Exception as exc:  # noqa: BLE001 - el error queda en el backup
         logger.exception("Backup %s fallo", backup_id)
         with engine.begin() as conn:
@@ -343,6 +389,8 @@ def generar_backup(backup_id: int) -> None:
                 text("UPDATE backup SET estado = 'fallido', error = :m, completado_en = now() WHERE id = :i"),
                 {"m": str(exc)[:500], "i": backup_id},
             )
+            registrar_bitacora(conn, fila["creado_por_id"], "FALLO", "backup", backup_id,
+                               f"{_ORIGEN[fila['origen']]} #{backup_id} falló: {str(exc)[:300]}", fila["empresa_id"])
 
 
 def crear_backup(conn: Connection, empresa_id: int | None, secciones: list[str], origen: str,
@@ -584,7 +632,7 @@ def restaurar_backup(restauracion_id: int) -> None:
             estado = conn.execute(text("SELECT estado, error FROM backup WHERE id = :i"), {"i": previo}).first()
             conn.commit()
         if estado.estado != "completado":
-            raise RuntimeError(f"No se pudo hacer el backup previo, no se restauró nada: {estado.error}")
+            raise RuntimeError(f"No se pudo hacer el backup previo: {estado.error}")
 
         # 2) Restaurar desde el ZIP.
         contenido = zipfile.ZipFile(io.BytesIO(descargar_archivos(r["archivos"])))
@@ -593,11 +641,24 @@ def restaurar_backup(restauracion_id: int) -> None:
         with engine.begin() as conn:
             resumen = _Restaurador(conn, datos, empresa_id is None, empresa_id).restaurar(secciones)
         claves = {t.clave for t in TABLAS if seccion_de(t, empresa_id is None) in secciones}
-        imagenes = _devolver_imagenes(contenido, _imagenes_de(datos, claves))
+        try:
+            imagenes = _devolver_imagenes(contenido, _imagenes_de(datos, claves))
+        except Exception:  # noqa: BLE001 - los datos ya volvieron; las imagenes no la hacen fallar
+            logger.exception("Restauracion %s: no se pudieron reponer las imagenes", restauracion_id)
+            imagenes = 0
         with engine.begin() as conn:
             conn.execute(
                 text("UPDATE backup_restauracion SET estado = 'completada', resumen = CAST(:r AS JSONB), completado_en = now() WHERE id = :i"),
                 {"r": json.dumps({"tablas": resumen, "imagenes": imagenes}), "i": restauracion_id},
+            )
+            totales = {k: sum(x[k] for x in resumen.values()) for k in ("volvieron", "actualizadas", "omitidas")}
+            registrar_bitacora(
+                conn, r["hecho_por_id"], "COMPLETAR", "backup_restauracion", restauracion_id,
+                f"Restauración del backup #{r['backup_id']} completada ({', '.join(sorted(secciones))}): "
+                f"volvieron {totales['volvieron']} registros, se restauraron {totales['actualizadas']}, "
+                f"no pudieron volver {totales['omitidas']}, {imagenes} imágenes repuestas. "
+                f"Para volver atrás: backup #{previo}.",
+                empresa_id,
             )
     except Exception as exc:  # noqa: BLE001 - el error queda en la restauracion
         logger.exception("Restauracion %s fallo", restauracion_id)
@@ -606,6 +667,8 @@ def restaurar_backup(restauracion_id: int) -> None:
                 text("UPDATE backup_restauracion SET estado = 'fallida', error = :m, completado_en = now() WHERE id = :i"),
                 {"m": str(exc)[:500], "i": restauracion_id},
             )
+            registrar_bitacora(conn, r["hecho_por_id"], "FALLO", "backup_restauracion", restauracion_id,
+                               f"Restauración del backup #{r['backup_id']} falló, no se cambió nada: {str(exc)[:300]}", empresa_id)
 
 
 # ================================================================ programacion
@@ -690,6 +753,9 @@ def ejecutar_programados() -> int:
             )
             # Una tienda que bajo a un plan sin backups: la programacion se salta.
             if p["empresa_id"] is not None and not plan_con_backups(conn, p["empresa_id"])[0]:
+                registrar_bitacora(conn, p["creado_por_id"], "OMITIR", "backup_programacion", p["id"],
+                                   f"Backup programado «{p['nombre']}» no se hizo: el plan de la tienda no incluye backups.",
+                                   p["empresa_id"])
                 continue
             atrasado = ahora - p["proxima_ejecucion"] > timedelta(minutes=10)
             nuevos.append((crear_backup(conn, p["empresa_id"], list(p["secciones"]), "programado", p["creado_por_id"],

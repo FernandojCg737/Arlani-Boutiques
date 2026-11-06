@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso
 from app.core import backups as motor
-from app.core.audit import log_bitacora
+from app.core.audit import client_ip, client_platform
 from app.db.session import get_db
 from app.models import Usuario
 
@@ -157,6 +157,14 @@ def _backup(db: Session, backup_id: int, empresa: int | None):
     return fila
 
 
+def _registrar(db: Session, usuario: Usuario, accion: str, entidad: str, entidad_id: int | None, detalle: str,
+               request: Request, empresa: int | None) -> None:
+    """Bitacora (CU08) con la tienda a la que se refiere, tambien si lo hizo el
+    SuperAdministrador (asi la tienda lo ve en su bitacora)."""
+    motor.registrar_bitacora(db.connection(), usuario.id, accion, entidad, entidad_id, detalle, empresa,
+                             client_ip(request), client_platform(request))
+
+
 def _donde(empresa: int | None) -> str:
     return "del sistema completo" if empresa is None else "de la tienda"
 
@@ -216,7 +224,7 @@ def crear(
     ).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "Ya hay un backup en proceso: espera a que termine.")
     backup_id = motor.crear_backup(db.connection(), empresa, secciones, "manual", usuario.id)
-    log_bitacora(db, usuario, "CREAR", "backup", backup_id, f"Backup manual {_donde(empresa)} ({', '.join(secciones)})", request)
+    _registrar(db, usuario, "CREAR", "backup", backup_id, f"Backup manual {_donde(empresa)} ({', '.join(secciones)})", request, empresa)
     db.commit()
     tareas.add_task(motor.generar_backup, backup_id)
     return next(b for b in listar(empresa_id, db, usuario) if b.id == backup_id)
@@ -238,7 +246,7 @@ def descargar(
         contenido = motor.descargar_archivos(fila["archivos"])
     except RuntimeError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
-    log_bitacora(db, usuario, "DESCARGAR", "backup", backup_id, f"Descargó el backup #{backup_id} {_donde(empresa)}", request)
+    _registrar(db, usuario, "DESCARGAR", "backup", backup_id, f"Descargó el backup #{backup_id} {_donde(empresa)}", request, empresa)
     db.commit()
     nombre = f"arlani-backup-{backup_id}-{fila['creado_en']:%Y%m%d-%H%M}.zip"
     return Response(contenido, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
@@ -257,7 +265,7 @@ def borrar(
     if fila["estado"] == "en_proceso":
         raise HTTPException(status.HTTP_409_CONFLICT, "Ese backup todavía se está haciendo.")
     db.execute(text("DELETE FROM backup WHERE id = :i"), {"i": backup_id})
-    log_bitacora(db, usuario, "ELIMINAR", "backup", backup_id, f"Borró el backup #{backup_id} {_donde(empresa)}", request)
+    _registrar(db, usuario, "ELIMINAR", "backup", backup_id, f"Borró el backup #{backup_id} {_donde(empresa)}", request, empresa)
     db.commit()
     motor.borrar_archivos(fila["archivos"])
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -299,9 +307,9 @@ def restaurar(
         ),
         {"b": backup_id, "e": empresa, "s": secciones, "u": usuario.id},
     ).scalar_one()
-    log_bitacora(
+    _registrar(
         db, usuario, "RESTAURAR", "backup", backup_id,
-        f"Restauró el backup #{backup_id} {_donde(empresa)} ({', '.join(secciones)})", request,
+        f"Restauró el backup #{backup_id} {_donde(empresa)} ({', '.join(secciones)})", request, empresa,
     )
     db.commit()
     tareas.add_task(motor.restaurar_backup, restauracion_id)
@@ -391,7 +399,7 @@ def crear_programacion(
         ),
         {"e": empresa, "u": usuario.id, **_datos_programacion(payload, secciones, proxima)},
     ).scalar_one()
-    log_bitacora(db, usuario, "CREAR", "backup_programacion", nuevo, f"Programó backups {_donde(empresa)}: {payload.nombre}", request)
+    _registrar(db, usuario, "CREAR", "backup_programacion", nuevo, f"Programó backups {_donde(empresa)}: {payload.nombre}", request, empresa)
     db.commit()
     return next(p for p in programaciones(empresa_id, db, usuario) if p.id == nuevo)
 
@@ -418,8 +426,8 @@ def editar_programacion(
     ).rowcount
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Programación no encontrada.")
-    log_bitacora(db, usuario, "ACTUALIZAR", "backup_programacion", programacion_id,
-                 f"Editó la programación de backups: {payload.nombre}", request)
+    _registrar(db, usuario, "ACTUALIZAR", "backup_programacion", programacion_id,
+                 f"Editó la programación de backups: {payload.nombre}", request, empresa)
     db.commit()
     return next(p for p in programaciones(empresa_id, db, usuario) if p.id == programacion_id)
 
@@ -440,6 +448,6 @@ def borrar_programacion(
     ).rowcount
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Programación no encontrada.")
-    log_bitacora(db, usuario, "ELIMINAR", "backup_programacion", programacion_id, "Borró una programación de backups", request)
+    _registrar(db, usuario, "ELIMINAR", "backup_programacion", programacion_id, "Borró una programación de backups", request, empresa)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
