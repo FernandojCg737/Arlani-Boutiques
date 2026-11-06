@@ -242,11 +242,16 @@ def cotizar_renovacion(
 
 @router.post("/suscripcion/orden", response_model=OrdenRenovacionOut)
 def orden_renovacion(
-    payload: RenovacionIn, db: Session = Depends(get_db), admin: Usuario = Depends(_admin_de_tienda)
+    payload: RenovacionIn, request: Request, db: Session = Depends(get_db), admin: Usuario = Depends(_admin_de_tienda)
 ) -> OrdenRenovacionOut:
     cot = _cotizar_renovacion(db, admin.empresa_id, payload)
-    orden = crear_orden(cot.monto_usd, referencia=f"RENOV-{admin.empresa_id}-{cot.plan_codigo}-{cot.periodo}")
-    return OrdenRenovacionOut(order_id=orden["id"], monto_usd=cot.monto_usd, monto_bob=cot.monto_bob)
+    base = str(request.base_url).rstrip("/")
+    orden = crear_orden(
+        cot.monto_usd, referencia=f"RENOV-{admin.empresa_id}-{cot.plan_codigo}-{cot.periodo}",
+        return_url=f"{base}/paypal-embed/retorno", cancel_url=f"{base}/paypal-embed/cancelado",
+    )
+    approve = next((l["href"] for l in orden.get("links", []) if l.get("rel") in ("approve", "payer-action")), None)
+    return OrdenRenovacionOut(order_id=orden["id"], monto_usd=cot.monto_usd, monto_bob=cot.monto_bob, approve_url=approve)
 
 
 @router.post("/suscripcion/confirmar", response_model=MiSuscripcionOut)

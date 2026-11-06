@@ -42,6 +42,11 @@ import 'features/storefront/cotizaciones_screen.dart';
 import 'features/storefront/producto_detalle_screen.dart';
 import 'features/live/live_admin_screen.dart';
 import 'features/superadmin/superadmin_shell.dart';
+import 'features/admin/backups/backups_screen.dart';
+import 'features/admin/caja/caja_screen.dart';
+import 'features/admin/conflictos/conflictos_screen.dart';
+import 'features/admin/metodos_pago/metodos_pago_screen.dart';
+import 'features/admin/suscripcion/suscripcion_screen.dart';
 import 'features/live/live_lista_screen.dart';
 import 'features/live/live_sala_screen.dart';
 
@@ -158,6 +163,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/live', builder: (context, state) => const LiveListaScreen()),
       GoRoute(path: '/live/:id', builder: (context, state) => LiveSalaScreen(liveId: int.parse(state.pathParameters['id']!))),
       GoRoute(path: '/admin/live', builder: (context, state) => const LiveAdminScreen()),
+      GoRoute(path: '/admin/caja', builder: (context, state) => const CajaScreen()),
+      GoRoute(path: '/admin/metodos-pago', builder: (context, state) => const MetodosPagoScreen()),
+      GoRoute(path: '/admin/conflictos', builder: (context, state) => const ConflictosScreen()),
+      GoRoute(path: '/admin/backups', builder: (context, state) => const BackupsScreen()),
+      GoRoute(path: '/admin/suscripcion', builder: (context, state) => const SuscripcionScreen()),
       // P4 offline: el cliente guarda el catalogo y reserva o compra sin internet.
       GoRoute(path: '/sin-conexion', builder: (context, state) => const SinConexionClienteScreen()),
       GoRoute(path: '/pagar-compras', builder: (context, state) => const PagarComprasScreen()),
