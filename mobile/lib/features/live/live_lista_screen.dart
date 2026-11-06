@@ -76,6 +76,21 @@ class _LiveListaScreenState extends ConsumerState<LiveListaScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // `.volver-link` de la web: a la pagina anterior o al inicio.
+                          InkWell(
+                            onTap: () => context.canPop() ? context.pop() : context.go('/'),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.arrow_back, size: 16, color: _tinta),
+                                const SizedBox(width: 6),
+                                Text('VOLVER',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: _tinta)),
+                              ]),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           Text('ARLANI LIVE',
                               style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.4, color: _rojo)),
                           const SizedBox(height: 6),
