@@ -107,18 +107,18 @@ export class HeaderPlataforma implements OnDestroy {
   ];
 
   constructor() {
+    // CU22: el botón LIVE se pone rojo cuando alguna tienda está en vivo (también
+    // para visitantes: al tocarlo, sin sesión, van al login y vuelven a los lives).
+    void this.live.revisarEnVivo();
+    this.intervaloLive = setInterval(() => void this.live.revisarEnVivo(), 60000);
     // Igual que <app-header>: el carrito y las notificaciones viven en el
     // backend ligados al cliente; se recargan cuando cambia la sesión, y las
     // notificaciones hacen polling mientras haya un cliente logueado.
     effect(() => {
       if (this.auth.currentUser()) {
         void this.cart.cargar();
-        void this.live.revisarEnVivo();
-        this.intervaloLive ??= setInterval(() => void this.live.revisarEnVivo(), 60000);
       } else {
         this.cart.limpiarLocal();
-        clearInterval(this.intervaloLive);
-        this.intervaloLive = undefined;
       }
 
       if (this.esClienteConSesion()) {

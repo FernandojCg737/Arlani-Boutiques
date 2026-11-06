@@ -305,7 +305,10 @@ $escritorio: 1024px;
 }
 
 .icono__live {
-  padding: 3px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
   border: 1.5px solid currentColor;
   border-radius: 6px;
   font-size: 11px;
@@ -313,21 +316,24 @@ $escritorio: 1024px;
   letter-spacing: 0.08em;
 }
 
-.icono__live-punto {
-  position: absolute;
-  top: 6px;
-  right: 0;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
+// Con tiendas en vivo: rojo lleno y un punto blanco que late.
+.icono--en-vivo .icono__live {
+  border-color: #e5292f;
   background: #e5292f;
-  box-shadow: 0 0 0 2px rgba(229, 41, 47, 0.25);
-  animation: latido-live 1.6s ease-in-out infinite;
+  color: #fff;
+}
+
+.icono__live-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: latido-live 1.4s ease-in-out infinite;
 }
 
 @keyframes latido-live {
   50% {
-    box-shadow: 0 0 0 5px rgba(229, 41, 47, 0);
+    opacity: 0.35;
   }
 }
 

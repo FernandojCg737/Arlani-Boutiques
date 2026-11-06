@@ -158,14 +158,20 @@
         </div>
       }
 
-      @if (auth.currentUser()) {
-        <a class="icono icono--live" routerLink="/live" aria-label="Lives de compra en vivo" title="Compra en vivo">
-          <span class="icono__live">LIVE</span>
+      <a
+        class="icono icono--live"
+        routerLink="/live"
+        [class.icono--en-vivo]="live.enVivo().length > 0"
+        [attr.aria-label]="live.enVivo().length ? live.enVivo().length + ' tiendas en vivo ahora' : 'Compra en vivo'"
+        [title]="live.enVivo().length ? 'Hay tiendas en vivo ahora' : 'Compra en vivo'"
+      >
+        <span class="icono__live">
           @if (live.enVivo().length > 0) {
             <span class="icono__live-punto" aria-hidden="true"></span>
           }
-        </a>
-      }
+          LIVE
+        </span>
+      </a>
 
       <div class="cuenta solo-escritorio">
         <button

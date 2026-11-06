@@ -185,10 +185,48 @@
   <div class="ventas-overlay" (click)="video.set(null)">
     <div class="ventas-modal ventas-modal--wide live-video" (click)="$event.stopPropagation()">
       <h2>{{ v.live.titulo }}</h2>
-      <p class="ventas-modal__subtitulo">{{ fechaUtc(v.live.inicio) | date: 'dd/MM/yyyy HH:mm' }} · {{ duracion(v.live) }}</p>
-      <video [src]="v.url" controls autoplay playsinline></video>
+      <p class="ventas-modal__subtitulo">
+        {{ fechaUtc(v.live.inicio) | date: 'dd/MM/yyyy HH:mm' }} · {{ duracion(v.live) }} · {{ repeticion().length }} comentarios
+      </p>
+      <div class="live-repeticion">
+        <video #grabacion [src]="v.url" controls autoplay playsinline (timeupdate)="alAvanzar(grabacion.currentTime)"></video>
+        <div class="live-chat">
+          <strong class="live-chat__titulo">Comentarios del live</strong>
+          <div class="live-chat__lista">
+            @for (c of repeticion(); track c.id) {
+              <button
+                type="button"
+                [id]="'rc-' + c.id"
+                class="live-chat__item"
+                [class.is-pasado]="c.segundo <= segundo()"
+                [class.is-actual]="c.id === comentarioActual()"
+                [class.is-oculto]="c.oculto"
+                (click)="irA(grabacion, c)"
+                [title]="'Ir al minuto ' + minuto(c.segundo)"
+              >
+                <span class="live-chat__minuto">{{ minuto(c.segundo) }}</span>
+                <span>
+                  <strong>{{ c.usuario }}</strong>
+                  @if (c.es_tienda) {
+                    <small class="live-chat__chip">Tienda</small>
+                  }
+                  {{ c.texto }}
+                  @if (c.oculto) {
+                    <small class="live-chat__oculto">Oculto</small>
+                  }
+                </span>
+              </button>
+            } @empty {
+              <p class="backups-nota">En este live nadie comentó.</p>
+            }
+          </div>
+        </div>
+      </div>
       <div class="ventas-modal__acciones">
-        <a class="live-descargar" [href]="v.url" target="_blank" rel="noopener">Descargar</a>
+        <a class="live-descargar" [href]="v.url" target="_blank" rel="noopener">Descargar video</a>
+        @if (repeticion().length) {
+          <button type="button" class="is-secondary" (click)="descargarComentarios(v.live)">Descargar comentarios</button>
+        }
         <button type="button" class="is-secondary" (click)="video.set(null)">Cerrar</button>
       </div>
     </div>

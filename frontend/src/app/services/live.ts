@@ -25,6 +25,7 @@ export interface LiveResumen {
   grabacion_segundos: number | null;
   grabacion_bytes: number | null;
   grabacion_error: string | null;
+  grabacion_inicio: string | null;
   motivo_corte: string | null;
   cortado_por: string | null;
 }
@@ -58,6 +59,11 @@ export interface ComentarioLive {
   fecha: string;
   oculto: boolean;
   es_tienda: boolean;
+}
+
+// Comentario con su segundo en la grabación (repetición con chat).
+export interface ComentarioRepeticion extends ComentarioLive {
+  segundo: number;
 }
 
 export interface EspectadorLive {
@@ -184,6 +190,10 @@ export class LiveApi {
 
   grabacion(id: number): Promise<{ url: string }> {
     return firstValueFrom(this.http.get<{ url: string }>(`${this.api}/${id}/grabacion`));
+  }
+
+  comentariosDelLive(id: number): Promise<ComentarioRepeticion[]> {
+    return firstValueFrom(this.http.get<ComentarioRepeticion[]>(`${this.api}/${id}/comentarios`));
   }
 
   borrarGrabacion(id: number): Promise<LiveResumen> {
