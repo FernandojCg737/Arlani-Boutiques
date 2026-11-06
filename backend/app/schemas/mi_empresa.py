@@ -187,3 +187,5 @@ class OrdenRenovacionOut(BaseModel):
     order_id: str
     monto_usd: Decimal
     monto_bob: Decimal
+    # La app movil aprueba el pago en su panel de PayPal incrustado.
+    approve_url: str | None = None

@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_config.dart';
 import '../auth/auth_provider.dart';
@@ -109,7 +108,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
                 ),
                 if (auth.isAdministrador)
                   InkWell(
-                    onTap: () => launchUrl(Uri.parse('$webAssetsBaseUrl/admin/suscripcion'), mode: LaunchMode.externalApplication),
+                    onTap: () => context.push('/admin/suscripcion'),
                     child: Text('MI SUSCRIPCIÓN',
                         style: GoogleFonts.inter(
                             color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, decoration: TextDecoration.underline,
