@@ -81,7 +81,8 @@ def dinamico_tienda(
 def exportar_tabla(
     payload: ExportarTablaIn,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(require_permiso("CU16")),
+    # CU16 (reportes) o CU17 del 2do parcial (reporte por voz, que tambien se exporta).
+    usuario: Usuario = Depends(require_permiso("CU16", "2P-CU17")),
 ) -> Response | dict:
     """Descarga (sin correo) o envia por correo una tabla de reporte."""
     t = payload.tabla
