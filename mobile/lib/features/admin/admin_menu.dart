@@ -70,11 +70,11 @@ const adminMenu = <AdminPackage>[
     label: 'Gestion de Experiencia y Analitica',
     useCases: [
       AdminUseCase(code: 'CU14', label: 'Enviar Notificaciones', route: '/admin/notificaciones'),
-      AdminUseCase(code: 'CU16', label: 'Gestion Reportes y Dashboards'),
+      AdminUseCase(code: 'CU16', label: 'Gestion Reportes y Dashboards', route: '/admin/reportes'),
       AdminUseCase(code: 'CU18', label: 'Recomendar Prendas por IA', route: '/admin/recomendaciones'),
       AdminUseCase(code: 'CU19', label: 'Atender Cliente con Chatbot', route: '/admin/chatbot'),
       AdminUseCase(code: 'CU20', label: 'Reputacion y Calificaciones', route: '/admin/calificaciones'),
-      AdminUseCase(code: 'CU25', label: 'Reportes por Voz (IA)', permiso: '2P-CU17'),
+      AdminUseCase(code: 'CU25', label: 'Reportes por Voz (IA)', route: '/admin/reporte-voz', permiso: '2P-CU17'),
     ],
   ),
 ];

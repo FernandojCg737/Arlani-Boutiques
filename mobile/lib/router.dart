@@ -47,6 +47,8 @@ import 'features/admin/caja/caja_screen.dart';
 import 'features/admin/conflictos/conflictos_screen.dart';
 import 'features/admin/metodos_pago/metodos_pago_screen.dart';
 import 'features/admin/suscripcion/suscripcion_screen.dart';
+import 'features/admin/reportes/reporte_voz_screen.dart';
+import 'features/admin/reportes/reportes_screen.dart';
 import 'features/live/live_lista_screen.dart';
 import 'features/live/live_sala_screen.dart';
 
@@ -168,6 +170,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/admin/conflictos', builder: (context, state) => const ConflictosScreen()),
       GoRoute(path: '/admin/backups', builder: (context, state) => const BackupsScreen()),
       GoRoute(path: '/admin/suscripcion', builder: (context, state) => const SuscripcionScreen()),
+      GoRoute(path: '/admin/reportes', builder: (context, state) => const ReportesScreen()),
+      GoRoute(path: '/admin/reporte-voz', builder: (context, state) => const ReporteVozScreen()),
       // P4 offline: el cliente guarda el catalogo y reserva o compra sin internet.
       GoRoute(path: '/sin-conexion', builder: (context, state) => const SinConexionClienteScreen()),
       GoRoute(path: '/pagar-compras', builder: (context, state) => const PagarComprasScreen()),
