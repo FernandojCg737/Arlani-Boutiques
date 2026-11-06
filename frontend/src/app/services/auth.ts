@@ -193,14 +193,18 @@ export class Auth {
   }
 
   async logout(): Promise<void> {
+    // Primero se borra la sesion aqui: asi ninguna peticion que siga en curso
+    // (notificaciones, carrito...) sale con la sesion que el servidor esta
+    // cerrando, y no aparece el aviso de "otro dispositivo".
+    const token = this.token();
+    this.clearSession();
+    if (!token) return;
     try {
-      if (this.token()) {
-        await firstValueFrom(this.http.post(`${environment.apiUrl}/auth/logout`, {}));
-      }
+      await firstValueFrom(
+        this.http.post(`${environment.apiUrl}/auth/logout`, {}, { headers: { Authorization: `Bearer ${token}` } }),
+      );
     } catch {
-      // best-effort: si el server no responde, igual limpiamos la sesion local.
-    } finally {
-      this.clearSession();
+      // best-effort: la sesion local ya quedo cerrada.
     }
   }
 
