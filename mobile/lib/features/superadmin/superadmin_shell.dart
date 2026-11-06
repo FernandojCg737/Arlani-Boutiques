@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -105,6 +106,8 @@ class _SuperadminShellState extends ConsumerState<SuperadminShell> {
         child: Row(children: [
           Image.asset('assets/portada/arlani-logo-encabezado.png', height: 40),
           const Spacer(),
+          _Avatar(onTap: () => context.push('/perfil')),
+          const SizedBox(width: 10),
           OutlinedButton(
             onPressed: _cerrarSesion,
             style: OutlinedButton.styleFrom(
@@ -285,6 +288,10 @@ class _SuperadminShellState extends ConsumerState<SuperadminShell> {
       'CU22' => 'Live commerce',
       _ => caso.nombre,
     };
+    // CU15 (Actualizar perfil): su propia pantalla.
+    if (_actual.parcial.id == 'p1' && caso.codigo == 'CU15') {
+      return _AbrirPerfil(onTap: () => context.push('/perfil'));
+    }
     final Widget contenido = switch ((_actual.parcial.id, caso.codigo)) {
       ('p2', 'CU08') => const SuperBitacora(),
       ('p2', 'CU22') => const SuperLive(),
@@ -302,6 +309,54 @@ class _SuperadminShellState extends ConsumerState<SuperadminShell> {
       KeyedSubtree(key: ValueKey('${_actual.parcial.id}-${caso.codigo}'), child: contenido),
     ]);
   }
+}
+
+/// Foto (o iniciales) del SuperAdministrador: abre su perfil.
+class _Avatar extends ConsumerWidget {
+  const _Avatar({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final u = ref.watch(authProvider).usuario;
+    final (n, a) = u?.partesNombre ?? ('', '');
+    final iniciales = [n, a].where((x) => x.isNotEmpty).map((x) => x[0]).join().toUpperCase();
+    return Tooltip(
+      message: 'Mi perfil',
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: CircleAvatar(
+          radius: 19,
+          backgroundColor: const Color(0xFFE8806B),
+          backgroundImage: u?.fotoUrl != null ? CachedNetworkImageProvider(u!.fotoUrl!) : null,
+          child: u?.fotoUrl == null
+              ? Text(iniciales, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800))
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _AbrirPerfil extends StatelessWidget {
+  const _AbrirPerfil({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('ACTUALIZAR PERFIL DE USUARIO',
+            style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w900, height: 1.15, color: noche)),
+        const SizedBox(height: 10),
+        Text('Tu foto, tus nombres y apellidos, y tu contraseña.', style: GoogleFonts.inter(fontSize: 14.5, color: _gris)),
+        const SizedBox(height: 18),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: noche, shape: const RoundedRectangleBorder(), minimumSize: const Size.fromHeight(48)),
+          onPressed: onTap,
+          icon: const Icon(Icons.person_outline),
+          label: const Text('ABRIR MI PERFIL'),
+        ),
+      ]);
 }
 
 class _Paquete extends StatelessWidget {
