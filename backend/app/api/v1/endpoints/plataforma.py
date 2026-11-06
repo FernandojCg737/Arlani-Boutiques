@@ -301,7 +301,7 @@ def limite_sucursales(
 def listar_planes(db: Session = Depends(get_db), _: Usuario = Depends(require_superadmin)) -> list[PlanOut]:
     filas = db.execute(
         text(
-            "SELECT p.id, p.codigo, p.nombre, p.precio_mensual, p.max_sucursales, p.dias_prueba, p.ia_generativa, p.operacion_offline, "
+            "SELECT p.id, p.codigo, p.nombre, p.precio_mensual, p.max_sucursales, p.dias_prueba, p.ia_generativa, p.operacion_offline, p.backups, p.live_commerce, "
             "p.comision_pct, (SELECT count(*) FROM suscripcion su WHERE su.plan_id = p.id AND su.estado = 'activa') AS empresas "
             "FROM plan_suscripcion p WHERE p.activo ORDER BY p.orden"
         )

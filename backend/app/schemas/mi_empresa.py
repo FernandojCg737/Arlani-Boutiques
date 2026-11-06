@@ -43,6 +43,8 @@ class PlanDisponibleOut(BaseModel):
     dias_prueba: int | None
     ia_generativa: bool
     operacion_offline: bool
+    backups: bool
+    live_commerce: bool
     comision_pct: Decimal
 
 
