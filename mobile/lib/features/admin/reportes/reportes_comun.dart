@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/api_client.dart';
 
@@ -11,8 +10,8 @@ import '../../../core/api_client.dart';
 const formatosReporte = {'pdf': 'PDF', 'excel': 'Excel', 'csv': 'CSV', 'html': 'HTML'};
 const _extension = {'pdf': 'pdf', 'excel': 'xlsx', 'csv': 'csv', 'html': 'html'};
 
-/// Exportar un reporte: elegir formato y compartir/guardar el archivo o
-/// enviarlo por correo como adjunto. `ruta` + `params` para los reportes fijos
+/// Exportar un reporte: elegir formato y guardarlo en el telefono (carpeta
+/// Descargas/Arlani) o enviarlo por correo como adjunto. `ruta` + `params` para los reportes fijos
 /// (GET .../exportar); `tabla` para el dinamico y el de voz (POST exportar-tabla).
 Future<void> exportarReporte(
   BuildContext context,
@@ -28,9 +27,12 @@ Future<void> exportarReporte(
   final accion = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     builder: (ctx) => StatefulBuilder(
+      // Por encima del teclado y de los botones de navegacion del telefono.
       builder: (ctx, refrescar) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
+        padding: EdgeInsets.fromLTRB(
+            20, 20, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom + MediaQuery.viewPaddingOf(ctx).bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Exportar · $nombre', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
@@ -40,9 +42,9 @@ Future<void> exportarReporte(
           ]),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: () => Navigator.pop(ctx, 'compartir'),
-            icon: const Icon(Icons.ios_share),
-            label: const Text('COMPARTIR O GUARDAR'),
+            onPressed: () => Navigator.pop(ctx, 'guardar'),
+            icon: const Icon(Icons.download),
+            label: const Text('GUARDAR'),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -63,7 +65,7 @@ Future<void> exportarReporte(
     mensajero.showSnackBar(const SnackBar(content: Text('Escribe un correo válido.')));
     return;
   }
-  mensajero.showSnackBar(SnackBar(content: Text(accion == 'correo' ? 'Enviando el reporte…' : 'Preparando el archivo…')));
+  mensajero.showSnackBar(SnackBar(content: Text(accion == 'correo' ? 'Enviando el reporte…' : 'Guardando el archivo…')));
   try {
     final porCorreo = accion == 'correo';
     final Response res = ruta != null
@@ -77,14 +79,44 @@ Future<void> exportarReporte(
       mensajero.showSnackBar(SnackBar(content: Text('Te enviamos el reporte a $email.')));
       return;
     }
-    final dir = await getTemporaryDirectory();
-    final limpio = nombre.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
-    final archivo = File('${dir.path}/$limpio.${_extension[formato]}');
-    await archivo.writeAsBytes(res.data as List<int>);
-    await SharePlus.instance.share(ShareParams(files: [XFile(archivo.path)], subject: nombre));
+    final archivo = await _guardarEnTelefono(nombre, formato, res.data as List<int>);
+    mensajero
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text('Guardado en ${archivo.path.contains('/Download/') ? 'Descargas/Arlani' : 'la carpeta de la app'}: '
+            '${archivo.uri.pathSegments.last}'),
+      ));
   } catch (e) {
     mensajero.showSnackBar(SnackBar(content: Text(extractErrorMessage(e))));
   }
+}
+
+/// Guarda el archivo en Descargas/Arlani del telefono (si el sistema no lo
+/// permite, en la carpeta de archivos de la app). Con fecha y hora en el
+/// nombre para no pisar uno anterior.
+Future<File> _guardarEnTelefono(String nombre, String formato, List<int> bytes) async {
+  final ahora = DateTime.now();
+  String dos(int n) => n.toString().padLeft(2, '0');
+  final marca = '${ahora.year}${dos(ahora.month)}${dos(ahora.day)}-${dos(ahora.hour)}${dos(ahora.minute)}${dos(ahora.second)}';
+  final limpio = nombre.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+  final archivoNombre = '$limpio-$marca.${_extension[formato]}';
+  final carpetas = <Directory>[
+    if (Platform.isAndroid) Directory('/storage/emulated/0/Download/Arlani'),
+    ?await getExternalStorageDirectory(),
+    await getApplicationDocumentsDirectory(),
+  ];
+  for (final carpeta in carpetas) {
+    try {
+      await carpeta.create(recursive: true);
+      final archivo = File('${carpeta.path}/$archivoNombre');
+      await archivo.writeAsBytes(bytes, flush: true);
+      return archivo;
+    } catch (_) {
+      // Sin permiso en esa carpeta: se prueba la siguiente.
+    }
+  }
+  throw const FileSystemException('No se pudo guardar el archivo en el teléfono.');
 }
 
 /// Tabla de un reporte (dinamico o por voz): columnas, filas y totales, que
