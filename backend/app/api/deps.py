@@ -100,7 +100,11 @@ def _usuario_del_token(credentials: HTTPAuthorizationCredentials | None, db: Ses
     if usuario is None or usuario.estado != "activo":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Cuenta no disponible.")
 
-    if not usuario.session_id or usuario.session_id != payload.get("sid"):
+    # Sin sesion activa: la cerro el propio usuario (o vencio). Con otra
+    # sesion distinta: entro desde otro dispositivo.
+    if not usuario.session_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tu sesión se cerró. Inicia sesión de nuevo.")
+    if usuario.session_id != payload.get("sid"):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             "Tu sesion se cerro porque iniciaste sesion en otro dispositivo.",

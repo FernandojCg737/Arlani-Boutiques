@@ -45,7 +45,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       // Solo forzamos el logout si el request iba autenticado: un 401 en
       // /auth/login (contrasena incorrecta) es un error normal de formulario,
       // no una sesion invalidada.
-      if (token && error instanceof HttpErrorResponse && error.status === 401) {
+      // Solo si esa peticion iba con la sesion actual: la respuesta tardia de una
+      // sesion que el usuario ya cerro (o que se renovo) no debe sacarlo ni avisar.
+      if (token && auth.token() === token && error instanceof HttpErrorResponse && error.status === 401) {
         const detail = (error.error as { detail?: unknown } | null)?.detail;
         const message = typeof detail === 'string' ? detail : 'Tu sesion expiro. Inicia sesion de nuevo.';
         auth.forceLogout(message);
