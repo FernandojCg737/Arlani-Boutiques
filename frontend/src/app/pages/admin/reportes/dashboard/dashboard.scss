@@ -84,21 +84,28 @@
   }
 }
 
+// minmax(0, 1fr) y min-width: 0: sin esto, el canvas del grafico y las tablas
+// ensanchan la columna en pantallas angostas y los graficos se cortan.
 .reportes-graficos {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 40px;
 
   @media (min-width: 900px) {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 .reportes-grafico {
+  min-width: 0;
   background: #fff;
   border: 1px solid #eee;
-  padding: 20px;
+  padding: 14px;
+
+  @media (min-width: 700px) {
+    padding: 20px;
+  }
 
   &--ancho {
     @media (min-width: 900px) {
