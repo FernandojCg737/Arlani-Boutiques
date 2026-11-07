@@ -146,13 +146,21 @@ function hoy(dias = 0): string {
   styles: `
     .dinamico {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 20px;
     }
     .dinamico__panel,
     .dinamico__resultado {
-      padding: 20px;
+      min-width: 0;
+      padding: 14px;
       background: #fff;
       border: 1px solid #e5e5e5;
+    }
+    @media (min-width: 700px) {
+      .dinamico__panel,
+      .dinamico__resultado {
+        padding: 20px;
+      }
     }
     .dinamico__etiqueta {
       display: block;
