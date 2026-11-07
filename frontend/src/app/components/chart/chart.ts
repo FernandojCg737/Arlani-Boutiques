@@ -33,8 +33,9 @@ export class AppChart implements OnDestroy {
   readonly labels = input.required<string[]>();
   readonly data = input.required<number[]>();
   readonly label = input<string>('');
-  // Varias series (p. ej. suscripciones y comisiones por mes): barras apiladas.
-  readonly series = input<{ label: string; data: number[] }[]>([]);
+  // Varias series (p. ej. suscripciones y comisiones por mes): barras apiladas;
+  // en un grafico de lineas, una linea por serie (null = sin dato ese punto).
+  readonly series = input<{ label: string; data: (number | null)[] }[]>([]);
 
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private chart?: Chart;
@@ -55,7 +56,7 @@ export class AppChart implements OnDestroy {
     labels: string[],
     data: number[],
     label: string,
-    series: { label: string; data: number[] }[],
+    series: { label: string; data: (number | null)[] }[],
   ): void {
     const ctx = this.canvasRef().nativeElement.getContext('2d');
     if (!ctx) return;
@@ -63,17 +64,23 @@ export class AppChart implements OnDestroy {
     this.chart?.destroy();
 
     const esCircular = tipo === 'pie' || tipo === 'doughnut';
-    const apiladas = series.length > 0 && !esCircular;
+    const conSeries = series.length > 0 && !esCircular;
+    const apiladas = conSeries && tipo === 'bar';
     const config: ChartConfiguration = {
       type: tipo,
       data: {
         labels,
-        datasets: apiladas
+        datasets: conSeries
           ? series.map((s, i) => ({
               label: s.label,
               data: s.data,
               backgroundColor: PALETTE[i % PALETTE.length],
+              borderColor: PALETTE[i % PALETTE.length],
               borderRadius: 3,
+              borderWidth: tipo === 'line' ? 2 : 0,
+              borderDash: tipo === 'line' && i > 0 ? [6, 4] : [],
+              tension: 0.3,
+              fill: false,
             }))
           : [
           {
@@ -92,7 +99,7 @@ export class AppChart implements OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: esCircular || apiladas, position: 'bottom', labels: { font: { size: 11 } } },
+          legend: { display: esCircular || conSeries, position: 'bottom', labels: { font: { size: 11 } } },
         },
         scales: esCircular
           ? {}

@@ -33,6 +33,9 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
   DateTime _hasta = DateTime.now();
   DateTime _desde = DateTime.now().subtract(const Duration(days: 30));
   Map<String, dynamic>? _dashboard;
+  // CU18: pronostico de ventas de las proximas 4 semanas (modelo de ML).
+  Map<String, dynamic>? _pronostico;
+  String? _pronosticoError;
   List<Map<String, dynamic>> _fuentes = [];
   String? _fuente;
   final Set<String> _agrupar = {};
@@ -52,6 +55,8 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
     super.initState();
     _dio.get('/reportes/dashboard').then((r) => mounted ? setState(() => _dashboard = r.data as Map<String, dynamic>) : null,
         onError: (e) => mounted ? setState(() => _error = extractErrorMessage(e)) : null);
+    _dio.get('/reportes/pronostico').then((r) => mounted ? setState(() => _pronostico = r.data as Map<String, dynamic>) : null,
+        onError: (e) => mounted ? setState(() => _pronosticoError = extractErrorMessage(e)) : null);
     _dio.get('/reportes/dinamico/fuentes').then((r) {
       if (!mounted) return;
       setState(() {
@@ -267,6 +272,89 @@ class _ReportesScreenState extends ConsumerState<ReportesScreen> {
       serie('Ventas por sucursal', d['ventas_por_sucursal'] as List),
       serie('Productos más vendidos', d['top_productos'] as List),
       serie('Ventas por día', d['ventas_por_dia'] as List),
+      _pronosticoCard(),
     ]);
+  }
+
+  /// Ventas esperadas de las proximas 4 semanas (CU18, regresion) frente a
+  /// las 4 ultimas reales, por semana y por sucursal.
+  Widget _pronosticoCard() {
+    final p = _pronostico;
+    final titulo = const Text('Pronóstico de ventas · próximas 4 semanas', style: TextStyle(fontWeight: FontWeight.w800));
+    if (p == null) {
+      return AdminCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          titulo,
+          const SizedBox(height: 6),
+          Text(_pronosticoError ?? 'Calculando el pronóstico…'),
+        ]),
+      );
+    }
+    double num_(dynamic v) => double.tryParse('$v') ?? 0;
+    final reales = (p['ultimas_4_semanas'] as List).map(num_).toList();
+    final futuras = (p['pronostico_total'] as List).map(num_).toList();
+    final etiquetas = [
+      'Hace 4 sem.', 'Hace 3 sem.', 'Hace 2 sem.', 'Última sem.',
+      ...(p['semanas'] as List).map((e) => e.toString()),
+    ];
+    final valores = [...reales, ...futuras];
+    final maximo = valores.fold<double>(1, (m, v) => v > m ? v : m);
+    final color = Theme.of(context).colorScheme.primary;
+    final variacion = p['variacion'] == null ? null : num_(p['variacion']);
+    final errorTotal = num_(p['metricas']['error_total_pct']);
+    return AdminCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        titulo,
+        const SizedBox(height: 4),
+        Text(
+          'Modelo de Machine Learning (${p['algoritmo']}). En días que no vio, acertó el total con un error de '
+          '${(errorTotal * 100).toStringAsFixed(0)} %. Datos hasta el ${fechaTexto(p['datos_hasta'].toString(), hora: false)}.',
+          style: const TextStyle(fontSize: 12, color: Colors.black54),
+        ),
+        const SizedBox(height: 10),
+        for (var i = 0; i < valores.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(children: [
+              SizedBox(width: 92, child: Text(etiquetas[i], style: const TextStyle(fontSize: 11.5))),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (_, c) => Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      height: 14,
+                      width: c.maxWidth * (valores[i] / maximo),
+                      decoration: BoxDecoration(
+                        color: i < reales.length ? color : color.withValues(alpha: 0.35),
+                        border: i < reales.length ? null : Border.all(color: color),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 78, child: Text(bsTexto(valores[i].round()), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700))),
+            ]),
+          ),
+        const SizedBox(height: 4),
+        Text('Barras llenas: vendido · claras: pronóstico', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+        const Divider(height: 20),
+        Row(children: [
+          Expanded(child: Text('Próximas 4 semanas: ${bsTexto(futuras.fold<double>(0, (t, v) => t + v).round())}', style: const TextStyle(fontWeight: FontWeight.w700))),
+          if (variacion != null)
+            Text('${variacion > 0 ? '+' : ''}${(variacion * 100).toStringAsFixed(0)} %',
+                style: TextStyle(fontWeight: FontWeight.w800, color: variacion < 0 ? const Color(0xFFA8554B) : color)),
+        ]),
+        const SizedBox(height: 6),
+        for (final s in (p['sucursales'] as List).cast<Map<String, dynamic>>())
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(children: [
+              Expanded(child: Text(s['sucursal'].toString(), style: const TextStyle(fontSize: 12.5))),
+              Text('${bsTexto(num_(s['total_ultimas_4']).round())} → ${bsTexto(num_(s['total_pronostico']).round())}',
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+      ]),
+    );
   }
 }

@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { AppChart } from '../../../components/chart/chart';
 import { PlataformaApi, mensajeError } from '../../../services/plataforma';
+import type { Pronostico as PronosticoDashboard } from '../../admin/reportes/dashboard/dashboard';
 
 interface Comparacion {
   representacion: string;
@@ -109,7 +110,19 @@ interface Sugerida {
   similitud: number;
 }
 
-type Vista = 'reportes' | 'reportes_saas' | 'chatbot' | 'recomendaciones' | 'segmentos';
+// Pronóstico de ventas (supervisado, regresión) de una tienda.
+interface Pronostico extends PronosticoDashboard {
+  version: number;
+  entrenado_en?: string;
+  entrenado_por?: string | null;
+  comparacion: { algoritmo: string; mae: number; rmse: number; r2: number | null; error_pct: number | null; error_total_pct: number | null }[];
+  variables: { variable: string; peso: number }[];
+  n_reales: number;
+  n_sinteticos: number;
+  n_prueba: number;
+}
+
+type Vista = 'reportes' | 'reportes_saas' | 'chatbot' | 'recomendaciones' | 'segmentos' | 'pronostico';
 type Clasificador = 'reportes' | 'reportes_saas' | 'chatbot';
 
 const EJEMPLOS: Record<'reportes' | 'reportes_saas' | 'chatbot', string[]> = {
@@ -251,6 +264,46 @@ export class ModelosMl implements OnInit {
       void this.cargarDatos();
     }
     if (v === 'recomendaciones' && !this.recom()) void this.cargarRecom();
+    if (v === 'pronostico' && !this.pronostico()) void this.cargarPronostico(false);
+  }
+
+  protected readonly pronostico = signal<Pronostico | null>(null);
+  protected readonly pronosticando = signal(false);
+
+  // Sin reentrenar trae la version activa (la primera vez se entrena sola).
+  protected async cargarPronostico(reentrenar: boolean): Promise<void> {
+    const id = this.empresaId();
+    if (id === null) return;
+    this.pronosticando.set(true);
+    this.error.set('');
+    if (!reentrenar) this.pronostico.set(null);
+    try {
+      const params = { empresa_id: id };
+      this.pronostico.set(
+        await firstValueFrom(
+          reentrenar
+            ? this.http.post<Pronostico>(`${this.api}/pronostico/entrenar`, {}, { params })
+            : this.http.get<Pronostico>(`${this.api}/pronostico`, { params }),
+        ),
+      );
+    } catch (err) {
+      this.error.set(mensajeError(err, 'No se pudo calcular el pronóstico.'));
+    } finally {
+      this.pronosticando.set(false);
+    }
+  }
+
+  protected elegirTiendaPronostico(id: number): void {
+    this.empresaId.set(id);
+    void this.cargarPronostico(false);
+  }
+
+  protected seriesPronostico(p: Pronostico): { label: string; data: (number | null)[] }[] {
+    const reales = p.ultimas_4_semanas;
+    return [
+      { label: 'Vendido (Bs)', data: [...reales, null, null, null, null] },
+      { label: 'Pronóstico (Bs)', data: [null, null, null, reales[3] ?? null, ...p.pronostico_total] },
+    ];
   }
 
   protected elegirTiendaRecom(id: number): void {

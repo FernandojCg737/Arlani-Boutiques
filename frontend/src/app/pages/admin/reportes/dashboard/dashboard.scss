@@ -116,6 +116,78 @@
   }
 }
 
+// CU18: pronostico de ventas
+.reportes-pron {
+  &__nota {
+    margin: -6px 0 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #555;
+  }
+
+  &__kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+
+    div {
+      border: 1px solid #eee;
+      padding: 10px 12px;
+    }
+
+    span {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+    }
+
+    strong {
+      font-size: 18px;
+      color: var(--brand-dark);
+    }
+
+    .is-baja strong {
+      color: #a8554b;
+    }
+  }
+
+  &__tabla {
+    overflow-x: auto;
+    margin-top: 14px;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      text-align: right;
+      white-space: nowrap;
+
+      &:first-child {
+        text-align: left;
+      }
+    }
+
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    .is-baja {
+      color: #a8554b;
+    }
+  }
+}
+
 .reportes-links {
   h2 {
     margin: 0 0 16px;

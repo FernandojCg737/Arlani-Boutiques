@@ -1,16 +1,17 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_permiso
+from app.api.deps import require_permiso, sucursal_restringida
 from app.core.email import nombre_marca
 from app.core.rate_limit import verificar_limite
 from app.core.reporte_export import descargar, desde_listas, enviar
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
+from app.ml import pronostico
 from app.models import Usuario
 from app.schemas.reportes import (
     AsistenciaFila,
@@ -288,6 +289,33 @@ def _responder(db: Session, usuario: Usuario, titulo: str, headers: list[str], f
 def _empresa_de(db: Session, usuario: Usuario) -> int | None:
     """La tienda del personal, o la que eligio el SuperAdministrador (X-Empresa)."""
     return usuario.empresa_id if usuario.empresa_id is not None else db.info.get("empresa_scope")
+
+
+@router.get("/pronostico")
+def pronostico_ventas(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso("CU16")),
+) -> dict:
+    """Dashboard (CU07): ventas esperadas de las proximas 4 semanas por
+    sucursal, con el modelo de pronostico del CU18 (se reentrena una vez al
+    dia). modelo_ml es de la plataforma (el rol de la tienda no lo ve): se usa
+    una sesion del sistema, siempre con la empresa del usuario autenticado."""
+    empresa = _empresa_de(db, usuario)
+    if empresa is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Elige primero la tienda.")
+    with SessionLocal() as sistema:
+        try:
+            r = pronostico.vigente(sistema, empresa)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    restringida = sucursal_restringida(usuario)
+    if restringida is not None:
+        # Encargado o cajero: solo su sucursal.
+        propias = [s for s in r["sucursales"] if s["sucursal_id"] == restringida]
+        r = {**r, "sucursales": propias,
+             "pronostico_total": propias[0]["semanas"] if propias else [],
+             "ultimas_4_semanas": propias[0]["ultimas_4_semanas"] if propias else []}
+    return r
 
 
 def _datos_asistencia(
