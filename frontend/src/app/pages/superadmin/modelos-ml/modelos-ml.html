@@ -48,6 +48,7 @@
     <button type="button" [class.is-activa]="vista() === 'chatbot'" (click)="cambiarVista('chatbot')">Chatbot de las tiendas</button>
     <button type="button" [class.is-activa]="vista() === 'recomendaciones'" (click)="cambiarVista('recomendaciones')">Recomendador de prendas</button>
     <button type="button" [class.is-activa]="vista() === 'segmentos'" (click)="cambiarVista('segmentos')">Segmentación de clientes (K-Means)</button>
+    <button type="button" [class.is-activa]="vista() === 'pronostico'" (click)="cambiarVista('pronostico')">Pronóstico de ventas</button>
   </nav>
 
   @if (error()) {
@@ -332,6 +333,79 @@
       </section>
     } @else if (recomCargando()) {
       <p class="ml__sub">Cargando el recomendador (la primera vez se entrena)…</p>
+    }
+  } @else if (vista() === 'pronostico') {
+    <section class="ml__bloque">
+      <h2>Pronóstico de ventas (aprendizaje supervisado · regresión)</h2>
+      <p class="ml__sub">
+        Predice lo que venderá cada sucursal, día por día, en las próximas 4 semanas. Se entrena con el historial real de la tienda
+        más un año de datos sintéticos generados con su propio patrón (día de la semana, temporada de la moda y ruido). Compara
+        Ridge, Random Forest y Gradient Boosting contra una línea base, midiendo en los días reales más recientes, que el modelo no vio.
+      </p>
+      <div class="ml__probar">
+        <select [value]="empresaId() ?? ''" (change)="elegirTiendaPronostico(+$any($event.target).value)">
+          @for (e of empresas(); track e.id) {
+            <option [value]="e.id">{{ e.nombre }}</option>
+          }
+        </select>
+        <button type="button" class="ml__boton" [disabled]="pronosticando()" (click)="cargarPronostico(true)">
+          {{ pronosticando() ? 'Entrenando…' : 'Reentrenar' }}
+        </button>
+      </div>
+    </section>
+    @if (pronostico(); as p) {
+      <div class="ml__kpis">
+        <div><span>Modelo elegido</span><strong>{{ p.algoritmo }}</strong></div>
+        <div><span>MAE diario (Bs)</span><strong>{{ p.metricas.mae | number: '1.0-0' }}</strong></div>
+        <div><span>Error del total</span><strong>{{ p.metricas.error_total_pct ?? 0 | percent: '1.0-1' }}</strong></div>
+        <div><span>R²</span><strong>{{ p.metricas.r2 ?? 0 | number: '1.2-2' }}</strong></div>
+        <div><span>Versión</span><strong>v{{ p.version }}</strong></div>
+      </div>
+      <section class="ml__bloque">
+        <h2>Próximas 4 semanas (todas las sucursales)</h2>
+        <app-chart type="line" [labels]="['Hace 4 sem.', 'Hace 3 sem.', 'Hace 2 sem.', 'Última sem.'].concat(p.semanas)" [data]="[]"
+          [series]="seriesPronostico(p)" />
+        <div class="ml__tabla-wrap">
+          <table class="ml__tabla">
+            <thead><tr><th>Sucursal</th>@for (s of p.semanas; track s) {<th>{{ s }}</th>}<th>Total (Bs)</th><th>Últimas 4 sem. (Bs)</th></tr></thead>
+            <tbody>
+              @for (s of p.sucursales; track s.sucursal_id) {
+                <tr><td><b>{{ s.sucursal }}</b></td>@for (v of s.semanas; track $index) {<td>{{ v | number: '1.0-0' }}</td>}
+                  <td><b>{{ s.total_pronostico | number: '1.0-0' }}</b></td><td>{{ s.total_ultimas_4 | number: '1.0-0' }}</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <div class="ml__dos">
+        <section class="ml__bloque">
+          <h2>Evaluación (días reales no vistos)</h2>
+          <p class="ml__sub">
+            {{ p.n_reales }} días reales + {{ p.n_sinteticos }} sintéticos para entrenar; prueba con los {{ p.n_prueba }} días reales más
+            recientes. Datos hasta el {{ p.datos_hasta }}.
+          </p>
+          <div class="ml__tabla-wrap">
+            <table class="ml__tabla">
+              <thead><tr><th>Modelo</th><th>MAE (Bs)</th><th>RMSE (Bs)</th><th>R²</th><th>Error diario</th><th>Error del total</th></tr></thead>
+              <tbody>
+                @for (c of p.comparacion; track c.algoritmo) {
+                  <tr [class.is-mejor]="c.algoritmo === p.algoritmo">
+                    <td>{{ c.algoritmo }}</td><td>{{ c.mae | number: '1.0-0' }}</td><td>{{ c.rmse | number: '1.0-0' }}</td>
+                    <td>{{ c.r2 ?? 0 | number: '1.2-2' }}</td><td>{{ c.error_pct ?? 0 | percent: '1.0-0' }}</td>
+                    <td>{{ c.error_total_pct ?? 0 | percent: '1.0-1' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="ml__bloque">
+          <h2>Qué pesa más en la predicción</h2>
+          <app-chart type="bar" [labels]="p.variables.slice(0, 8).map(v => v.variable)" [data]="p.variables.slice(0, 8).map(v => v.peso)" label="Importancia" />
+        </section>
+      </div>
+    } @else if (pronosticando()) {
+      <p class="ml__sub">Entrenando el modelo de pronóstico…</p>
     }
   } @else {
     <section class="ml__bloque">

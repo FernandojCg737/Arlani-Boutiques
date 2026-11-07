@@ -75,6 +75,52 @@
           <app-chart type="bar" [labels]="labelsSucursal()" [data]="dataSucursal()" label="Ventas (Bs)" />
         }
       </div>
+
+      <div class="reportes-grafico reportes-grafico--ancho">
+        <h3>Pronóstico de ventas · próximas 4 semanas</h3>
+        @if (pronostico(); as p) {
+          <p class="reportes-pron__nota">
+            Modelo de Machine Learning (<b>{{ p.algoritmo }}</b>) entrenado con el historial diario de cada sucursal.
+            En días que no vio, acertó el total con un error de
+            <b>{{ p.metricas.error_total_pct ?? 0 | percent: '1.0-0' }}</b>. Datos hasta el {{ p.datos_hasta }}.
+          </p>
+          <div class="reportes-pron__kpis">
+            <div><span>Últimas 4 semanas</span><strong>Bs {{ suma(p.ultimas_4_semanas) | number: '1.0-0' }}</strong></div>
+            <div><span>Próximas 4 semanas</span><strong>Bs {{ suma(p.pronostico_total) | number: '1.0-0' }}</strong></div>
+            @if (p.variacion !== null) {
+              <div [class.is-baja]="p.variacion < 0">
+                <span>Variación esperada</span><strong>{{ p.variacion > 0 ? '+' : '' }}{{ p.variacion | percent: '1.0-0' }}</strong>
+              </div>
+            }
+          </div>
+          <app-chart type="line" [labels]="labelsPronostico(p)" [data]="[]" [series]="seriesPronostico(p)" />
+          <div class="reportes-pron__tabla">
+            <table>
+              <thead>
+                <tr><th>Sucursal</th><th>Últimas 4 sem. (Bs)</th><th>Próximas 4 sem. (Bs)</th><th>Variación</th></tr>
+              </thead>
+              <tbody>
+                @for (s of p.sucursales; track s.sucursal_id) {
+                  <tr>
+                    <td>{{ s.sucursal }}</td>
+                    <td>{{ s.total_ultimas_4 | number: '1.0-0' }}</td>
+                    <td>{{ s.total_pronostico | number: '1.0-0' }}</td>
+                    <td [class.is-baja]="s.total_pronostico < s.total_ultimas_4">
+                      @if (s.total_ultimas_4 > 0) {
+                        {{ (s.total_pronostico - s.total_ultimas_4) / s.total_ultimas_4 | percent: '1.0-0' }}
+                      } @else { — }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else if (pronosticoError()) {
+          <p class="reportes-vacio">{{ pronosticoError() }}</p>
+        } @else {
+          <p class="reportes-vacio">Calculando el pronóstico…</p>
+        }
+      </div>
     </div>
   }
 

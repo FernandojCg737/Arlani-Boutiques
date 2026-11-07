@@ -10,6 +10,8 @@
 - Recomendador de prendas por tienda: hibrido de contenido y filtrado
   colaborativo KNN (app/ml/recomendador.py).
 - Segmentacion de clientes por tienda (no supervisado): K-Means sobre RFM.
+- Pronostico de ventas por sucursal (supervisado, regresion): Ridge, Random
+  Forest o Gradient Boosting contra una linea base (app/ml/pronostico.py).
 """
 
 import json
@@ -27,6 +29,7 @@ from app.db.session import get_db
 from app.ml.datos import dataset
 from app.ml.entrenamiento import predecir, segmentar_clientes
 from app.ml import embeddings
+from app.ml import pronostico as pronostico_ventas
 from app.ml.recomendador import parecidas
 from app.ml.servicio import ModeloNoListo, _a_json, datos_tienda, guardar_entrenamiento, guardar_recomendador, modelo_activo, recomendador_activo
 from app.models import Usuario
@@ -163,6 +166,31 @@ def probar_recomendador(
     )}
     return [{"producto_id": pid, "nombre": info[pid].nombre, "categoria": info[pid].categoria, "precio": float(info[pid].precio),
              "similitud": s} for pid, s in sugeridas if pid in info]
+
+
+# ---------- Pronostico de ventas por sucursal (supervisado, regresion)
+
+
+@router.get("/pronostico")
+def pronostico(empresa_id: int, db: Session = Depends(get_db), _: Usuario = Depends(require_superadmin)) -> dict:
+    """El modelo de pronostico activo de la tienda (lo entrena si no hay)."""
+    try:
+        return pronostico_ventas.activo(db, empresa_id) or pronostico_ventas.guardar(db, empresa_id, None)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+
+
+@router.post("/pronostico/entrenar")
+def entrenar_pronostico(
+    empresa_id: int, request: Request, db: Session = Depends(get_db), usuario: Usuario = Depends(require_superadmin),
+) -> dict:
+    try:
+        r = pronostico_ventas.guardar(db, empresa_id, usuario.id)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    tienda = db.execute(text("SELECT nombre FROM empresa WHERE id = :e"), {"e": empresa_id}).scalar()
+    log_bitacora(db, usuario, "ENTRENAR", "modelo_ml", r["id"], f"Pronóstico de ventas de {tienda} reentrenado (versión {r['version']})", request)
+    return r
 
 
 @router.get("/{tarea}/datos")

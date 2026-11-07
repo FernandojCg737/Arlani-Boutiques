@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
@@ -32,6 +32,24 @@ interface Dashboard {
   top_productos: SerieCategoria[];
 }
 
+// CU18: pronostico de ventas (modelo supervisado de regresion) por sucursal.
+export interface Pronostico {
+  algoritmo: string;
+  metricas: { mae: number; rmse: number; r2: number | null; error_pct: number | null; error_total_pct: number | null };
+  semanas: string[];
+  pronostico_total: number[];
+  ultimas_4_semanas: number[];
+  variacion: number | null;
+  datos_hasta: string;
+  sucursales: {
+    sucursal_id: number;
+    sucursal: string;
+    semanas: number[];
+    total_pronostico: number;
+    total_ultimas_4: number;
+  }[];
+}
+
 const REPORTES_LINKS = [
   { label: 'Ventas', desc: 'Total vendido, metodos de pago, top productos y sucursales', route: 'ventas' },
   { label: 'Asistencia de empleados', desc: 'Horas conectadas por empleado y sucursal, segun login/logout', route: 'asistencia' },
@@ -45,7 +63,7 @@ const REPORTES_LINKS = [
 // ultimos 30 dias, mas accesos a los 4 reportes detallados y filtrables.
 @Component({
   selector: 'app-admin-reportes-dashboard',
-  imports: [DecimalPipe, RouterLink, AppChart],
+  imports: [DecimalPipe, PercentPipe, RouterLink, AppChart],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -57,8 +75,39 @@ export class AdminReportesDashboard implements OnInit {
   protected readonly error = signal('');
   protected readonly reportesLinks = REPORTES_LINKS;
 
+  protected readonly pronostico = signal<Pronostico | null>(null);
+  protected readonly pronosticoError = signal('');
+
   ngOnInit(): void {
     void this.cargar();
+    void this.cargarPronostico();
+  }
+
+  private async cargarPronostico(): Promise<void> {
+    try {
+      this.pronostico.set(await firstValueFrom(this.http.get<Pronostico>(`${environment.apiUrl}/reportes/pronostico`)));
+    } catch (err: unknown) {
+      const detalle = (err as { error?: { detail?: string } })?.error?.detail;
+      this.pronosticoError.set(typeof detalle === 'string' ? detalle : 'No se pudo calcular el pronóstico.');
+    }
+  }
+
+  // Grafico: las 4 semanas reales y las 4 pronosticadas (la linea del
+  // pronostico arranca en la ultima semana real para que se vean unidas).
+  protected labelsPronostico(p: Pronostico): string[] {
+    return ['Hace 4 sem.', 'Hace 3 sem.', 'Hace 2 sem.', 'Última sem.', ...p.semanas];
+  }
+
+  protected seriesPronostico(p: Pronostico): { label: string; data: (number | null)[] }[] {
+    const reales = p.ultimas_4_semanas;
+    return [
+      { label: 'Vendido (Bs)', data: [...reales, null, null, null, null] },
+      { label: 'Pronóstico (Bs)', data: [null, null, null, reales[3] ?? null, ...p.pronostico_total] },
+    ];
+  }
+
+  protected suma(valores: number[]): number {
+    return valores.reduce((t, v) => t + v, 0);
   }
 
   private async cargar(): Promise<void> {

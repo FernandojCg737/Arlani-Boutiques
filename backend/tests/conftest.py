@@ -65,6 +65,14 @@ class Prueba:
         token = create_access_token(str(usuario_id), sesion)
         return usuario_id, {"Authorization": f"Bearer {token}"}
 
+    def superadmin(self) -> dict:
+        """SuperAdministrador de prueba (de la plataforma, sin empresa)."""
+        usuario_id, headers = self.admin_de(None)  # type: ignore[arg-type]
+        self.sql("UPDATE usuario SET tipo = 'superadministrador', rol_id = (SELECT id FROM rol WHERE nombre = 'SuperAdministrador') WHERE id = :i",
+                 i=usuario_id)
+        self.sql("INSERT INTO superadministrador (id) VALUES (:i)", i=usuario_id)
+        return headers
+
     def tienda(self, plan_codigo: str) -> Tienda:
         """Empresa nueva con suscripcion activa al plan, una sucursal y su administrador."""
         sufijo = uuid.uuid4().hex[:8]
