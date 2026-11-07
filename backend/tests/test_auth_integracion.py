@@ -40,13 +40,11 @@ def correos(monkeypatch):
 
 
 @pytest.fixture()
-def client():
-    from fastapi.testclient import TestClient
-
-    from app.main import app
-
+def client(prueba):
+    # Dentro de la transaccion de prueba (conftest.py): la cuenta que se
+    # registra y todo lo que crea sp_crear_cliente se deshace al terminar.
     rate_limit.reiniciar_limites()
-    return TestClient(app)
+    return prueba.client
 
 
 @pytest.fixture()
@@ -54,12 +52,7 @@ def cliente_nuevo(client, correos):
     email = f"pytest_{uuid.uuid4().hex[:10]}@example.com"
     r = client.post(f"{API}/auth/register", json={"nombre": "Pytest <b>Cliente</b>", "email": email, "password": PASSWORD})
     assert r.status_code == 201, r.text
-    yield email
-    # Limpieza: la cuenta de prueba queda inactiva (no se borra porque
-    # sp_crear_cliente crea filas relacionadas).
-    with SessionLocal() as db:
-        db.execute(text("UPDATE usuario SET estado='inactivo', session_id=NULL WHERE email=:e"), {"e": email})
-        db.commit()
+    return email
 
 
 def _ultimo_codigo(correos, email):

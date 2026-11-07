@@ -39,11 +39,24 @@ class Fuente:
     sucursal: str | None = None
     empresa: str | None = None
     defecto: tuple[list[str], list[str]] = field(default_factory=lambda: ([], []))
+    # Filtros por categoria o producto (CU17: "ventas de vestidos", "stock del
+    # polo basico"): condicion fija con su parametro (:categoria / :producto).
+    filtros: dict[str, str] = field(default_factory=dict)
 
 
 _LINEAS = """(SELECT id, venta_presencial_id AS venta_id, precio_unitario FROM detalle_venta_presencial
               UNION ALL SELECT id, venta_digital_id, precio_unitario FROM detalle_venta_digital)"""
 _TIPO_VENTA = "CASE v.tipo WHEN 'venta_presencial' THEN 'Mostrador' ELSE 'En línea' END"
+
+
+def _con_prenda(desde: str, enlace: str, condicion: str) -> str:
+    """La venta o reserva tiene al menos una prenda que cumple la condicion."""
+    return (f"EXISTS (SELECT 1 FROM {desde} JOIN item_linea il2 ON il2.id = x.id "
+            f"JOIN producto pr2 ON pr2.id = il2.producto_id WHERE {enlace} AND {condicion})")
+
+
+_VENTA_CON = lambda cond: _con_prenda(f"{_LINEAS} x", "x.venta_id = v.id", cond)  # noqa: E731
+_RESERVA_CON = lambda cond: _con_prenda("detalle_reserva x", "x.reserva_id = r.id", cond)  # noqa: E731
 
 FUENTES_TIENDA: dict[str, Fuente] = {
     "ventas": Fuente(
@@ -55,6 +68,7 @@ FUENTES_TIENDA: dict[str, Fuente] = {
         {"cantidad": ("Ventas", "count(*)", "numero"), "total": ("Total vendido (Bs)", "sum(v.total)", "moneda"),
          "promedio": ("Ticket promedio (Bs)", "avg(v.total)", "moneda")},
         donde="v.estado <> 'cancelada'", sucursal="v.sucursal_id", defecto=(["mes"], ["cantidad", "total"]),
+        filtros={"categoria": _VENTA_CON("pr2.categoria_id = :categoria"), "producto": _VENTA_CON("il2.producto_id = :producto")},
     ),
     "productos": Fuente(
         "Prendas vendidas", "Cada prenda vendida: producto, categoría, talla, color y lo que se cobró.",
@@ -69,6 +83,7 @@ FUENTES_TIENDA: dict[str, Fuente] = {
          "ingresos": ("Ingresos (Bs)", "sum(il.cantidad * d.precio_unitario)", "moneda"),
          "ventas": ("Ventas", "count(DISTINCT v.id)", "numero")},
         donde="v.estado = 'pagada'", sucursal="v.sucursal_id", defecto=(["producto"], ["unidades", "ingresos"]),
+        filtros={"categoria": "pr.categoria_id = :categoria", "producto": "il.producto_id = :producto"},
     ),
     "reservas": Fuente(
         "Reservas", "Reservas de clientes por estado, sucursal y origen.",
@@ -77,6 +92,7 @@ FUENTES_TIENDA: dict[str, Fuente] = {
          "origen": ("Online/Offline", "upper(r.origen)")},
         {"cantidad": ("Reservas", "count(*)", "numero")},
         sucursal="r.sucursal_id", defecto=(["estado"], ["cantidad"]),
+        filtros={"categoria": _RESERVA_CON("pr2.categoria_id = :categoria"), "producto": _RESERVA_CON("il2.producto_id = :producto")},
     ),
     "inventario": Fuente(
         "Inventario", "Stock actual por sucursal, producto, categoría, talla y color (sin fechas).",
@@ -89,6 +105,7 @@ FUENTES_TIENDA: dict[str, Fuente] = {
          "agotadas": ("Agotadas", "count(*) FILTER (WHERE i.cantidad = 0)", "numero"),
          "valor": ("Valor del stock (Bs)", "sum(i.cantidad * pr.precio)", "moneda")},
         donde="pr.estado = 'activo'", sucursal="i.sucursal_id", defecto=(["sucursal"], ["stock", "valor"]),
+        filtros={"categoria": "pr.categoria_id = :categoria", "producto": "i.producto_id = :producto"},
     ),
 }
 
@@ -171,6 +188,8 @@ def ejecutar(
     marca: str = "Arlani Boutiques",
     limite: int | None = None,
     ascendente: bool = False,
+    categoria_id: int | None = None,
+    producto_id: int | None = None,
 ) -> Reporte:
     f = fuentes.get(fuente)
     if f is None:
@@ -197,6 +216,10 @@ def ejecutar(
     if empresa_id is not None and f.empresa:
         condiciones.append(f"{f.empresa} = :empresa")
         params["empresa"] = empresa_id
+    for clave, valor in (("categoria", categoria_id), ("producto", producto_id)):
+        if valor is not None and clave in f.filtros:
+            condiciones.append(f.filtros[clave])
+            params[clave] = valor
 
     dims_sql = [f"{f.dimensiones[a][1]} AS d{i}" for i, a in enumerate(agrupar)]
     mets_sql = [f"coalesce({f.metricas[m][1]}, 0) AS {m}" for m in metricas]

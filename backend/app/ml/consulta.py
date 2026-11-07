@@ -42,8 +42,33 @@ class Consulta:
     limite: int | None = None
     ascendente: bool = False
     sucursal_id: int | None = None
+    categoria_id: int | None = None
+    producto_id: int | None = None
     grafico: str = "bar"
     filtros: list[str] = field(default_factory=list)
+
+
+def _singular(palabra: str) -> str:
+    """vestidos -> vestido, pantalones -> pantalon (el plural se acepta despues)."""
+    if len(palabra) > 4 and palabra.endswith("es") and palabra[-3] not in "aeiou":
+        return palabra[:-2]
+    if len(palabra) > 3 and palabra.endswith("s"):
+        return palabra[:-1]
+    return palabra
+
+
+def _nombrado(t: str, opciones: list[tuple[int, str]]) -> tuple[int, str] | None:
+    """La opcion (id, nombre) cuyo nombre aparece en la frase, en singular o
+    plural ("vestido"/"vestidos"). Gana el nombre mas largo: "polo basico"
+    antes que "polo"."""
+    for oid, nombre in sorted(opciones, key=lambda o: -len(o[1])):
+        clave = normalizar(nombre)
+        if len(clave) < 3:
+            continue
+        palabras = [re.escape(_singular(p)) + r"(?:e?s)?" for p in clave.split()]
+        if re.search(r"\b" + r"\s+".join(palabras) + r"\b", t):
+            return oid, nombre
+    return None
 
 
 def _mes(m: int, hoy: date) -> tuple[date, date]:
@@ -93,7 +118,14 @@ def periodo(t: str, hoy: date) -> tuple[date | None, date | None, str | None]:
     return None, None, None
 
 
-def interpretar(texto: str, intencion: str, hoy: date, sucursales: list[tuple[int, str]]) -> Consulta:
+def interpretar(
+    texto: str,
+    intencion: str,
+    hoy: date,
+    sucursales: list[tuple[int, str]],
+    categorias: list[tuple[int, str]] | None = None,
+    productos: list[tuple[int, str]] | None = None,
+) -> Consulta:
     t = normalizar(texto)
     # normalizar convierte los digitos en "num": se recuperan del texto original.
     digitos = iter(re.findall(r"\d+", texto))
@@ -145,6 +177,20 @@ def interpretar(texto: str, intencion: str, hoy: date, sucursales: list[tuple[in
         desde, hasta = hoy - timedelta(days=29), hoy
         filtros.append("Periodo: últimos 30 días (no se indicó)")
     c.desde, c.hasta, c.sucursal_id, c.filtros = (desde, hasta, sucursal_id, filtros) if c.fuente != "inventario" else (None, None, sucursal_id, filtros)
+
+    # Producto o categoria nombrados en la frase. Si el reporte agrupa por
+    # producto y se nombra uno, se desglosa ese producto por talla (y color en
+    # el stock); si agrupa por categoria, no se filtra por categoria.
+    producto = _nombrado(t, productos or [])
+    if producto:
+        c.producto_id = producto[0]
+        c.filtros.append(f"Producto: {producto[1]}")
+        if "producto" in c.agrupar:
+            c.agrupar = ["talla", "color"] if c.fuente == "inventario" else ["talla"]
+    categoria = None if producto or "categoria" in c.agrupar else _nombrado(t, categorias or [])
+    if categoria:
+        c.categoria_id = categoria[0]
+        c.filtros.append(f"Categoría: {categoria[1]}")
     if c.limite:
         c.filtros.append(f"Los {c.limite} {'de menor' if c.ascendente else 'de mayor'} {'stock' if c.fuente == 'inventario' else 'venta'}")
     return c
