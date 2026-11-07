@@ -83,11 +83,17 @@ def generar(
     sql = "SELECT id, nombre FROM sucursal WHERE empresa_id = :e AND estado = 'activa'"
     sucursales = [(f.id, f.nombre) for f in db.execute(text(sql), {"e": empresa})]
     hoy = db.execute(text("SELECT (now() AT TIME ZONE 'America/La_Paz')::date")).scalar() or date.today()
-    c = interpretar(payload.texto, pred["intencion"], hoy, sucursales)
+    # Categorias (las base y las propias) y productos de la tienda, para
+    # reconocer filtros como "ventas de vestidos" o "stock del polo basico".
+    categorias = [(f.id, f.nombre) for f in db.execute(
+        text("SELECT id, nombre FROM categoria WHERE empresa_id IS NULL OR empresa_id = :e"), {"e": empresa})]
+    productos = [(f.id, f.nombre) for f in db.execute(text("SELECT id, nombre FROM producto WHERE empresa_id = :e"), {"e": empresa})]
+    c = interpretar(payload.texto, pred["intencion"], hoy, sucursales, categorias, productos)
     sucursal = restringida or c.sucursal_id
     r = ejecutar(
         db, FUENTES_TIENDA, c.fuente, c.agrupar, c.metricas, c.desde, c.hasta, sucursal_id=sucursal,
         marca=nombre_marca(db, empresa), limite=c.limite, ascendente=c.ascendente,
+        categoria_id=c.categoria_id, producto_id=c.producto_id,
     )
     r.titulo = NOMBRES[pred["intencion"]]
     r.subtitulo = " · ".join([f"“{payload.texto.strip()}”"] + c.filtros)
