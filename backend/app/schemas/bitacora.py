@@ -11,6 +11,8 @@ class BitacoraItem(BaseModel):
     accion: str
     entidad_afectada: str
     entidad_id: int | None
+    # Numero de la entidad en su tienda (ventas, reservas, cajas...), el que se muestra.
+    entidad_numero: int | None = None
     fecha: datetime
     detalle: str | None
     ip_address: str | None

@@ -51,6 +51,9 @@ class DetalleDevolucionOut(BaseModel):
 class DevolucionOut(BaseModel):
     id: int
     venta_id: int
+    # Numeros propios de la tienda (los que se muestran).
+    numero: int | None = None
+    venta_numero: int | None = None
     empleado_nombre: str | None = None
     motivo: str
     tipo: str

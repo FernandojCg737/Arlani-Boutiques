@@ -79,6 +79,7 @@ def _to_detalle_out(d: DetalleReserva) -> DetalleReservaOut:
 def _to_out(r: Reserva) -> ReservaOut:
     return ReservaOut(
         id=r.id,
+        numero=r.numero,
         origen=getattr(r, "origen", None) or "online",
         cliente_id=r.cliente_id,
         sucursal_id=r.sucursal_id,
@@ -152,7 +153,7 @@ def _mover_stock_reserva(db: Session, reserva: Reserva, tipo: str, empleado_id: 
                 empleado_id=empleado_id,
                 tipo=tipo,
                 cantidad=d.cantidad,
-                documento_referencia=f"Reserva #{reserva.id} ({motivo})",
+                documento_referencia=f"Reserva #{reserva.numero or reserva.id} ({motivo})",
             )
         )
 
@@ -353,7 +354,7 @@ def completar_reserva(
     )
     venta_id = result.scalar_one()
     db.commit()
-    log_bitacora(db, admin, "ACTUALIZAR", "reserva", reserva.id, f"Reserva completada (pagada/entregada en efectivo, venta #{venta_id})", request)
+    log_bitacora(db, admin, "ACTUALIZAR", "reserva", reserva.id, f"Reserva completada (pagada/entregada en efectivo, venta #{db.execute(text('SELECT fn_numero_venta(:v)'), {'v': venta_id}).scalar()})", request)
 
     reserva = _get_reserva_or_404(db, reserva_id)
     return _to_admin_out(reserva)

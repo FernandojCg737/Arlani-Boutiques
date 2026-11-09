@@ -43,7 +43,7 @@ PERMISO = "2P-CU16"
 _HOY = "fn_dia_bolivia(now()::timestamp)"
 
 _SQL_CAJA = f"""
-    SELECT c.id, c.tipo, c.sucursal_id, c.fecha, c.abierta_en, c.monto_inicial, c.efectivo_esperado,
+    SELECT c.id, c.numero, c.tipo, c.sucursal_id, c.fecha, c.abierta_en, c.monto_inicial, c.efectivo_esperado,
            c.efectivo_contado, c.diferencia, c.observacion,
            s.nombre AS sucursal_nombre, ua.nombre AS abierta_por_nombre, ua.tipo AS abierta_por_rol,
            uc.nombre AS cerrada_por_nombre,
@@ -65,6 +65,7 @@ _SQL_CAJA = f"""
 def _to_out(f) -> dict:
     return dict(
         id=f["id"],
+        numero=f["numero"],
         tipo=f["tipo"],
         estado=f["estado"],
         sucursal_id=f["sucursal_id"],
@@ -206,7 +207,7 @@ def detalle(
     ).mappings().all()
     ventas = db.execute(
         text(
-            """SELECT v.id, v.fecha, v.tipo, v.origen, v.estado, v.total, v.fuera_de_arqueo,
+            """SELECT v.id, v.numero, v.fecha, v.tipo, v.origen, v.estado, v.total, v.fuera_de_arqueo,
                       coalesce(v.factura_nombre, u.nombre, 'Cliente') AS cliente,
                       p.metodo AS metodo_pago, p.estado AS estado_pago, ue.nombre AS atendido_por
                FROM venta v

@@ -131,7 +131,7 @@ class _VentaCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          AdminInfoRow('Venta', '#${venta.id} · ${venta.tipo == 'venta_digital' ? 'En linea' : 'Mostrador'}'),
+          AdminInfoRow('Venta', '#${venta.numero ?? venta.id} · ${venta.tipo == 'venta_digital' ? 'En linea' : 'Mostrador'}'),
           AdminInfoRow('Sucursal', venta.sucursalNombre),
           AdminInfoRow('Fecha', '${venta.fecha.day}/${venta.fecha.month}/${venta.fecha.year} ${venta.fecha.hour.toString().padLeft(2, '0')}:${venta.fecha.minute.toString().padLeft(2, '0')}'),
           if (venta.atendidoPorNombre != null) AdminInfoRow('Atendido por', venta.atendidoPorNombre!),

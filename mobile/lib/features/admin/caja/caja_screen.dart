@@ -127,7 +127,7 @@ class _CajaScreenState extends ConsumerState<CajaScreen> {
             ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              title: Text('#${v['id']} · ${v['cliente']} · ${bsTexto(v['total'])}'),
+              title: Text('#${v['numero'] ?? v['id']} · ${v['cliente']} · ${bsTexto(v['total'])}'),
               subtitle: Text('${v['metodo_pago'] ?? '—'} · ${v['origen']} · ${fechaTexto(v['fecha'])}'
                   '${v['fuera_de_arqueo'] == true ? ' · fuera de arqueo' : ''}'),
             ),

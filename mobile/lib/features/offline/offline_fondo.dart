@@ -127,6 +127,8 @@ Future<bool> enviarPendientesEnFondo() async {
         ..mensaje = res['mensaje'] as String?
         ..ventaId = (res['venta_id'] as int?) ?? o.ventaId
         ..reservaId = (res['reserva_id'] as int?) ?? o.reservaId
+        ..ventaNumero = (res['venta_numero'] as int?) ?? o.ventaNumero
+        ..reservaNumero = (res['reserva_numero'] as int?) ?? o.reservaNumero
         ..noPagados = NoPagado.deJson(res['no_pagados'])
         ..totalCobrado = res['total_cobrado']?.toString();
       await db.actualizarOperacion(o);
@@ -157,6 +159,8 @@ Future<bool> enviarPendientesEnFondo() async {
           ..mensaje = e['mensaje'] as String?
           ..ventaId = (e['venta_id'] as int?) ?? o.ventaId
           ..reservaId = (e['reserva_id'] as int?) ?? o.reservaId
+          ..ventaNumero = (e['venta_numero'] as int?) ?? o.ventaNumero
+          ..reservaNumero = (e['reserva_numero'] as int?) ?? o.reservaNumero
           ..noPagados = NoPagado.deJson(e['no_pagados'])
           ..totalCobrado = e['total_cobrado']?.toString();
         await db.actualizarOperacion(o);

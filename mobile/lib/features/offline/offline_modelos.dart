@@ -260,6 +260,8 @@ class OperacionLocal {
     this.mensaje,
     this.ventaId,
     this.reservaId,
+    this.ventaNumero,
+    this.reservaNumero,
     this.intentos = 0,
     this.ultimoIntento,
     this.noPagados = const [],
@@ -290,6 +292,9 @@ class OperacionLocal {
   String? mensaje;
   int? ventaId;
   int? reservaId;
+  // Numeros que ve la tienda (los da el servidor al sincronizar).
+  int? ventaNumero;
+  int? reservaNumero;
   int intentos;
   String? ultimoIntento;
   List<NoPagado> noPagados;

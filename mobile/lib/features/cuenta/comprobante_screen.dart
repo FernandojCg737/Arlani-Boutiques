@@ -56,6 +56,7 @@ class _Detalle {
 class _Comprobante {
   _Comprobante(Map<String, dynamic> j)
       : id = j['id'] as int,
+        numero = j['numero'] as int?,
         tipo = j['tipo'] as String,
         sucursal = j['sucursal_nombre'] as String,
         fecha = fechaDelBackend(j['fecha']!),
@@ -71,6 +72,7 @@ class _Comprobante {
         detalles = [for (final d in (j['detalles'] as List<dynamic>).cast<Map<String, dynamic>>()) _Detalle(d)];
 
   final int id;
+  final int? numero;
   final String tipo;
   final String sucursal;
   final DateTime fecha;
@@ -92,7 +94,7 @@ class _Comprobante {
 
   String get tiendaNombre => _t('nombre') ?? 'Arlani Boutiques';
   String? get logo => _t('logo_url');
-  String get folio => '$id'.padLeft(6, '0');
+  String get folio => '${numero ?? id}'.padLeft(6, '0');
   String get fechaTexto {
     final h = fecha.hour % 12 == 0 ? 12 : fecha.hour % 12;
     return '${fecha.day} de ${_meses[fecha.month - 1]} de ${fecha.year}, $h:${fecha.minute.toString().padLeft(2, '0')} ${fecha.hour < 12 ? 'AM' : 'PM'}';

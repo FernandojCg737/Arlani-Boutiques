@@ -2,6 +2,7 @@
 class VentaAdmin {
   const VentaAdmin({
     required this.id,
+    this.numero,
     required this.tipo,
     required this.sucursalNombre,
     required this.fecha,
@@ -14,6 +15,7 @@ class VentaAdmin {
   });
 
   final int id;
+  final int? numero;
   final String tipo;
   final String sucursalNombre;
   final DateTime fecha;
@@ -27,6 +29,7 @@ class VentaAdmin {
   factory VentaAdmin.fromJson(Map<String, dynamic> json) {
     return VentaAdmin(
       id: json['id'] as int,
+      numero: json['numero'] as int?,
       tipo: json['tipo'] as String,
       sucursalNombre: json['sucursal_nombre'] as String,
       fecha: DateTime.parse(json['fecha'] as String),

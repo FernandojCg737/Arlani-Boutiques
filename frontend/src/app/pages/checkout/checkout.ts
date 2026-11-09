@@ -74,6 +74,8 @@ interface TiendaCheckout {
 }
 
 interface VentaCreada {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   sucursal_nombre: string;
   tienda: { id: number; nombre: string; color_marca: string } | null;

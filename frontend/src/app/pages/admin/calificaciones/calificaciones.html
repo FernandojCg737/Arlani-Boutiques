@@ -71,7 +71,7 @@
                   <span>{{ c.cliente_email }}</span>
                 </div>
               </td>
-              <td>#{{ c.venta_id }}</td>
+              <td>#{{ c.venta_numero ?? c.venta_id }}</td>
               <td>{{ c.sucursal_nombre }}</td>
               <td>{{ c.empleado_nombre ?? '-' }}</td>
               <td>

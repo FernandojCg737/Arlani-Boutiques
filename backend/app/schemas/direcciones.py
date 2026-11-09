@@ -23,6 +23,8 @@ class UbicacionClienteOut(BaseModel):
     """Ubicacion de la ultima compra con envio de un cliente (CU03)."""
 
     venta_id: int
+    # Numero de esa venta en su tienda (el que se muestra).
+    venta_numero: int | None = None
     fecha: datetime
     tienda_nombre: str
     direccion: str

@@ -8,6 +8,9 @@ import { Auth } from '../../../services/auth';
 import { mensajeError } from '../../../services/plataforma';
 
 export interface CambioPrenda {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
+  venta_numero?: number | null;
   id: number;
   venta_id: number;
   venta_fecha: string;
@@ -152,7 +155,7 @@ export class AdminCambios implements OnInit {
   }
 
   protected async aprobarPago(c: CambioPrenda): Promise<void> {
-    if (!confirm(`¿Aprobar el pago de la diferencia del cambio #${c.id}? Se entrega la prenda nueva y se mueve el stock.`)) return;
+    if (!confirm(`¿Aprobar el pago de la diferencia del cambio #${c.numero ?? c.id}? Se entrega la prenda nueva y se mueve el stock.`)) return;
     await this.ejecutar(c, 'aprobar-pago', {}, false);
   }
 

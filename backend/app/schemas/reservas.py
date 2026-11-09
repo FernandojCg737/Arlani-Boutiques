@@ -36,6 +36,8 @@ class DetalleReservaOut(BaseModel):
 
 class ReservaOut(BaseModel):
     id: int
+    # Numero propio de la tienda (#1, #2...): el que se muestra.
+    numero: int | None = None
     # online | offline (hecha sin conexion y sincronizada despues).
     origen: str = "online"
     cliente_id: int

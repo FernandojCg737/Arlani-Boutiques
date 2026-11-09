@@ -74,6 +74,8 @@ interface Prenda {
 }
 
 interface Opciones {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  venta_numero?: number | null;
   venta_id: number;
   plazo_hasta: string;
   puede_cambiar: boolean;
@@ -295,7 +297,7 @@ export class MisCambios implements OnInit {
       this.cambios.update((cs) => [nuevo, ...cs]);
       this.opciones.set(null);
       this.aviso.set(
-        `Pedimos tu cambio #${nuevo.id} a ${o.tienda_nombre}. Te avisamos cuando lo revisen; síguelo en la pestaña Mis Cambios.`,
+        `Pedimos tu cambio #${nuevo.numero ?? nuevo.id} a ${o.tienda_nombre}. Te avisamos cuando lo revisen; síguelo en la pestaña Mis Cambios.`,
       );
       this.solicitado.emit();
     } catch (err) {
@@ -306,7 +308,7 @@ export class MisCambios implements OnInit {
   }
 
   protected async cancelar(c: CambioCliente): Promise<void> {
-    if (!confirm(`¿Cancelar el cambio #${c.id}?`)) return;
+    if (!confirm(`¿Cancelar el cambio #${c.numero ?? c.id}?`)) return;
     try {
       const nuevo = await firstValueFrom(this.http.post<CambioCliente>(`${this.api}/${c.id}/cancelar`, {}));
       this.reemplazar(nuevo);
@@ -349,7 +351,7 @@ export class MisCambios implements OnInit {
           );
           this.reemplazar(nuevo);
           this.pagando.set(null);
-          this.aviso.set(`Listo: pagaste la diferencia del cambio #${c.id}. Recoge tu prenda en ${nuevo.sucursal_nombre}.`);
+          this.aviso.set(`Listo: pagaste la diferencia del cambio #${c.numero ?? c.id}. Recoge tu prenda en ${nuevo.sucursal_nombre}.`);
         } catch (err) {
           this.errorPago.set(this.extraerError(err));
         } finally {
@@ -386,7 +388,7 @@ export class MisCambios implements OnInit {
       const nuevo = await firstValueFrom(this.http.post<CambioCliente>(`${this.api}/${p.cambio.id}/comprobante`, datos));
       this.reemplazar(nuevo);
       this.pagando.set(null);
-      this.aviso.set(`Recibimos tu comprobante del cambio #${p.cambio.id}. La tienda lo revisa y te avisamos.`);
+      this.aviso.set(`Recibimos tu comprobante del cambio #${p.cambio.numero ?? p.cambio.id}. La tienda lo revisa y te avisamos.`);
     } catch (err) {
       this.errorPago.set(this.extraerError(err));
     } finally {

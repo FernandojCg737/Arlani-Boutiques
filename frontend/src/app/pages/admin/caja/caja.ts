@@ -20,6 +20,8 @@ interface ResumenCaja {
 }
 
 export interface Caja {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   tipo: 'fisica' | 'online';
   estado: 'abierta' | 'cerrada';
@@ -49,6 +51,8 @@ interface MovimientoCaja {
 }
 
 interface VentaCaja {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   fecha: string;
   tipo: string;

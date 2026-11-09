@@ -52,6 +52,7 @@ class OpcionesCambioOut(BaseModel):
     """Lo que el cliente puede cambiar de una compra y por que prendas."""
 
     venta_id: int
+    venta_numero: int | None = None
     fecha: datetime
     plazo_hasta: datetime
     en_plazo: bool
@@ -95,6 +96,9 @@ class MotivoIn(BaseModel):
 class CambioOut(BaseModel):
     id: int
     venta_id: int
+    # Numeros propios de la tienda (los que se muestran).
+    numero: int | None = None
+    venta_numero: int | None = None
     # Linea de la compra que se cambia (para tacharla en Mis Compras).
     item_linea_id: int
     venta_fecha: datetime

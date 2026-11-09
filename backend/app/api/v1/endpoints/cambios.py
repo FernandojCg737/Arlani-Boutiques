@@ -55,7 +55,7 @@ router = APIRouter()
 PLAZO_CAMBIO = timedelta(hours=24)
 
 _SQL_CAMBIO = """
-    SELECT c.*, v.fecha AS venta_fecha, s.nombre AS sucursal_nombre, s.empresa_id,
+    SELECT c.*, v.fecha AS venta_fecha, v.numero AS venta_numero, s.nombre AS sucursal_nombre, s.empresa_id,
            e.nombre AS e_nombre, e.subdominio AS e_subdominio, e.logo_url AS e_logo_url, e.color_marca AS e_color_marca,
            e.ciudad AS e_ciudad, e.email_contacto AS e_email_contacto, e.razon_social AS e_razon_social,
            e.nit AS e_nit, e.direccion_fiscal AS e_direccion_fiscal, e.telefono AS e_telefono,
@@ -80,7 +80,7 @@ _SQL_CAMBIO = """
 """
 
 _CAMPOS_CAMBIO = (
-    "id venta_id item_linea_id venta_fecha estado motivo observaciones cantidad sucursal_id sucursal_nombre cliente_nombre "
+    "id venta_id numero venta_numero item_linea_id venta_fecha estado motivo observaciones cantidad sucursal_id sucursal_nombre cliente_nombre "
     "cliente_email producto_original talla_original color_original producto_nuevo talla_nueva color_nuevo "
     "precio_pagado precio_nuevo diferencia destino motivo_rechazo reembolso_metodo metodo_pago_nombre "
     "comprobante_url empleado_nombre fecha_solicitud fecha_resolucion fecha_completado"
@@ -169,7 +169,7 @@ def opciones_de_cambio(
     cliente = _get_cliente_o_403(db, usuario)
     venta = db.execute(
         text(
-            "SELECT v.id, v.fecha, v.estado, v.sucursal_id, s.nombre AS sucursal, s.empresa_id, e.nombre AS tienda, "
+            "SELECT v.id, v.numero, v.fecha, v.estado, v.sucursal_id, s.nombre AS sucursal, s.empresa_id, e.nombre AS tienda, "
             "e.color_marca, "
             "fn_empresa_operativa(e.id) AS operativa, now() AT TIME ZONE 'UTC' AS ahora "
             "FROM venta v JOIN sucursal s ON s.id = v.sucursal_id JOIN empresa e ON e.id = s.empresa_id "
@@ -260,6 +260,7 @@ def opciones_de_cambio(
 
     return OpcionesCambioOut(
         venta_id=venta["id"],
+        venta_numero=venta["numero"],
         fecha=venta["fecha"],
         plazo_hasta=plazo,
         en_plazo=en_plazo,
@@ -293,7 +294,7 @@ def solicitar_cambio(
         },
     ).scalar_one()
     db.commit()
-    log_bitacora(db, usuario, "CREAR", "cambio_prenda", cambio_id, f"Solicitud de cambio de prenda (venta #{payload.venta_id})", request)
+    log_bitacora(db, usuario, "CREAR", "cambio_prenda", cambio_id, f"Solicitud de cambio de prenda (venta #{db.execute(text('SELECT fn_numero_venta(:v)'), {'v': payload.venta_id}).scalar()})", request)
     return _to_out(db, _cambio(db, cambio_id), con_metodos=True)
 
 
@@ -513,16 +514,16 @@ def aprobar_cambio(
 
     if estado == "por_pagar":
         mensaje = (
-            f"Tu cambio de prenda #{cambio_id} fue aprobado. Paga la diferencia de Bs {diferencia} "
+            f"Tu cambio de prenda #{fila['numero'] or cambio_id} fue aprobado. Paga la diferencia de Bs {diferencia} "
             "desde Mi cuenta para completarlo."
         )
     elif diferencia < 0:
         mensaje = (
-            f"Tu cambio de prenda #{cambio_id} está listo. Te devolvemos Bs {-diferencia}"
+            f"Tu cambio de prenda #{fila['numero'] or cambio_id} está listo. Te devolvemos Bs {-diferencia}"
             + (" a tu PayPal." if metodo_reembolso == "paypal" else " en la tienda al recoger tu prenda.")
         )
     else:
-        mensaje = f"Tu cambio de prenda #{cambio_id} está listo. Recoge tu prenda nueva en {fila['sucursal_nombre']}."
+        mensaje = f"Tu cambio de prenda #{fila['numero'] or cambio_id} está listo. Recoge tu prenda nueva en {fila['sucursal_nombre']}."
     _notificar(db, fila["cliente_id"], "cambio_aprobado", mensaje, cambio_id)
     db.commit()
     log_bitacora(db, usuario, "ACTUALIZAR", "cambio_prenda", cambio_id, f"Cambio de prenda aprobado ({estado}, destino {payload.destino})", request)
@@ -541,7 +542,7 @@ def rechazar_cambio(
     fila = _cambio(db, cambio_id)
     verificar_acceso_sucursal(usuario, fila["sucursal_id"])
     _ejecutar(db, "SELECT sp_rechazar_cambio(:id, :emp, :motivo)", {"id": cambio_id, "emp": empleado.id, "motivo": payload.motivo})
-    _notificar(db, fila["cliente_id"], "cambio_rechazado", f"Tu cambio de prenda #{cambio_id} fue rechazado: {payload.motivo}", cambio_id)
+    _notificar(db, fila["cliente_id"], "cambio_rechazado", f"Tu cambio de prenda #{fila['numero'] or cambio_id} fue rechazado: {payload.motivo}", cambio_id)
     db.commit()
     log_bitacora(db, usuario, "ACTUALIZAR", "cambio_prenda", cambio_id, f"Cambio de prenda rechazado: {payload.motivo}", request)
     return _to_out(db, _cambio(db, cambio_id))
@@ -559,7 +560,7 @@ def aprobar_pago_cambio(
     verificar_acceso_sucursal(usuario, fila["sucursal_id"])
     _ejecutar(db, "SELECT sp_revisar_pago_cambio(:id, :emp, TRUE, NULL)", {"id": cambio_id, "emp": empleado.id})
     _notificar(db, fila["cliente_id"], "cambio_completado",
-               f"Recibimos el pago de tu cambio #{cambio_id}. Recoge tu prenda nueva en {fila['sucursal_nombre']}.", cambio_id)
+               f"Recibimos el pago de tu cambio #{fila['numero'] or cambio_id}. Recoge tu prenda nueva en {fila['sucursal_nombre']}.", cambio_id)
     db.commit()
     log_bitacora(db, usuario, "ACTUALIZAR", "cambio_prenda", cambio_id, "Pago de la diferencia del cambio aprobado", request)
     return _to_out(db, _cambio(db, cambio_id))
@@ -578,7 +579,7 @@ def rechazar_pago_cambio(
     verificar_acceso_sucursal(usuario, fila["sucursal_id"])
     _ejecutar(db, "SELECT sp_revisar_pago_cambio(:id, :emp, FALSE, :m)", {"id": cambio_id, "emp": empleado.id, "m": payload.motivo})
     _notificar(db, fila["cliente_id"], "cambio_pago_rechazado",
-               f"El comprobante de tu cambio #{cambio_id} no fue aceptado: {payload.motivo}. Puedes volver a pagar.", cambio_id)
+               f"El comprobante de tu cambio #{fila['numero'] or cambio_id} no fue aceptado: {payload.motivo}. Puedes volver a pagar.", cambio_id)
     db.commit()
     log_bitacora(db, usuario, "ACTUALIZAR", "cambio_prenda", cambio_id, f"Comprobante del cambio rechazado: {payload.motivo}", request)
     return _to_out(db, _cambio(db, cambio_id))

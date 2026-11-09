@@ -108,7 +108,7 @@
           } @else {
             @for (r of d.detalle; track r.id) {
               <tr>
-                <td>{{ r.id }}</td>
+                <td>{{ r.numero ?? r.id }}</td>
                 <td>{{ r.fecha_creacion | date: 'd MMM yyyy, h:mm a' }}</td>
                 <td>{{ r.cliente_nombre }}</td>
                 <td>{{ r.sucursal_nombre }}</td>

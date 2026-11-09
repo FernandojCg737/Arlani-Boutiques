@@ -94,7 +94,7 @@
                   <div class="ultima-ubicacion">
                     <strong>Último envío</strong>
                     <span>{{ u.direccion }}{{ u.ciudad ? ', ' + u.ciudad : '' }}</span>
-                    <small>Compra #{{ u.venta_id }} en {{ u.tienda_nombre }} · {{ u.fecha + 'Z' | date: 'd MMM y' : '-0400' }}</small>
+                    <small>Compra #{{ u.venta_numero ?? u.venta_id }} en {{ u.tienda_nombre }} · {{ u.fecha + 'Z' | date: 'd MMM y' : '-0400' }}</small>
                     <button type="button" (click)="ubicacionVista.set(c)">Ver en el mapa</button>
                   </div>
                 }
@@ -134,7 +134,7 @@
             <h2>Ubicación de envío de {{ c.nombre }}</h2>
             <p class="ubicacion-modal__texto">
               {{ u.direccion }}{{ u.ciudad ? ', ' + u.ciudad : '' }}{{ u.referencia ? ' · ' + u.referencia : '' }}<br />
-              <small>Compra #{{ u.venta_id }} en {{ u.tienda_nombre }} · {{ u.fecha + 'Z' | date: "d MMM y, HH:mm" : '-0400' }}</small>
+              <small>Compra #{{ u.venta_numero ?? u.venta_id }} en {{ u.tienda_nombre }} · {{ u.fecha + 'Z' | date: "d MMM y, HH:mm" : '-0400' }}</small>
             </p>
             <app-mapa-ubicacion [punto]="{ lat: +u.latitud, lng: +u.longitud }" [soloLectura]="true" [alto]="320" />
             <div class="modal-actions">

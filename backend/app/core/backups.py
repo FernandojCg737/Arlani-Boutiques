@@ -359,7 +359,7 @@ def generar_backup(backup_id: int) -> None:
                     hashes[ruta] = hashlib.sha256(resp.content).hexdigest()
                     imagenes += 1
             meta = {
-                "backup_id": backup_id, "alcance": fila["alcance"], "empresa_id": fila["empresa_id"],
+                "backup_id": backup_id, "numero": fila["numero"], "alcance": fila["alcance"], "empresa_id": fila["empresa_id"],
                 "secciones": sorted(secciones), "creado_en": fila["creado_en"].isoformat(),
                 "version_base": version, "conteos": {k: len(v) for k, v in datos.items()},
                 # Para poder importarlo despues (ver leer_importacion).
@@ -392,7 +392,7 @@ def generar_backup(backup_id: int) -> None:
             ).scalar() if fila["programacion_id"] else None
             registrar_bitacora(
                 conn, fila["creado_por_id"], "COMPLETAR", "backup", backup_id,
-                f"{_ORIGEN[fila['origen']]}{' «' + programa + '»' if programa else ''} #{backup_id} {donde} completado"
+                f"{_ORIGEN[fila['origen']]}{' «' + programa + '»' if programa else ''} #{fila['numero'] or backup_id} {donde} completado"
                 f"{' (atrasado: el servidor estaba dormido)' if fila['atrasado'] else ''}: "
                 f"{sum(meta['conteos'].values())} registros, {imagenes} imágenes, {_tamano(len(contenido))}. "
                 f"Secciones: {', '.join(sorted(secciones))}.",
@@ -406,7 +406,7 @@ def generar_backup(backup_id: int) -> None:
                 {"m": str(exc)[:500], "i": backup_id},
             )
             registrar_bitacora(conn, fila["creado_por_id"], "FALLO", "backup", backup_id,
-                               f"{_ORIGEN[fila['origen']]} #{backup_id} falló: {str(exc)[:300]}", fila["empresa_id"])
+                               f"{_ORIGEN[fila['origen']]} #{fila['numero'] or backup_id} falló: {str(exc)[:300]}", fila["empresa_id"])
 
 
 def crear_backup(conn: Connection, empresa_id: int | None, secciones: list[str], origen: str,
@@ -708,6 +708,9 @@ class _Restaurador:
                     )
         for tabla in SIN_TRIGGERS:
             self.conn.execute(text(f"ALTER TABLE {tabla} ENABLE TRIGGER USER"))
+        # Lo que volvio sin numero de tienda (backups viejos o con los triggers
+        # apagados) recibe el suyo, y los contadores quedan por encima.
+        self.conn.execute(text("SELECT fn_numerar_faltantes()"))
         # Las filas volvieron con su id: el contador de cada tabla queda por
         # encima (si no, en una base nueva el proximo registro chocaria).
         for tabla in self.resumen:
@@ -742,7 +745,7 @@ def restaurar_backup(restauracion_id: int) -> None:
     """Hace el backup previo y restaura (ya creada 'en_proceso')."""
     with engine.connect() as conn:
         r = conn.execute(
-            text("SELECT r.*, b.archivos, b.empresa_id AS backup_empresa FROM backup_restauracion r JOIN backup b ON b.id = r.backup_id WHERE r.id = :i"),
+            text("SELECT r.*, b.archivos, b.empresa_id AS backup_empresa, coalesce(b.numero, b.id) AS backup_numero FROM backup_restauracion r JOIN backup b ON b.id = r.backup_id WHERE r.id = :i"),
             {"i": restauracion_id},
         ).mappings().first()
         conn.commit()
@@ -781,12 +784,13 @@ def restaurar_backup(restauracion_id: int) -> None:
                 {"r": json.dumps({"tablas": resumen, "imagenes": imagenes}), "i": restauracion_id},
             )
             totales = {k: sum(x[k] for x in resumen.values()) for k in ("volvieron", "actualizadas", "omitidas")}
+            previo_numero = conn.execute(text("SELECT coalesce(numero, id) FROM backup WHERE id = :b"), {"b": previo}).scalar()
             registrar_bitacora(
                 conn, r["hecho_por_id"], "COMPLETAR", "backup_restauracion", restauracion_id,
-                f"Restauración del backup #{r['backup_id']} completada ({', '.join(sorted(secciones))}): "
+                f"Restauración del backup #{r['backup_numero']} completada ({', '.join(sorted(secciones))}): "
                 f"volvieron {totales['volvieron']} registros, se restauraron {totales['actualizadas']}, "
                 f"no pudieron volver {totales['omitidas']}, {imagenes} imágenes repuestas. "
-                f"Para volver atrás: backup #{previo}.",
+                f"Para volver atrás: backup #{previo_numero}.",
                 empresa_id,
             )
     except Exception as exc:  # noqa: BLE001 - el error queda en la restauracion
@@ -797,7 +801,7 @@ def restaurar_backup(restauracion_id: int) -> None:
                 {"m": str(exc)[:500], "i": restauracion_id},
             )
             registrar_bitacora(conn, r["hecho_por_id"], "FALLO", "backup_restauracion", restauracion_id,
-                               f"Restauración del backup #{r['backup_id']} falló, no se cambió nada: {str(exc)[:300]}", empresa_id)
+                               f"Restauración del backup #{r['backup_numero']} falló, no se cambió nada: {str(exc)[:300]}", empresa_id)
 
 
 # ================================================================ programacion

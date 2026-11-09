@@ -296,6 +296,8 @@ def _to_out(dev: Devolucion, db: Session) -> DevolucionOut:
     return DevolucionOut(
         id=dev.id,
         venta_id=dev.venta_id,
+        numero=dev.numero,
+        venta_numero=dev.venta.numero if dev.venta else None,
         empleado_nombre=dev.empleado.nombre if dev.empleado else None,
         motivo=dev.motivo,
         tipo=dev.tipo,
@@ -429,7 +431,7 @@ def solicitar_devolucion_cliente(
         db,
         cliente.id,
         "devolucion_solicitada",
-        f"Has solicitado una devolucion {payload.tipo} para tu compra #{venta_id} "
+        f"Has solicitado una devolucion {payload.tipo} para tu compra #{venta.numero or venta_id} "
         f"por {monto_total} Bs. Nuestro personal la revisara a la brevedad.",
         devolucion.id,
     )
@@ -437,7 +439,7 @@ def solicitar_devolucion_cliente(
 
     log_bitacora(
         db, usuario, "CREAR", "devolucion", devolucion.id,
-        f"Cliente #{cliente.id} solicito devolucion {payload.tipo} para compra #{venta_id} por {monto_total} Bs (plazo 24h)",
+        f"Cliente #{cliente.id} solicito devolucion {payload.tipo} para compra #{venta.numero or venta_id} por {monto_total} Bs (plazo 24h)",
         request,
     )
 
@@ -490,7 +492,7 @@ def registrar_devolucion(
         db,
         venta.cliente_id,
         "devolucion_registrada",
-        f"Se ha registrado una devolucion {payload.tipo} para tu compra #{venta_id} "
+        f"Se ha registrado una devolucion {payload.tipo} para tu compra #{venta.numero or venta_id} "
         f"por {monto_total} Bs. Te avisaremos cuando se procese.",
         devolucion.id,
     )
@@ -498,7 +500,7 @@ def registrar_devolucion(
 
     log_bitacora(
         db, usuario, "CREAR", "devolucion", devolucion.id,
-        f"Devolucion {payload.tipo} registrada para venta #{venta_id} por {monto_total} Bs",
+        f"Devolucion {payload.tipo} registrada para venta #{venta.numero or venta_id} por {monto_total} Bs",
         request,
     )
 
@@ -546,7 +548,7 @@ def completar_devolucion(
         db.flush()
         _registrar_movimiento(
             db, inventario.id, empleado.id, "entrada", detalle.cantidad_devuelta,
-            f"Devolucion #{dev.id} de venta #{venta.id}",
+            f"Devolucion #{dev.numero or dev.id} de venta #{venta.numero or venta.id}",
         )
 
     dev.empleado_id = empleado.id
@@ -565,7 +567,7 @@ def completar_devolucion(
         db,
         venta.cliente_id,
         "devolucion_completada",
-        f"Tu devolucion para la compra #{venta.id} fue aprobada. "
+        f"Tu devolucion para la compra #{venta.numero or venta.id} fue aprobada. "
         f"Se te reembolsaran {dev.monto_reembolso} Bs via {dev.metodo_reembolso.replace('_', ' ')}.",
         dev.id,
     )
@@ -573,7 +575,7 @@ def completar_devolucion(
 
     log_bitacora(
         db, usuario, "ACTUALIZAR", "devolucion", dev.id,
-        f"Devolucion #{dev.id} completada — stock reingresado, venta #{venta.id} marcada como {nuevo_estado}",
+        f"Devolucion #{dev.numero or dev.id} completada — stock reingresado, venta #{venta.numero or venta.id} marcada como {nuevo_estado}",
         request,
     )
 
@@ -607,7 +609,7 @@ def rechazar_devolucion(
         db,
         dev.venta.cliente_id,
         "devolucion_rechazada",
-        f"Tu solicitud de devolución para la compra #{dev.venta_id} fue rechazada"
+        f"Tu solicitud de devolución para la compra #{dev.venta.numero or dev.venta_id} fue rechazada"
         + (f": {motivo}" if motivo else ".")
         + " Si tienes dudas, comunícate con la tienda.",
         dev.id,
@@ -616,7 +618,7 @@ def rechazar_devolucion(
 
     log_bitacora(
         db, usuario, "ACTUALIZAR", "devolucion", dev.id,
-        f"Devolucion #{dev.id} rechazada para venta #{dev.venta_id}",
+        f"Devolucion #{dev.numero or dev.id} rechazada para venta #{dev.venta.numero or dev.venta_id}",
         request,
     )
 
@@ -663,7 +665,7 @@ def eliminar_devolucion(
             db.flush()
             _registrar_movimiento(
                 db, inventario.id, empleado.id, "salida", detalle.cantidad_devuelta,
-                f"Reversion Devolucion #{dev.id} de venta #{venta.id}",
+                f"Reversion Devolucion #{dev.numero or dev.id} de venta #{venta.numero or venta.id}",
             )
 
         otras_completadas = (
@@ -678,6 +680,8 @@ def eliminar_devolucion(
         if not otras_completadas:
             venta.estado = "pagada"
 
+    numero_dev = dev.numero or dev.id
+    numero_venta = venta.numero or venta.id
     db.delete(dev)
     db.commit()
 
@@ -687,8 +691,8 @@ def eliminar_devolucion(
         "ELIMINAR",
         "devolucion",
         devolucion_id,
-        f"Devolucion #{devolucion_id} (estado previo: {estado_previo}) eliminada para venta #{venta.id}",
+        f"Devolucion #{numero_dev} (estado previo: {estado_previo}) eliminada para venta #{numero_venta}",
         request,
     )
 
-    return {"message": f"Devolucion #{devolucion_id} eliminada exitosamente."}
+    return {"message": f"Devolucion #{numero_dev} eliminada exitosamente."}

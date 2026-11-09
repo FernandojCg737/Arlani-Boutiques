@@ -20,6 +20,8 @@ interface DetalleReservaItem {
 }
 
 interface ReservaItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   // offline: hecha en "Sin conexión" y sincronizada despues.
   origen?: string;
@@ -40,6 +42,8 @@ interface DetalleVentaItem {
 }
 
 interface VentaItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   // offline: hecha en "Sin conexión" y sincronizada despues.
   origen?: string;
@@ -126,6 +130,9 @@ interface CambioDeLinea {
 }
 
 interface DevolucionCliente {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
+  venta_numero?: number | null;
   id: number;
   venta_id: number;
   tienda_nombre: string;
@@ -632,7 +639,7 @@ export class Perfil implements OnInit {
   }
 
   protected async cancelarReserva(r: ReservaItem): Promise<void> {
-    if (!confirm(`Cancelar tu reserva #${r.id}?`)) return;
+    if (!confirm(`Cancelar tu reserva #${r.numero ?? r.id}?`)) return;
     this.procesandoReserva.set(r.id);
     try {
       await firstValueFrom(this.http.post(`${environment.apiUrl}/reservas/${r.id}/cancelar`, {}));

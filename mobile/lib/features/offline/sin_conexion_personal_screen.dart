@@ -301,8 +301,8 @@ class _SinConexionPersonalScreenState extends ConsumerState<SinConexionPersonalS
                 '${o.intentos > 0 ? ' · ${o.intentos} ${o.intentos == 1 ? 'envío' : 'envíos'}' : ''}',
             extra: [
               if (o.clienteNombre != null) subOffline('Cliente: ${o.clienteNombre}'),
-              if (o.ventaId != null) subOffline('Venta #${o.ventaId}'),
-              if (o.reservaId != null) subOffline('Reserva #${o.reservaId}'),
+              if (o.ventaId != null) subOffline('Venta #${o.ventaNumero ?? o.ventaId}'),
+              if (o.reservaId != null) subOffline('Reserva #${o.reservaNumero ?? o.reservaId}'),
               if (o.estado == 'conflicto') subOffline('Lo resuelve el encargado o el administrador desde la web.'),
             ],
           ),

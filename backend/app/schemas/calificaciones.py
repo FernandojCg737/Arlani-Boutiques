@@ -11,6 +11,8 @@ class CalificacionIn(BaseModel):
 class CalificacionOut(BaseModel):
     id: int
     venta_id: int
+    # Numero de la venta en su tienda (el que se muestra).
+    venta_numero: int | None = None
     estrellas: int
     comentario: str | None
     fecha: datetime

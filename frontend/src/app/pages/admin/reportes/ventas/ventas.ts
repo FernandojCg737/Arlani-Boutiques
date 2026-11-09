@@ -14,6 +14,8 @@ interface SerieCategoria {
 }
 
 interface VentaFila {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   fecha: string;
   cliente_nombre: string;

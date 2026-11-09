@@ -484,10 +484,19 @@ def _registrar_reserva(db: Session, op: OperacionOfflineIn, cliente_id: int, fec
     return reserva.id, aviso
 
 
-def _resultado(fila) -> ResultadoOperacionOut:
+def _numero(db: Session | None, funcion: str, ident: int | None) -> int | None:
+    """Numero que ve la tienda (fn_numero_venta / fn_numero_reserva)."""
+    if db is None or ident is None:
+        return None
+    return db.execute(text(f"SELECT {funcion}(:i)"), {"i": ident}).scalar()
+
+
+def _resultado(fila, db: Session | None = None) -> ResultadoOperacionOut:
     return ResultadoOperacionOut(
         uuid=fila["uuid"], estado=fila["estado"], mensaje=fila["mensaje"],
         venta_id=fila["venta_id"], reserva_id=fila["reserva_id"],
+        venta_numero=_numero(db, "fn_numero_venta", fila["venta_id"]),
+        reserva_numero=_numero(db, "fn_numero_reserva", fila["reserva_id"]),
         # Compra con PayPal guardado: lo que no se cobro y por que.
         no_pagados=fila["conflicto"] if fila["estado"] in ("pago_parcial", "no_pagada") and fila["conflicto"] else None,
     )
@@ -504,7 +513,7 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
         db.execute(
             text("UPDATE operacion_offline SET intentos = intentos + 1 WHERE id = :i"), {"i": previa["id"]}
         )
-        return _resultado(previa)
+        return _resultado(previa, db)
 
     personal = _es_personal(usuario)
     sucursal = db.execute(
@@ -594,7 +603,7 @@ def _procesar(db: Session, op: OperacionOfflineIn, usuario: Usuario, request: Re
         )
     )
     db.flush()
-    return _resultado(fila)
+    return _resultado(fila, db)
 
 
 def _puede_sincronizar(usuario: Usuario) -> None:
@@ -629,7 +638,7 @@ def sincronizar(
                 text("SELECT * FROM operacion_offline WHERE uuid = :u"), {"u": str(op.uuid)}
             ).mappings().first()
             resultados.append(
-                _resultado(fila) if fila else ResultadoOperacionOut(uuid=op.uuid, estado="error", mensaje="Reintentar.")
+                _resultado(fila, db) if fila else ResultadoOperacionOut(uuid=op.uuid, estado="error", mensaje="Reintentar.")
             )
         except (DBAPIError, HTTPException) as exc:
             punto.rollback()
@@ -724,6 +733,8 @@ def _to_out(db: Session, f) -> OperacionOfflineOut:
         recibida_en=f["recibida_en"], intentos=f["intentos"], total=total, items=detalle,
         conflicto=[ItemConflictoOut(**c) for c in conflicto] if conflicto else None,
         venta_id=f["venta_id"], reserva_id=f["reserva_id"], resuelta_por_nombre=f["resuelta_por_nombre"],
+        numero=f["numero"], venta_numero=_numero(db, "fn_numero_venta", f["venta_id"]),
+        reserva_numero=_numero(db, "fn_numero_reserva", f["reserva_id"]),
         resuelta_en=f["resuelta_en"], resolucion=f["resolucion"],
     )
 
@@ -833,7 +844,7 @@ def resolver_conflicto(
                 venta_id = _registrar_venta(db, ajustada, usuario, fecha)
                 nuevo = db.execute(text("SELECT total FROM venta WHERE id = :v"), {"v": venta_id}).scalar()
                 diferencia = Decimal(total_original) - Decimal(nuevo)
-                resolucion = f"Venta ajustada (#{venta_id}) por Bs {Decimal(nuevo):.2f}."
+                resolucion = f"Venta ajustada (#{_numero(db, 'fn_numero_venta', venta_id)}) por Bs {Decimal(nuevo):.2f}."
                 if diferencia > 0:
                     resolucion += f" Devolver Bs {diferencia:.2f} en efectivo al cliente."
                 elif diferencia < 0:
@@ -841,7 +852,7 @@ def resolver_conflicto(
             else:
                 cliente = ajustada.cliente_id if _es_personal_de_fila(fila) else fila["usuario_id"]
                 reserva_id, _ = _registrar_reserva(db, ajustada, cliente, fecha)
-                resolucion = f"Reserva ajustada (#{reserva_id})."
+                resolucion = f"Reserva ajustada (#{_numero(db, 'fn_numero_reserva', reserva_id)})."
         except DBAPIError as exc:
             db.rollback()
             raise http_desde_pg(exc) or HTTPException(status.HTTP_409_CONFLICT, "No se pudo registrar el ajuste.")
@@ -1069,6 +1080,7 @@ def _revisar(db: Session, fila) -> PedidoOfflineOut:
         total_usd=total_usd, precio_cambio=any(i.precio_guardado != i.precio_actual for i in items),
         sin_stock=sin_stock, puede_pagar=estado == "por_pagar" and not sin_stock and bool(metodos), metodos=metodos,
         venta_id=fila["venta_id"],
+        venta_numero=_numero(db, "fn_numero_venta", fila["venta_id"]),
     )
 
 
@@ -1185,7 +1197,7 @@ def pedido_paypal_capturar(
                 text("SELECT sp_registrar_liquidacion(:e, :o, :c, :v, :tc)"),
                 {"e": fila["empresa_id"], "o": order_id, "c": captura["id"], "v": [venta_id], "tc": _a_usd(db, Decimal(1))[1]},
             ).scalar_one()
-        _marcar_pagada(db, fila, venta_id, datos, f"Pagada con PayPal · Venta #{venta_id}")
+        _marcar_pagada(db, fila, venta_id, datos, f"Pagada con PayPal · Venta #{_numero(db, 'fn_numero_venta', venta_id)}")
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Compra sin conexión pagada con PayPal (orden {order_id})", request)
     except Exception:
         db.rollback()
@@ -1226,7 +1238,7 @@ async def pedido_comprobante(
             text("SELECT sp_crear_venta_tienda(:c, :s, NULL, CAST(:items AS JSONB), CAST(:d AS INTEGER[]), :m, NULL, :u)"),
             {"c": usuario.id, "s": datos.sucursal_id, "items": _items_actuales(datos), "d": [], "m": metodo.id, "u": comprobante_url},
         ).scalar_one()
-        _marcar_pagada(db, fila, venta_id, datos, f"Comprobante enviado ({metodo.nombre}): la tienda lo revisa · Venta #{venta_id}")
+        _marcar_pagada(db, fila, venta_id, datos, f"Comprobante enviado ({metodo.nombre}): la tienda lo revisa · Venta #{_numero(db, 'fn_numero_venta', venta_id)}")
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, f"Compra sin conexión con comprobante ({metodo.nombre})", request)
     except DBAPIError as exc:
         db.rollback()
@@ -1255,7 +1267,7 @@ def pedido_contra_entrega(
             {"c": usuario.id, "s": datos.sucursal_id, "items": _items_actuales(datos), "m": metodo.id},
         ).scalar_one()
         momento = "al recibirla" if datos.entrega == "envio" else "al recogerla"
-        _marcar_pagada(db, fila, venta_id, datos, f"Confirmada: pagas {momento} · Venta #{venta_id}")
+        _marcar_pagada(db, fila, venta_id, datos, f"Confirmada: pagas {momento} · Venta #{_numero(db, 'fn_numero_venta', venta_id)}")
         log_bitacora(db, usuario, "CREAR", "venta", venta_id, "Compra sin conexión confirmada contra entrega", request)
     except DBAPIError as exc:
         db.rollback()
@@ -1289,7 +1301,7 @@ def pedido_cancelar(
 
 
 def _con_total(db: Session, fila) -> ResultadoOperacionOut:
-    r = _resultado(fila)
+    r = _resultado(fila, db)
     if fila["venta_id"] and fila["estado"] in ("pagada", "pago_parcial") and fila["tipo"] == "pedido":
         r.total_cobrado = db.execute(text("SELECT total FROM venta WHERE id = :v"), {"v": fila["venta_id"]}).scalar()
     return r
@@ -1477,7 +1489,7 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request |
             _cerrar_cobro(
                 db, fila, "pago_parcial",
                 f"Pago no finalizado: se cobraron Bs {total:.2f} por lo que sí había; "
-                f"{len(no_pagados)} prenda(s) no se cobraron · Venta #{venta_id}",
+                f"{len(no_pagados)} prenda(s) no se cobraron · Venta #{_numero(db, 'fn_numero_venta', venta_id)}",
                 no_pagados, venta_id,
             )
             _avisar_cobro(
@@ -1488,12 +1500,12 @@ def _cobrar(db: Session, usuario: Usuario, operacion_id: int, request: Request |
             )
         else:
             _cerrar_cobro(
-                db, fila, "pagada", f"Pago finalizado con éxito: Bs {total:.2f} con tu PayPal · Venta #{venta_id}",
+                db, fila, "pagada", f"Pago finalizado con éxito: Bs {total:.2f} con tu PayPal · Venta #{_numero(db, 'fn_numero_venta', venta_id)}",
                 [], venta_id,
             )
             _avisar_cobro(
                 db, fila, "Pago finalizado con éxito",
-                f"Tu compra sin conexión en {tienda} se pagó con tu PayPal guardado: Bs {total:.2f} (venta #{venta_id}).",
+                f"Tu compra sin conexión en {tienda} se pagó con tu PayPal guardado: Bs {total:.2f} (venta #{_numero(db, 'fn_numero_venta', venta_id)}).",
             )
         db.add(
             Bitacora(
@@ -1643,7 +1655,7 @@ def _atender_en_espera(db: Session, operacion_id: int) -> int:
             db.rollback()
             return 0
         momento = "al recibirla" if datos.entrega == "envio" else "al recogerla"
-        _marcar_pagada(db, fila, venta_id, datos, f"Volvió el stock y se confirmó sola: pagas {momento} · Venta #{venta_id}")
+        _marcar_pagada(db, fila, venta_id, datos, f"Volvió el stock y se confirmó sola: pagas {momento} · Venta #{_numero(db, 'fn_numero_venta', venta_id)}")
         db.add(
             Bitacora(
                 usuario_id=fila["usuario_id"], accion="CREAR", entidad_afectada="venta", entidad_id=venta_id,
@@ -1652,7 +1664,7 @@ def _atender_en_espera(db: Session, operacion_id: int) -> int:
         )
         _avisar_cobro(
             db, fila, "Compra realizada con éxito",
-            f"Volvió a haber stock: tu compra sin conexión en {tienda} se confirmó (venta #{venta_id}). Pagas {momento}.",
+            f"Volvió a haber stock: tu compra sin conexión en {tienda} se confirmó (venta #{_numero(db, 'fn_numero_venta', venta_id)}). Pagas {momento}.",
         )
         db.commit()
         return 1

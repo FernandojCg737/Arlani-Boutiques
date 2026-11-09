@@ -45,7 +45,7 @@
         </div>
         <div class="comprobante__folio">
           <span>Comprobante de compra</span>
-          <strong>N&deg; {{ folio(v.id) }}</strong>
+          <strong>N&deg; {{ folio(v.numero ?? v.id) }}</strong>
           <span>{{ v.fecha | date: "d 'de' MMMM 'de' yyyy, h:mm a" : '-0400' }}</span>
         </div>
       </header>

@@ -8,6 +8,7 @@ class BitacoraItem {
     required this.accion,
     required this.entidadAfectada,
     this.entidadId,
+    this.entidadNumero,
     required this.fecha,
     this.detalle,
     this.ipAddress,
@@ -21,6 +22,7 @@ class BitacoraItem {
   final String accion;
   final String entidadAfectada;
   final int? entidadId;
+  final int? entidadNumero;
   final DateTime fecha;
   final String? detalle;
   final String? ipAddress;
@@ -35,6 +37,7 @@ class BitacoraItem {
       accion: json['accion'] as String,
       entidadAfectada: json['entidad_afectada'] as String,
       entidadId: json['entidad_id'] as int?,
+      entidadNumero: json['entidad_numero'] as int?,
       fecha: DateTime.parse(json['fecha'] as String),
       detalle: json['detalle'] as String?,
       ipAddress: json['ip_address'] as String?,

@@ -74,7 +74,7 @@
                 <td>{{ item.empresa_nombre || 'Plataforma' }}</td>
               }
               <td><span class="admin-badge">{{ item.accion }}</span></td>
-              <td>{{ item.entidad_afectada }} @if (item.entidad_id) { #{{ item.entidad_id }} }</td>
+              <td>{{ item.entidad_afectada }} @if (item.entidad_id) { #{{ item.entidad_numero ?? item.entidad_id }} }</td>
               <td>{{ item.fecha | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }}</td>
               <td>
                 @if (item.plataforma === 'web') {

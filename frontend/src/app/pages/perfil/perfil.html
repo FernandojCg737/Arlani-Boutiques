@@ -96,7 +96,7 @@
               } @else {
                 @for (v of compras().slice(0, 3); track v.id) {
                   <div class="dash-mini-item">
-                    <span>#{{ v.id }} · {{ v.total }} Bs</span>
+                    <span>#{{ v.numero ?? v.id }} · {{ v.total }} Bs</span>
                     <span class="admin-badge admin-badge--{{ v.estado_pago }}">{{ v.estado_pago }}</span>
                   </div>
                 }
@@ -164,9 +164,9 @@
               <li class="dash-card">
                 <div class="dash-card__fila">
                   <div class="dash-card__info">
-                    <strong>Devolución #{{ d.id }} · {{ d.tienda_nombre }}</strong>
+                    <strong>Devolución #{{ d.numero ?? d.id }} · {{ d.tienda_nombre }}</strong>
                     <span>
-                      Compra #{{ d.venta_id }} · pedida el {{ d.fecha_solicitud | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
+                      Compra #{{ d.venta_numero ?? d.venta_id }} · pedida el {{ d.fecha_solicitud | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
                       {{ d.sucursal_nombre }}
                     </span>
                     <ul class="dash-card__detalles">
@@ -211,7 +211,7 @@
                 <div class="dash-card__fila">
                   <div class="dash-card__info">
                     <strong>
-                      Compra #{{ v.id }} · {{ v.total }} Bs
+                      Compra #{{ v.numero ?? v.id }} · {{ v.total }} Bs
                       @if (v.origen === 'offline') {
                         <span class="dash-sin-conexion">Sin conexión</span>
                       }
@@ -824,7 +824,7 @@
       <div class="perfil-modal__header">
         <div>
           <h3>Solicitar Devolución</h3>
-          <p>Compra #{{ v.id }} · Plazo de 24 horas</p>
+          <p>Compra #{{ v.numero ?? v.id }} · Plazo de 24 horas</p>
         </div>
         <button type="button" class="perfil-modal__close" (click)="cerrarModalDevolucion()">✕</button>
       </div>

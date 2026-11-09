@@ -31,6 +31,10 @@ interface ItemConflicto {
 }
 
 export interface OperacionServidor {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
+  venta_numero?: number | null;
+  reserva_numero?: number | null;
   id: number;
   uuid: string;
   tipo: 'venta' | 'reserva' | 'pedido';

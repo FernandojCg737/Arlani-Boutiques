@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, FetchedValue, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -31,6 +31,8 @@ class Reserva(Base):
     __tablename__ = "reserva"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Numero propio de la tienda (#1, #2...): lo asigna el trigger trg_0_numero.
+    numero: Mapped[int | None] = mapped_column(server_default=FetchedValue())
     cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id"))
     sucursal_id: Mapped[int] = mapped_column(ForeignKey("sucursal.id"))
     horario_atencion: Mapped[datetime] = mapped_column(DateTime)
@@ -92,6 +94,8 @@ class Venta(Base):
     __tablename__ = "venta"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Numero propio de la tienda (#1, #2...): lo asigna el trigger trg_0_numero.
+    numero: Mapped[int | None] = mapped_column(server_default=FetchedValue())
     cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id"))
     sucursal_id: Mapped[int] = mapped_column(ForeignKey("sucursal.id"))
     fecha: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -258,6 +262,8 @@ class Devolucion(Base):
     __tablename__ = "devolucion"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Numero propio de la tienda (#1, #2...): lo asigna el trigger trg_0_numero.
+    numero: Mapped[int | None] = mapped_column(server_default=FetchedValue())
     venta_id: Mapped[int] = mapped_column(ForeignKey("venta.id"))
     empleado_id: Mapped[int | None] = mapped_column(ForeignKey("empleado.id"), nullable=True)
     motivo: Mapped[str] = mapped_column(String(30))

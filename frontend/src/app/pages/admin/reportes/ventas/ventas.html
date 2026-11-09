@@ -163,7 +163,7 @@
           } @else {
             @for (v of d.detalle; track v.id) {
               <tr>
-                <td>{{ v.id }}</td>
+                <td>{{ v.numero ?? v.id }}</td>
                 <td>{{ v.fecha | date: "d MMM yyyy, h:mm a" }}</td>
                 <td>{{ v.cliente_nombre }}</td>
                 <td>{{ v.sucursal_nombre }}</td>

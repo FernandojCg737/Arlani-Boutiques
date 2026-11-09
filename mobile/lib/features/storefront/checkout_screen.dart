@@ -439,7 +439,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ),
           const SizedBox(height: 6),
           for (final v in p.ventas)
-            Text('Compra #${v.id} · ${v.sucursalNombre}',
+            Text('Compra #${v.numero ?? v.id} · ${v.sucursalNombre}',
                 style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF1F5135))),
         ],
       ),

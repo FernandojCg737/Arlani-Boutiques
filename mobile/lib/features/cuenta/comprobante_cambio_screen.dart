@@ -36,7 +36,9 @@ String _bs(double v) => '${v.toStringAsFixed(2)} Bs';
 class _Cambio {
   _Cambio(Map<String, dynamic> j)
       : id = j['id'] as int,
+        numero = j['numero'] as int?,
         ventaId = j['venta_id'] as int,
+        ventaNumero = j['venta_numero'] as int?,
         ventaFecha = fechaDelBackend(j['venta_fecha']!),
         estado = j['estado'] as String,
         motivo = j['motivo'] as String,
@@ -60,7 +62,9 @@ class _Cambio {
         tienda = (j['tienda'] as Map<String, dynamic>?) ?? const {};
 
   final int id;
+  final int? numero;
   final int ventaId;
+  final int? ventaNumero;
   final DateTime ventaFecha;
   final String estado;
   final String motivo;
@@ -90,7 +94,7 @@ class _Cambio {
 
   String get tiendaNombre => _t('nombre') ?? 'Arlani Boutiques';
   String? get logo => _t('logo_url');
-  String get folio => '$id'.padLeft(6, '0');
+  String get folio => '${numero ?? id}'.padLeft(6, '0');
   String get fechaTexto {
     final h = fecha.hour % 12 == 0 ? 12 : fecha.hour % 12;
     return '${fecha.day} de ${_meses[fecha.month - 1]} de ${fecha.year}, $h:${fecha.minute.toString().padLeft(2, '0')} ${fecha.hour < 12 ? 'AM' : 'PM'}';
@@ -106,7 +110,7 @@ class _Cambio {
 
   List<String> get info => [
         'Cliente: $cliente · $clienteEmail',
-        'Compra original: N° $ventaId del ${ventaFecha.day}/${ventaFecha.month}/${ventaFecha.year}',
+        'Compra original: N° ${ventaNumero ?? ventaId} del ${ventaFecha.day}/${ventaFecha.month}/${ventaFecha.year}',
         'Sucursal: $sucursal',
         'Motivo: ${_motivo[motivo] ?? motivo}',
         if (empleado != null) 'Atendido por: $empleado',

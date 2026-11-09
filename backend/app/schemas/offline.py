@@ -156,6 +156,9 @@ class ResultadoOperacionOut(BaseModel):
     mensaje: str | None
     venta_id: int | None = None
     reserva_id: int | None = None
+    # Numeros propios de la tienda (los que se muestran).
+    venta_numero: int | None = None
+    reserva_numero: int | None = None
     # Compras con PayPal guardado: lo que NO se cobro y por que (producto,
     # talla, color, motivo), y lo que si se cobro.
     no_pagados: list[dict] | None = None
@@ -182,6 +185,10 @@ class ItemConflictoOut(BaseModel):
 
 class OperacionOfflineOut(BaseModel):
     id: int
+    # Numeros propios de la tienda (los que se muestran).
+    numero: int | None = None
+    venta_numero: int | None = None
+    reserva_numero: int | None = None
     uuid: UUID
     tipo: str
     estado: str
@@ -333,6 +340,7 @@ class PedidoOfflineOut(BaseModel):
     puede_pagar: bool
     metodos: list[dict]
     venta_id: int | None = None
+    venta_numero: int | None = None
 
     @field_serializer("registrada_en")
     def _fecha(self, value: datetime) -> str | None:

@@ -47,6 +47,8 @@ class BackupIn(BaseModel):
 
 class BackupOut(BaseModel):
     id: int
+    # Numero propio de la tienda (o del sistema): el que se muestra.
+    numero: int | None = None
     empresa_id: int | None
     alcance: str
     secciones: list[str]
@@ -73,6 +75,8 @@ class RestaurarIn(BaseModel):
 class RestauracionOut(BaseModel):
     id: int
     backup_id: int | None
+    backup_numero: int | None = None
+    backup_previo_numero: int | None = None
     backup_creado_en: datetime | None
     secciones: list[str]
     estado: str
@@ -246,9 +250,9 @@ def descargar(
         contenido = motor.descargar_archivos(fila["archivos"])
     except RuntimeError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
-    _registrar(db, usuario, "DESCARGAR", "backup", backup_id, f"Descargó el backup #{backup_id} {_donde(empresa)}", request, empresa)
+    _registrar(db, usuario, "DESCARGAR", "backup", backup_id, f"Descargó el backup #{fila['numero'] or backup_id} {_donde(empresa)}", request, empresa)
     db.commit()
-    nombre = f"arlani-backup-{backup_id}-{fila['creado_en']:%Y%m%d-%H%M}.zip"
+    nombre = f"arlani-backup-{fila['numero'] or backup_id}-{fila['creado_en']:%Y%m%d-%H%M}.zip"
     return Response(contenido, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
 
 
@@ -277,7 +281,8 @@ def importar(
     original = str(meta.get("creado_en") or "")[:16].replace("T", " ")
     _registrar(
         db, usuario, "IMPORTAR", "backup", backup_id,
-        f"Importó desde un archivo el backup #{meta.get('backup_id')} ({original} UTC) {_donde(empresa)} como backup #{backup_id}",
+        f"Importó desde un archivo el backup #{meta.get('numero') or meta.get('backup_id')} ({original} UTC) {_donde(empresa)} "
+        f"como backup #{db.execute(text('SELECT numero FROM backup WHERE id = :i'), {'i': backup_id}).scalar()}",
         request, empresa,
     )
     db.commit()
@@ -297,7 +302,7 @@ def borrar(
     if fila["estado"] == "en_proceso":
         raise HTTPException(status.HTTP_409_CONFLICT, "Ese backup todavía se está haciendo.")
     db.execute(text("DELETE FROM backup WHERE id = :i"), {"i": backup_id})
-    _registrar(db, usuario, "ELIMINAR", "backup", backup_id, f"Borró el backup #{backup_id} {_donde(empresa)}", request, empresa)
+    _registrar(db, usuario, "ELIMINAR", "backup", backup_id, f"Borró el backup #{fila['numero'] or backup_id} {_donde(empresa)}", request, empresa)
     db.commit()
     motor.borrar_archivos(fila["archivos"])
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -341,7 +346,7 @@ def restaurar(
     ).scalar_one()
     _registrar(
         db, usuario, "RESTAURAR", "backup", backup_id,
-        f"Restauró el backup #{backup_id} {_donde(empresa)} ({', '.join(secciones)})", request, empresa,
+        f"Restauró el backup #{fila['numero'] or backup_id} {_donde(empresa)} ({', '.join(secciones)})", request, empresa,
     )
     db.commit()
     tareas.add_task(motor.restaurar_backup, restauracion_id)
@@ -357,7 +362,8 @@ def restauraciones(
     empresa = _ambito(db, usuario, empresa_id)
     filas = db.execute(
         text(
-            """SELECT r.*, b.creado_en AS backup_creado_en, u.nombre AS hecho_por
+            """SELECT r.*, b.creado_en AS backup_creado_en, u.nombre AS hecho_por, b.numero AS backup_numero,
+                      (SELECT bp.numero FROM backup bp WHERE bp.id = r.backup_previo_id) AS backup_previo_numero
                FROM backup_restauracion r LEFT JOIN backup b ON b.id = r.backup_id
                LEFT JOIN usuario u ON u.id = r.hecho_por_id
                WHERE r.empresa_id IS NOT DISTINCT FROM :e ORDER BY r.creado_en DESC LIMIT 100"""

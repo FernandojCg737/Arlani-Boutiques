@@ -122,7 +122,7 @@
   @if (editando(); as r) {
     <div class="reservas-overlay" (click)="cerrarEditar()">
       <div class="reservas-modal" (click)="$event.stopPropagation()">
-        <h2>Editar reserva #{{ r.id }}</h2>
+        <h2>Editar reserva #{{ r.numero ?? r.id }}</h2>
         <p class="reservas-modal__subtitulo">{{ r.cliente_nombre }}</p>
 
         @if (editError()) {

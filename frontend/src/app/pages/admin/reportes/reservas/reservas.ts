@@ -8,6 +8,8 @@ import { ExportarReporte } from '../../../../components/reporte/exportar-reporte
 import { environment } from '../../../../../environments/environment';
 
 interface ReservaFila {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   fecha_creacion: string;
   cliente_nombre: string;

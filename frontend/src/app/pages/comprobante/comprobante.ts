@@ -31,6 +31,8 @@ export interface TiendaFactura {
 }
 
 interface Venta {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   tipo: string;
   sucursal_nombre: string;

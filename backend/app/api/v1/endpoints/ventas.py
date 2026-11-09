@@ -298,6 +298,7 @@ def _to_out(venta: Venta) -> VentaOut:
 
     return VentaOut(
         id=venta.id,
+        numero=venta.numero,
         origen=getattr(venta, "origen", None) or "online",
         tipo=venta.tipo,
         sucursal_id=venta.sucursal_id,

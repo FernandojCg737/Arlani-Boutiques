@@ -72,7 +72,7 @@ class _MisDevolucionesState extends ConsumerState<MisDevoluciones> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text('Devolución #${d.id} · ${d.tiendaNombre}',
+                      child: Text('Devolución #${d.numero ?? d.id} · ${d.tiendaNombre}',
                           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: tintaCuenta)),
                     ),
                     const SizedBox(width: 8),
@@ -80,7 +80,7 @@ class _MisDevolucionesState extends ConsumerState<MisDevoluciones> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Compra #${d.ventaId} · pedida el ${fechaLarga(d.fechaSolicitud)} · ${d.sucursalNombre}',
+                Text('Compra #${d.ventaNumero ?? d.ventaId} · pedida el ${fechaLarga(d.fechaSolicitud)} · ${d.sucursalNombre}',
                     style: GoogleFonts.inter(fontSize: 12, height: 1.4, color: grisCuenta)),
                 const SizedBox(height: 8),
                 for (final linea in d.detalles)

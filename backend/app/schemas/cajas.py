@@ -19,6 +19,8 @@ class ResumenCajaOut(BaseModel):
 
 class CajaOut(BaseModel):
     id: int
+    # Numero propio de la tienda (#1, #2...): el que se muestra.
+    numero: int | None = None
     tipo: str
     estado: str
     sucursal_id: int | None
@@ -48,6 +50,7 @@ class MovimientoCajaOut(BaseModel):
 
 class VentaCajaOut(BaseModel):
     id: int
+    numero: int | None = None
     fecha: datetime
     tipo: str
     origen: str

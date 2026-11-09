@@ -54,7 +54,9 @@ class DireccionCliente {
 class DevolucionCliente {
   DevolucionCliente.fromJson(Map<String, dynamic> j)
       : id = j['id'] as int,
+        numero = j['numero'] as int?,
         ventaId = j['venta_id'] as int,
+        ventaNumero = j['venta_numero'] as int?,
         tiendaNombre = j['tienda_nombre'] as String,
         sucursalNombre = j['sucursal_nombre'] as String,
         motivo = j['motivo'] as String,
@@ -71,7 +73,9 @@ class DevolucionCliente {
         ];
 
   final int id;
+  final int? numero;
   final int ventaId;
+  final int? ventaNumero;
   final String tiendaNombre;
   final String sucursalNombre;
   final String motivo;
@@ -117,7 +121,9 @@ class MetodoCobro {
 class CambioCliente {
   CambioCliente.fromJson(Map<String, dynamic> j)
       : id = j['id'] as int,
+        numero = j['numero'] as int?,
         ventaId = j['venta_id'] as int,
+        ventaNumero = j['venta_numero'] as int?,
         estado = j['estado'] as String,
         cantidad = j['cantidad'] as int,
         sucursalNombre = j['sucursal_nombre'] as String,
@@ -138,7 +144,9 @@ class CambioCliente {
         ];
 
   final int id;
+  final int? numero;
   final int ventaId;
+  final int? ventaNumero;
   final String estado;
   final int cantidad;
   final String sucursalNombre;
@@ -220,6 +228,7 @@ class PrendaCambio {
 class OpcionesCambio {
   OpcionesCambio.fromJson(Map<String, dynamic> j)
       : ventaId = j['venta_id'] as int,
+        ventaNumero = j['venta_numero'] as int?,
         plazoHasta = _fecha(j['plazo_hasta']!),
         puedeCambiar = j['puede_cambiar'] as bool,
         motivoNo = j['motivo_no'] as String?,
@@ -231,6 +240,7 @@ class OpcionesCambio {
         prendas = [for (final p in (j['prendas'] as List<dynamic>).cast<Map<String, dynamic>>()) PrendaCambio.fromJson(p)];
 
   final int ventaId;
+  final int? ventaNumero;
   final DateTime plazoHasta;
   final bool puedeCambiar;
   final String? motivoNo;

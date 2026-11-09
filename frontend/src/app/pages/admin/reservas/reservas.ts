@@ -16,6 +16,8 @@ interface DetalleReservaItem {
 }
 
 interface ReservaItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   cliente_id: number;
   cliente_nombre: string;
@@ -175,7 +177,7 @@ export class AdminReservas implements OnInit {
   }
 
   protected async cancelar(reserva: ReservaItem): Promise<void> {
-    if (!confirm(`Cancelar la reserva #${reserva.id} de ${reserva.cliente_nombre}?`)) return;
+    if (!confirm(`Cancelar la reserva #${reserva.numero ?? reserva.id} de ${reserva.cliente_nombre}?`)) return;
     await this.cambiarEstado(reserva, 'cancelada');
   }
 
@@ -195,7 +197,7 @@ export class AdminReservas implements OnInit {
   }
 
   protected async completar(reserva: ReservaItem): Promise<void> {
-    if (!confirm(`Marcar la reserva #${reserva.id} como entregada? Esto descuenta el stock reservado.`)) return;
+    if (!confirm(`Marcar la reserva #${reserva.numero ?? reserva.id} como entregada? Esto descuenta el stock reservado.`)) return;
     this.procesando.set(reserva.id);
     this.error.set('');
     try {
@@ -211,7 +213,7 @@ export class AdminReservas implements OnInit {
   protected async eliminar(reserva: ReservaItem): Promise<void> {
     if (
       !confirm(
-        `Eliminar por completo la reserva #${reserva.id} de ${reserva.cliente_nombre}? Esto no se puede deshacer.`,
+        `Eliminar por completo la reserva #${reserva.numero ?? reserva.id} de ${reserva.cliente_nombre}? Esto no se puede deshacer.`,
       )
     ) {
       return;

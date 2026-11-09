@@ -125,7 +125,7 @@ class _BitacoraCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          AdminInfoRow('Entidad', item.entidadId != null ? '${item.entidadAfectada} #${item.entidadId}' : item.entidadAfectada),
+          AdminInfoRow('Entidad', item.entidadId != null ? '${item.entidadAfectada} #${item.entidadNumero ?? item.entidadId}' : item.entidadAfectada),
           AdminInfoRow('Fecha', _formatearFecha(item.fecha)),
           AdminInfoRow('Dispositivo', item.plataforma == 'web' ? 'Web' : item.plataforma == 'movil' ? 'Movil' : '-'),
           AdminInfoRow('IP', item.ipAddress ?? '-'),

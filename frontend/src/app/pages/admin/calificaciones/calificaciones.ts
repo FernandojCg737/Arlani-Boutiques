@@ -17,6 +17,8 @@ interface CalificacionResumen {
 }
 
 interface CalificacionItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  venta_numero?: number | null;
   id: number;
   venta_id: number;
   estrellas: number;

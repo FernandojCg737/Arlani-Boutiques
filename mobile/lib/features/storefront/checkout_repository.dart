@@ -79,11 +79,14 @@ class StockItem {
 class VentaCreada {
   VentaCreada.fromJson(Map<String, dynamic> j)
       : id = j['id'] as int,
+        numero = j['numero'] as int?,
         sucursalNombre = j['sucursal_nombre'] as String,
         tiendaNombre = (j['tienda'] as Map<String, dynamic>?)?['nombre'] as String?,
         tiendaColor = (j['tienda'] as Map<String, dynamic>?)?['color_marca'] as String?;
 
   final int id;
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  final int? numero;
   final String sucursalNombre;
   final String? tiendaNombre;
   final String? tiendaColor;

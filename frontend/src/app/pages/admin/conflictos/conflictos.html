@@ -50,7 +50,7 @@
           @for (o of operaciones(); track o.id) {
             <tr>
               <td>
-                <strong>{{ o.tipo === 'venta' ? 'Venta de contado' : o.tipo === 'pedido' ? 'Compra del cliente' : 'Reserva' }} #{{ o.id }}</strong>
+                <strong>{{ o.tipo === 'venta' ? 'Venta de contado' : o.tipo === 'pedido' ? 'Compra del cliente' : 'Reserva' }} #{{ o.numero ?? o.id }}</strong>
                 <small class="offline-sub">{{ o.sucursal_nombre }}</small>
                 <small class="offline-sub offline-uuid" [title]="o.uuid">ID {{ o.uuid.slice(0, 8) }}</small>
               </td>
@@ -91,10 +91,10 @@
                     <button type="button" (click)="abrir(o)">Resolver</button>
                   }
                   @if (o.venta_id) {
-                    <span class="offline-sub">Venta #{{ o.venta_id }}</span>
+                    <span class="offline-sub">Venta #{{ o.venta_numero ?? o.venta_id }}</span>
                   }
                   @if (o.reserva_id) {
-                    <span class="offline-sub">Reserva #{{ o.reserva_id }}</span>
+                    <span class="offline-sub">Reserva #{{ o.reserva_numero ?? o.reserva_id }}</span>
                   }
                 </div>
               </td>
@@ -135,7 +135,7 @@
               <tr>
                 <td><span class="cola-stock__turno">{{ i + 1 }}</span></td>
                 <td>
-                  <strong>Compra del cliente #{{ o.id }}</strong>
+                  <strong>Compra del cliente #{{ o.numero ?? o.id }}</strong>
                   <small class="offline-sub">{{ o.usuario_nombre ?? '—' }} · {{ o.sucursal_nombre }}</small>
                   <small class="offline-sub">Hecha {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }} · Bs {{ o.total | number: '1.2-2' }}</small>
                 </td>
@@ -170,7 +170,7 @@
 @if (resolviendo(); as o) {
   <div class="ventas-overlay" (click)="cerrar()">
     <div class="ventas-modal conflicto-modal" (click)="$event.stopPropagation()">
-      <h2>Resolver conflicto #{{ o.id }}</h2>
+      <h2>Resolver conflicto #{{ o.numero ?? o.id }}</h2>
       <p class="ventas-modal__subtitulo">
         {{ o.tipo === 'venta' ? 'Venta de contado' : 'Reserva' }} hecha sin conexión el {{ o.registrada_en | date: 'dd/MM/yyyy HH:mm' }}
         por {{ o.usuario_nombre }} en {{ o.sucursal_nombre }} · cobrado Bs {{ o.total | number: '1.2-2' }}.

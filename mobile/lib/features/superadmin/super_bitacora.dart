@@ -165,7 +165,7 @@ class _SuperBitacoraState extends ConsumerState<SuperBitacora> {
                           i,
                           i['empresa_nombre'] ?? 'Plataforma',
                           i['accion'],
-                          i['entidad_id'] != null ? '${i['entidad_afectada']} #${i['entidad_id']}' : i['entidad_afectada'],
+                          i['entidad_id'] != null ? '${i['entidad_afectada']} #${i['entidad_numero'] ?? i['entidad_id']}' : i['entidad_afectada'],
                           _fecha(i['fecha'].toString()),
                           i['plataforma'] == 'web' ? 'Web' : i['plataforma'] == 'movil' ? 'Móvil' : (i['plataforma'] ?? '—'),
                           i['ip_address'] ?? '—',

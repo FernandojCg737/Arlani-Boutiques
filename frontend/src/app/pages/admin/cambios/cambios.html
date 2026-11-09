@@ -53,8 +53,8 @@
         @for (c of cambios(); track c.id) {
           <tr>
             <td>
-              <strong>{{ c.id }}</strong>
-              <small class="cambios-sub">Compra #{{ c.venta_id }}</small>
+              <strong>{{ c.numero ?? c.id }}</strong>
+              <small class="cambios-sub">Compra #{{ c.venta_numero ?? c.venta_id }}</small>
             </td>
             <td>
               <div class="admin-table__user">
@@ -137,7 +137,7 @@
     <div class="ventas-modal" (click)="$event.stopPropagation()">
       @switch (a.tipo) {
         @case ('aprobar') {
-          <h2>Aprobar cambio #{{ a.cambio.id }}</h2>
+          <h2>Aprobar cambio #{{ a.cambio.numero ?? a.cambio.id }}</h2>
           <p class="ventas-modal__subtitulo">
             {{ a.cambio.cliente_nombre }} devuelve {{ a.cambio.producto_original }} ({{ a.cambio.talla_original }}) y se lleva
             {{ a.cambio.producto_nuevo }} ({{ a.cambio.talla_nueva }}, {{ a.cambio.color_nuevo }}).
@@ -166,7 +166,7 @@
           </label>
         }
         @case ('rechazar') {
-          <h2>Rechazar cambio #{{ a.cambio.id }}</h2>
+          <h2>Rechazar cambio #{{ a.cambio.numero ?? a.cambio.id }}</h2>
           <p class="ventas-modal__subtitulo">{{ a.cambio.cliente_nombre }} verá el motivo en Mi cuenta.</p>
           <label class="ventas-campo">
             <span>Motivo</span>
@@ -175,7 +175,7 @@
           </label>
         }
         @case ('rechazar-pago') {
-          <h2>Rechazar el pago del cambio #{{ a.cambio.id }}</h2>
+          <h2>Rechazar el pago del cambio #{{ a.cambio.numero ?? a.cambio.id }}</h2>
           <p class="ventas-modal__subtitulo">El cambio vuelve a esperar el pago; el cliente puede pagar de nuevo.</p>
           <label class="ventas-campo">
             <span>Motivo</span>

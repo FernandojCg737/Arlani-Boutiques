@@ -352,6 +352,8 @@ class OfflineServicio extends ChangeNotifier with WidgetsBindingObserver {
       ..mensaje = r['mensaje'] as String?
       ..ventaId = (r['venta_id'] as int?) ?? o.ventaId
       ..reservaId = (r['reserva_id'] as int?) ?? o.reservaId
+      ..ventaNumero = (r['venta_numero'] as int?) ?? o.ventaNumero
+      ..reservaNumero = (r['reserva_numero'] as int?) ?? o.reservaNumero
       ..noPagados = NoPagado.deJson(r['no_pagados'])
       ..totalCobrado = r['total_cobrado']?.toString();
     await _db.actualizarOperacion(o);

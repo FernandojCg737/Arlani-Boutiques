@@ -165,7 +165,7 @@
           @for (c of historial(); track c.id) {
             <tr>
               <td>
-                <strong>#{{ c.id }} · {{ c.tipo === 'online' ? 'Caja online' : c.sucursal_nombre }}</strong>
+                <strong>#{{ c.numero ?? c.id }} · {{ c.tipo === 'online' ? 'Caja online' : c.sucursal_nombre }}</strong>
                 <span class="caja-estado caja-estado--mini" [class.is-abierta]="c.estado === 'abierta'">
                   {{ c.estado === 'abierta' ? 'Abierta' : 'Cerrada' }}
                 </span>
@@ -330,7 +330,7 @@
 @if (detalle(); as d) {
   <div class="ventas-overlay" (click)="cerrarDetalle()">
     <div class="ventas-modal caja-detalle" (click)="$event.stopPropagation()">
-      <h2>Caja #{{ d.id }} · {{ d.tipo === 'online' ? 'Caja online' : d.sucursal_nombre }}</h2>
+      <h2>Caja #{{ d.numero ?? d.id }} · {{ d.tipo === 'online' ? 'Caja online' : d.sucursal_nombre }}</h2>
       <p class="ventas-modal__subtitulo">
         @if (d.tipo === 'online') {
           Ventas en línea del {{ d.fecha + 'T12:00:00Z' | date: "d 'de' MMMM 'de' yyyy" : '-0400' }} · se abre y se cierra sola.
@@ -398,7 +398,7 @@
           <tbody>
             @for (v of d.ventas_detalle; track v.id) {
               <tr [class.caja-tardia]="v.fuera_de_arqueo">
-                <td>{{ v.id }}</td>
+                <td>{{ v.numero ?? v.id }}</td>
                 <td>{{ utc(v.fecha) | date: 'dd/MM HH:mm' : '-0400' }}</td>
                 <td>
                   {{ v.tipo === 'venta_digital' ? 'En línea' : 'Mostrador' }}

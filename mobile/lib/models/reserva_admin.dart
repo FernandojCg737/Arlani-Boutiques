@@ -31,6 +31,7 @@ class DetalleReservaAdmin {
 class ReservaAdmin {
   const ReservaAdmin({
     required this.id,
+    this.numero,
     required this.clienteNombre,
     required this.clienteEmail,
     required this.sucursalNombre,
@@ -41,6 +42,7 @@ class ReservaAdmin {
   });
 
   final int id;
+  final int? numero;
   final String clienteNombre;
   final String clienteEmail;
   final String sucursalNombre;
@@ -54,6 +56,7 @@ class ReservaAdmin {
   factory ReservaAdmin.fromJson(Map<String, dynamic> json) {
     return ReservaAdmin(
       id: json['id'] as int,
+      numero: json['numero'] as int?,
       clienteNombre: json['cliente_nombre'] as String,
       clienteEmail: json['cliente_email'] as String,
       sucursalNombre: json['sucursal_nombre'] as String,

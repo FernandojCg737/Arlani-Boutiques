@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_permiso
+from app.core.numeracion import numeros_de
 from app.db.session import get_db
 from app.models import Bitacora, Empresa, Usuario
 from app.schemas.bitacora import BitacoraItem, BitacoraPage
@@ -47,6 +48,7 @@ def list_bitacora(
         .all()
     )
 
+    numeros = numeros_de(db, ((b.entidad_afectada, b.entidad_id) for b in rows))
     items = [
         BitacoraItem(
             id=b.id,
@@ -56,6 +58,7 @@ def list_bitacora(
             accion=b.accion,
             entidad_afectada=b.entidad_afectada,
             entidad_id=b.entidad_id,
+            entidad_numero=numeros.get((b.entidad_afectada, b.entidad_id)),
             fecha=b.fecha,
             detalle=b.detalle,
             ip_address=b.ip_address,

@@ -26,6 +26,7 @@ interface Cliente {
 
 interface UltimaUbicacion {
   venta_id: number;
+  venta_numero?: number | null;
   fecha: string;
   tienda_nombre: string;
   direccion: string;

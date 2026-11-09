@@ -18,9 +18,9 @@
         <li class="dash-card">
           <div class="dash-card__fila">
             <div class="dash-card__info">
-              <strong>Cambio #{{ c.id }} · {{ c.tienda.nombre }}</strong>
+              <strong>Cambio #{{ c.numero ?? c.id }} · {{ c.tienda.nombre }}</strong>
               <span>
-                Compra #{{ c.venta_id }} · {{ c.fecha_solicitud + 'Z' | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
+                Compra #{{ c.venta_numero ?? c.venta_id }} · {{ c.fecha_solicitud + 'Z' | date: "d MMM 'de' yyyy, h:mm a" : '-0400' }} ·
                 Recoges en {{ c.sucursal_nombre }}
               </span>
               <p class="mc__prendas">
@@ -117,7 +117,7 @@
       <div class="perfil-modal__header">
         <div>
           <h3>Cambiar una prenda</h3>
-          <p>Compra #{{ o.venta_id }} · {{ o.tienda_nombre }} · hasta el {{ o.plazo_hasta + 'Z' | date: "d MMM, h:mm a" : '-0400' }}</p>
+          <p>Compra #{{ o.venta_numero ?? o.venta_id }} · {{ o.tienda_nombre }} · hasta el {{ o.plazo_hasta + 'Z' | date: "d MMM, h:mm a" : '-0400' }}</p>
         </div>
         <button type="button" class="perfil-modal__close" (click)="cerrar()">✕</button>
       </div>

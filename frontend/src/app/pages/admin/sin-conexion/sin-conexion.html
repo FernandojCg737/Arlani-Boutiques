@@ -176,10 +176,10 @@
                     <small class="offline-sub offline-mensaje">{{ o.mensaje }}</small>
                   }
                   @if (o.venta_id) {
-                    <small class="offline-sub">Venta #{{ o.venta_id }}</small>
+                    <small class="offline-sub">Venta #{{ o.venta_numero ?? o.venta_id }}</small>
                   }
                   @if (o.reserva_id) {
-                    <small class="offline-sub">Reserva #{{ o.reserva_id }}</small>
+                    <small class="offline-sub">Reserva #{{ o.reserva_numero ?? o.reserva_id }}</small>
                   }
                 </td>
               </tr>

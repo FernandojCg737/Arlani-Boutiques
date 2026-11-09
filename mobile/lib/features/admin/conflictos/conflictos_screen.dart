@@ -120,7 +120,7 @@ class _ConflictosScreenState extends ConsumerState<ConflictosScreen> {
               AdminCard(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Expanded(child: Text('${_tipo(o)} #${o['id']}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                    Expanded(child: Text('${_tipo(o)} #${o['numero'] ?? o['id']}', style: const TextStyle(fontWeight: FontWeight.w800))),
                     NeutralBadge(estadoOperacion[o['estado']] ?? o['estado'].toString()),
                   ]),
                   Text('${o['sucursal_nombre'] ?? ''} · ${o['usuario_nombre'] ?? ''} · ${fechaTexto(o['registrada_en'])}',
@@ -152,7 +152,7 @@ class _ConflictosScreenState extends ConsumerState<ConflictosScreen> {
               for (var n = 0; n < _cola.length; n++)
                 AdminCard(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Turno ${n + 1} · Compra del cliente #${_cola[n]['id']}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text('Turno ${n + 1} · Compra del cliente #${_cola[n]['numero'] ?? _cola[n]['id']}', style: const TextStyle(fontWeight: FontWeight.w800)),
                     Text('${_cola[n]['usuario_nombre'] ?? ''} · ${_cola[n]['sucursal_nombre'] ?? ''} · ${fechaTexto(_cola[n]['registrada_en'])}',
                         style: const TextStyle(fontSize: 12)),
                     _faltas(_cola[n]),
@@ -248,7 +248,7 @@ class _ResolverState extends State<_Resolver> {
   @override
   Widget build(BuildContext context) {
     return AdminScaffold(
-      title: 'RESOLVER #${widget.op['id']}',
+      title: 'RESOLVER #${widget.op['numero'] ?? widget.op['id']}',
       body: _cargando
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(16), children: [

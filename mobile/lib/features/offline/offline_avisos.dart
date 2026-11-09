@@ -107,7 +107,9 @@ Future<void> avisarResultado(OperacionLocal o, {required String antes, required 
     case 'confirmada':
     case 'resuelta':
       final tab = o.tipo == 'reserva' ? 'reservas' : 'compras';
-      final numero = o.reservaId != null ? ' #${o.reservaId}' : (o.ventaId != null ? ' #${o.ventaId}' : '');
+      final numero = o.reservaId != null
+          ? ' #${o.reservaNumero ?? o.reservaId}'
+          : (o.ventaId != null ? ' #${o.ventaNumero ?? o.ventaId}' : '');
       return (
         titulo: o.estado == 'resuelta' ? '$que resuelta por la tienda' : '$que realizada con éxito',
         cuerpo: '$que$numero en $lugar: $prendas. Total $total.'
@@ -118,7 +120,7 @@ Future<void> avisarResultado(OperacionLocal o, {required String antes, required 
       return (
         titulo: 'Compra realizada con éxito',
         cuerpo: '${antes == 'en_espera' ? 'Volvió a haber stock. ' : ''}'
-            'Compra${o.ventaId != null ? ' #${o.ventaId}' : ''} en $lugar: $prendas. '
+            'Compra${o.ventaId != null ? ' #${o.ventaNumero ?? o.ventaId}' : ''} en $lugar: $prendas. '
             '${o.formaPago == 'contra_entrega' ? 'Total $total: pagas ${o.entrega == 'envio' ? 'al recibirla' : 'al recogerla'}.' : 'Pagaste $total${o.formaPago == 'paypal_guardado' ? ' con tu PayPal' : ''}.'}',
         ruta: exitoRuta('compras'),
       );

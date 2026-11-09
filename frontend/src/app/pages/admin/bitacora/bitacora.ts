@@ -7,6 +7,8 @@ import { Auth } from '../../../services/auth';
 import { EmpresaTenant, PlataformaApi } from '../../../services/plataforma';
 
 interface BitacoraItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  entidad_numero?: number | null;
   id: number;
   usuario_id: number;
   usuario_nombre: string;

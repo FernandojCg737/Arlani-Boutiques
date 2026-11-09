@@ -145,6 +145,7 @@ class ActividadOut(BaseModel):
     accion: str
     entidad_afectada: str
     entidad_id: int | None
+    entidad_numero: int | None = None
     detalle: str | None
     fecha: datetime
     usuario_nombre: str

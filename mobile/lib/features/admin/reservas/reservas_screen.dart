@@ -86,7 +86,7 @@ class _ReservasScreenState extends ConsumerState<ReservasScreen> {
     final ok = await confirmAdminAction(
       context,
       title: 'Eliminar reserva',
-      message: 'Se va a eliminar la reserva #${r.id} de ${r.clienteNombre}. Esta accion no se puede deshacer.',
+      message: 'Se va a eliminar la reserva #${r.numero ?? r.id} de ${r.clienteNombre}. Esta accion no se puede deshacer.',
     );
     if (!ok) return;
     setState(() => _procesandoId = r.id);
@@ -203,7 +203,7 @@ class _ReservaCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          AdminInfoRow('Reserva', '#${reserva.id} · ${reserva.detalles.length} ${reserva.detalles.length == 1 ? 'producto' : 'productos'} ($totalItems u.)'),
+          AdminInfoRow('Reserva', '#${reserva.numero ?? reserva.id} · ${reserva.detalles.length} ${reserva.detalles.length == 1 ? 'producto' : 'productos'} ($totalItems u.)'),
           AdminInfoRow('Sucursal', reserva.sucursalNombre),
           AdminInfoRow(
             'Horario',

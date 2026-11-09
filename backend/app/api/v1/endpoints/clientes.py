@@ -126,7 +126,7 @@ def _ultimas_ubicaciones(db: Session, usuario: Usuario, ids: list[int]) -> dict[
         # esta consulta vuelve al rol del backend (ve todas las tiendas).
         db.execute(text("RESET ROLE"))
     try:
-        filas = db.execute(text("SELECT * FROM fn_ultima_ubicacion_clientes(:ids)"), {"ids": ids}).mappings().all()
+        filas = db.execute(text("SELECT f.*, fn_numero_venta(f.venta_id) AS venta_numero FROM fn_ultima_ubicacion_clientes(:ids) f"), {"ids": ids}).mappings().all()
     finally:
         if alcance is not None:
             db.execute(text("SET LOCAL ROLE arlani_tenant"))

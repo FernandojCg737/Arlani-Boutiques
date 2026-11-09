@@ -174,7 +174,7 @@ class _CalificacionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          AdminInfoRow('Venta', '#${calificacion.ventaId} · ${calificacion.sucursalNombre}'),
+          AdminInfoRow('Venta', '#${calificacion.ventaNumero ?? calificacion.ventaId} · ${calificacion.sucursalNombre}'),
           if (calificacion.empleadoNombre != null) AdminInfoRow('Atendido por', calificacion.empleadoNombre!),
           if (calificacion.comentario != null && calificacion.comentario!.isNotEmpty) ...[
             const SizedBox(height: 6),

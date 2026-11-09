@@ -17,6 +17,7 @@ from app.api.deps import require_superadmin
 from app.core.audit import set_client_ip_for_trigger
 from app.core.errores_db import http_desde_pg
 from app.core.liquidaciones import enviar_liquidaciones
+from app.core.numeracion import numeros_de
 from app.db.session import get_db
 from app.models import Usuario
 from app.schemas.plataforma import (
@@ -182,7 +183,8 @@ def actividad(
         ),
         {"limite": max(1, min(limite, 50))},
     ).mappings().all()
-    return [ActividadOut(**f) for f in filas]
+    numeros = numeros_de(db, ((f["entidad_afectada"], f["entidad_id"]) for f in filas))
+    return [ActividadOut(**f, entidad_numero=numeros.get((f["entidad_afectada"], f["entidad_id"]))) for f in filas]
 
 
 # --------------------------------------------------------- empresas (CU09)

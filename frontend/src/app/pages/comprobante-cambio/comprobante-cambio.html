@@ -44,14 +44,14 @@
         </div>
         <div class="comprobante__folio">
           <span>Comprobante de cambio</span>
-          <strong>N&deg; {{ folio(c.id) }}</strong>
+          <strong>N&deg; {{ folio(c.numero ?? c.id) }}</strong>
           <span>{{ (c.fecha_completado ?? c.fecha_solicitud) + 'Z' | date: "d 'de' MMMM 'de' yyyy, h:mm a" : '-0400' }}</span>
         </div>
       </header>
 
       <div class="comprobante__info">
         <span>Cliente: {{ c.cliente_nombre }} · {{ c.cliente_email }}</span>
-        <span>Compra original: N&deg; {{ c.venta_id }} del {{ c.venta_fecha + 'Z' | date: 'd/M/yyyy' : '-0400' }}</span>
+        <span>Compra original: N&deg; {{ c.venta_numero ?? c.venta_id }} del {{ c.venta_fecha + 'Z' | date: 'd/M/yyyy' : '-0400' }}</span>
         <span>Sucursal: {{ c.sucursal_nombre }}</span>
         <span>Motivo: {{ motivoLabel[c.motivo] ?? c.motivo }}</span>
         @if (c.empleado_nombre) {

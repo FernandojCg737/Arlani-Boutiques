@@ -36,7 +36,7 @@
           }
           <span class="checkout-pagada__ventas">
             @for (v of p.ventas; track v.id) {
-              <a [routerLink]="['/mis-compras', v.id]">Compra #{{ v.id }} · {{ v.sucursal_nombre }}</a>
+              <a [routerLink]="['/mis-compras', v.id]">Compra #{{ v.numero ?? v.id }} · {{ v.sucursal_nombre }}</a>
             }
           </span>
         </div>

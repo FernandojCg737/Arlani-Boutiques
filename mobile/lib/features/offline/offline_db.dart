@@ -22,7 +22,7 @@ class OfflineDb {
 
   Future<Database> get _base async => _db ??= await openDatabase(
         p.join(await getDatabasesPath(), 'arlani_offline.db'),
-        version: 1,
+        version: 2,
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: (db, _) async {
           final b = db.batch();
@@ -63,7 +63,7 @@ class OfflineDb {
             registrada_en TEXT NOT NULL, cliente_id INTEGER, cliente_nombre TEXT, factura_nombre TEXT, factura_nit TEXT,
             horario_atencion TEXT, entrega TEXT, direccion_id INTEGER, forma_pago TEXT, metodo_pago_id INTEGER,
             paypal_cuenta TEXT, total REAL NOT NULL, estado TEXT NOT NULL, mensaje TEXT, venta_id INTEGER,
-            reserva_id INTEGER, intentos INTEGER NOT NULL DEFAULT 0, ultimo_intento TEXT, no_pagados TEXT,
+            reserva_id INTEGER, venta_numero INTEGER, reserva_numero INTEGER, intentos INTEGER NOT NULL DEFAULT 0, ultimo_intento TEXT, no_pagados TEXT,
             total_cobrado TEXT, cobro_visto INTEGER NOT NULL DEFAULT 0)''');
           b.execute('CREATE INDEX ix_operaciones_usuario ON operaciones(usuario_id, estado)');
           b.execute('''CREATE TABLE operacion_items (
@@ -80,6 +80,13 @@ class OfflineDb {
             rechazadas INTEGER NOT NULL, errores INTEGER NOT NULL, detalle TEXT NOT NULL)''');
           b.execute('CREATE TABLE imagenes (url TEXT PRIMARY KEY, ruta TEXT NOT NULL)');
           await b.commit(noResult: true);
+        },
+        // v2: numero de la venta/reserva en su tienda (#1, #2...), no el id global.
+        onUpgrade: (db, de, _) async {
+          if (de < 2) {
+            await db.execute('ALTER TABLE operaciones ADD COLUMN venta_numero INTEGER');
+            await db.execute('ALTER TABLE operaciones ADD COLUMN reserva_numero INTEGER');
+          }
         },
       );
 
@@ -303,6 +310,8 @@ class OfflineDb {
         'mensaje': o.mensaje,
         'venta_id': o.ventaId,
         'reserva_id': o.reservaId,
+        'venta_numero': o.ventaNumero,
+        'reserva_numero': o.reservaNumero,
         'intentos': o.intentos,
         'ultimo_intento': o.ultimoIntento,
         'no_pagados': o.noPagados.isEmpty
@@ -391,6 +400,8 @@ class OfflineDb {
           mensaje: o['mensaje'] as String?,
           ventaId: o['venta_id'] as int?,
           reservaId: o['reserva_id'] as int?,
+          ventaNumero: o['venta_numero'] as int?,
+          reservaNumero: o['reserva_numero'] as int?,
           intentos: o['intentos'] as int,
           ultimoIntento: o['ultimo_intento'] as String?,
           noPagados: NoPagado.deJson(o['no_pagados']),

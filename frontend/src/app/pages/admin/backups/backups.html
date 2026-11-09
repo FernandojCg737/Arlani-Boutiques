@@ -101,7 +101,7 @@
               @for (b of backups(); track b.id) {
                 <tr>
                   <td>
-                    <strong>#{{ b.id }} · {{ utc(b.creado_en) | date: 'dd/MM/yyyy HH:mm' }}</strong>
+                    <strong>#{{ b.numero ?? b.id }} · {{ utc(b.creado_en) | date: 'dd/MM/yyyy HH:mm' }}</strong>
                     <small class="backups-sub">{{ origen(b) }}{{ b.creado_por ? ' · ' + b.creado_por : '' }}</small>
                     @if (b.atrasado) {
                       <small class="backups-sub backups-atrasado">Corrió tarde: el servidor estaba dormido a esa hora</small>
@@ -239,12 +239,12 @@
                   </td>
                   <td>
                     @if (r.backup_id) {
-                      #{{ r.backup_id }} · {{ utc(r.backup_creado_en) | date: 'dd/MM/yyyy HH:mm' }}
+                      #{{ r.backup_numero ?? r.backup_id }} · {{ utc(r.backup_creado_en) | date: 'dd/MM/yyyy HH:mm' }}
                     } @else {
                       Backup borrado
                     }
                     @if (r.backup_previo_id) {
-                      <small class="backups-sub">Para volver atrás: backup #{{ r.backup_previo_id }}</small>
+                      <small class="backups-sub">Para volver atrás: backup #{{ r.backup_previo_numero ?? r.backup_previo_id }}</small>
                     }
                   </td>
                   <td>
@@ -291,7 +291,7 @@
 @if (restaurando(); as b) {
   <div class="ventas-overlay" (click)="cerrarRestaurar()">
     <div class="ventas-modal ventas-modal--wide" (click)="$event.stopPropagation()">
-      <h2>Restaurar backup #{{ b.id }}</h2>
+      <h2>Restaurar backup #{{ b.numero ?? b.id }}</h2>
       <p class="ventas-modal__subtitulo">
         Del {{ utc(b.creado_en) | date: 'dd/MM/yyyy HH:mm' }}. Antes de restaurar se hace un backup automático de cómo está todo
         ahora, por si quieres volver atrás.

@@ -71,7 +71,7 @@ class _MisCambiosState extends ConsumerState<MisCambios> {
   }
 
   Future<void> _cancelar(CambioCliente c) async {
-    if (!await confirmarCuenta(context, '¿Cancelar el cambio #${c.id}?', si: 'Cancelar cambio')) return;
+    if (!await confirmarCuenta(context, '¿Cancelar el cambio #${c.numero ?? c.id}?', si: 'Cancelar cambio')) return;
     try {
       _reemplazar(await ref.read(cuentaRepositoryProvider).cancelarCambio(c.id));
     } catch (e) {
@@ -119,7 +119,7 @@ class _MisCambiosState extends ConsumerState<MisCambios> {
       setState(() {
         _pagandoId = null;
         _avisoError = false;
-        _aviso = 'Listo: pagaste la diferencia del cambio #${c.id}. Recoge tu prenda en ${nuevo.sucursalNombre}.';
+        _aviso = 'Listo: pagaste la diferencia del cambio #${c.numero ?? c.id}. Recoge tu prenda en ${nuevo.sucursalNombre}.';
       });
     } catch (e) {
       if (mounted) setState(() => _errorPago = extractErrorMessage(e));
@@ -155,7 +155,7 @@ class _MisCambiosState extends ConsumerState<MisCambios> {
       setState(() {
         _pagandoId = null;
         _avisoError = false;
-        _aviso = 'Recibimos tu comprobante del cambio #${c.id}. La tienda lo revisa y te avisamos.';
+        _aviso = 'Recibimos tu comprobante del cambio #${c.numero ?? c.id}. La tienda lo revisa y te avisamos.';
       });
     } catch (e) {
       if (mounted) setState(() => _errorPago = extractErrorMessage(e));
@@ -191,7 +191,7 @@ class _MisCambiosState extends ConsumerState<MisCambios> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text('Cambio #${c.id} · ${c.tiendaNombre}',
+                child: Text('Cambio #${c.numero ?? c.id} · ${c.tiendaNombre}',
                     style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: tintaCuenta)),
               ),
               const SizedBox(width: 8),
@@ -199,7 +199,7 @@ class _MisCambiosState extends ConsumerState<MisCambios> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('Compra #${c.ventaId} · ${fechaLarga(c.fechaSolicitud)} · Recoges en ${c.sucursalNombre}',
+          Text('Compra #${c.ventaNumero ?? c.ventaId} · ${fechaLarga(c.fechaSolicitud)} · Recoges en ${c.sucursalNombre}',
               style: GoogleFonts.inter(fontSize: 12, height: 1.4, color: grisCuenta)),
           const SizedBox(height: 8),
           Text('${c.cantidad}× ${c.productoOriginal} (${c.tallaOriginal}, ${c.colorOriginal})',
@@ -387,7 +387,7 @@ Future<CambioCliente?> pedirCambio(BuildContext context, WidgetRef ref, int vent
     context,
     titulo: 'Cambiar una prenda',
     subtitulo:
-        'Compra #${opciones.ventaId} · ${opciones.tiendaNombre} · hasta el ${h.day}/${h.month} ${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}',
+        'Compra #${opciones.ventaNumero ?? opciones.ventaId} · ${opciones.tiendaNombre} · hasta el ${h.day}/${h.month} ${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}',
     cuerpo: (_) => _FormularioCambio(opciones: opciones, marca: marca),
   );
 }

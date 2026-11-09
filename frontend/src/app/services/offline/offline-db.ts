@@ -144,6 +144,9 @@ export interface OperacionLocal {
   mensaje: string | null;
   venta_id: number | null;
   reserva_id: number | null;
+  // Numeros que ve la tienda (los da el servidor al sincronizar).
+  venta_numero?: number | null;
+  reserva_numero?: number | null;
   intentos: number;
   ultimo_intento: string | null;
   // Resultado del cobro con el PayPal guardado.

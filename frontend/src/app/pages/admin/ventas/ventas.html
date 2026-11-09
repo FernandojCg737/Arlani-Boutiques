@@ -294,8 +294,8 @@
           } @else {
             @for (d of devoluciones(); track d.id) {
               <tr>
-                <td>{{ d.id }}</td>
-                <td>#{{ d.venta_id }}</td>
+                <td>{{ d.numero ?? d.id }}</td>
+                <td>#{{ d.venta_numero ?? d.venta_id }}</td>
                 <td>
                   <div class="admin-table__user">
                     <strong>{{ d.cliente_nombre }}</strong>
@@ -347,7 +347,7 @@
   @if (rechazando(); as r) {
     <div class="ventas-overlay" (click)="cerrarRechazo()">
       <div class="ventas-modal" (click)="$event.stopPropagation()">
-        <h2>Rechazar pago de la venta #{{ r.id }}</h2>
+        <h2>Rechazar pago de la venta #{{ r.numero ?? r.id }}</h2>
         <p class="ventas-modal__subtitulo">
           {{ r.cliente_nombre }} · {{ nombreMetodo(r) }} · {{ r.total }} Bs. La venta se cancela y el cliente ve el
           motivo en Mis compras.
@@ -383,7 +383,7 @@
     <div class="ventas-overlay" (click)="cerrarFormulario()">
       <div class="ventas-modal ventas-modal--mostrador" (click)="$event.stopPropagation()">
         @if (editando(); as e) {
-          <h2>Editar venta #{{ e.id }}</h2>
+          <h2>Editar venta #{{ e.numero ?? e.id }}</h2>
           <p class="ventas-modal__subtitulo">{{ e.cliente_nombre }}</p>
         } @else {
           <h2>Nueva venta presencial</h2>
@@ -663,7 +663,7 @@
       <div class="ventas-modal ventas-modal--wide" (click)="$event.stopPropagation()">
         <h2>Registrar devolucion</h2>
         <p class="ventas-modal__subtitulo">
-          Venta #{{ devolucionVenta()?.id }} · {{ devolucionVenta()?.cliente_nombre }}
+          Venta #{{ devolucionVenta()?.numero ?? devolucionVenta()?.id }} · {{ devolucionVenta()?.cliente_nombre }}
           · {{ devolucionVenta()?.total }} Bs
         </p>
 
@@ -763,9 +763,9 @@
   @if (devolucionRechazando(); as d) {
     <div class="ventas-overlay" (click)="cerrarRechazoDevolucion()">
       <div class="ventas-modal" (click)="$event.stopPropagation()">
-        <h2>Rechazar la devolución #{{ d.id }}</h2>
+        <h2>Rechazar la devolución #{{ d.numero ?? d.id }}</h2>
         <p class="ventas-modal__subtitulo">
-          Compra #{{ d.venta_id }} · {{ d.cliente_nombre }}. El cliente recibe el motivo en sus notificaciones y por correo.
+          Compra #{{ d.venta_numero ?? d.venta_id }} · {{ d.cliente_nombre }}. El cliente recibe el motivo en sus notificaciones y por correo.
         </p>
         <div class="ventas-motivos-rapidos">
           @for (m of motivosDevolucion; track m) {
@@ -804,9 +804,9 @@
       <div class="ventas-modal devolucion-ver-modal" (click)="$event.stopPropagation()">
         <div class="devolucion-modal-header">
           <div>
-            <h2>Detalle de Devolución #{{ dev.id }}</h2>
+            <h2>Detalle de Devolución #{{ dev.numero ?? dev.id }}</h2>
             <p class="ventas-modal__subtitulo">
-              Asociada a la venta <strong>#{{ dev.venta_id }}</strong> · Sucursal <strong>{{ dev.sucursal_nombre }}</strong>
+              Asociada a la venta <strong>#{{ dev.venta_numero ?? dev.venta_id }}</strong> · Sucursal <strong>{{ dev.sucursal_nombre }}</strong>
             </p>
           </div>
           <span class="admin-badge admin-badge--{{ dev.estado }}">{{ dev.estado }}</span>

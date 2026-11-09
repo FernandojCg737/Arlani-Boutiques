@@ -86,6 +86,8 @@ class EnvioEstadoIn(BaseModel):
 
 class VentaOut(BaseModel):
     id: int
+    # Numero propio de la tienda (#1, #2...): el que se muestra.
+    numero: int | None = None
     # online | offline (hecha sin conexion y sincronizada despues).
     origen: str = "online"
     tipo: str

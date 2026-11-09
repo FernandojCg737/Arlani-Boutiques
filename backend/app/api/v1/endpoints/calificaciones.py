@@ -100,7 +100,7 @@ def listar_calificaciones(
         text(
             f"""
             SELECT c.id, c.venta_id, c.estrellas, c.comentario, c.fecha,
-                   u.nombre, u.email, s.nombre, emp_u.nombre
+                   u.nombre, u.email, s.nombre, emp_u.nombre, v.numero
             FROM calificacion c
             JOIN venta v ON v.id = c.venta_id
             JOIN sucursal s ON s.id = v.sucursal_id
@@ -118,7 +118,7 @@ def listar_calificaciones(
 
     items = [
         CalificacionAdminOut(
-            id=r[0], venta_id=r[1], estrellas=r[2], comentario=r[3], fecha=r[4],
+            id=r[0], venta_id=r[1], venta_numero=r[9], estrellas=r[2], comentario=r[3], fecha=r[4],
             cliente_nombre=r[5], cliente_email=r[6], sucursal_nombre=r[7], empleado_nombre=r[8],
         )
         for r in rows

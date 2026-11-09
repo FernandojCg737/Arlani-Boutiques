@@ -21,6 +21,7 @@ interface Estado {
 
 interface Backup {
   id: number;
+  numero?: number | null;
   alcance: string;
   secciones: string[];
   origen: 'manual' | 'programado' | 'antes_de_restaurar' | 'importado';
@@ -45,6 +46,8 @@ interface ResumenTabla {
 interface Restauracion {
   id: number;
   backup_id: number | null;
+  backup_numero?: number | null;
+  backup_previo_numero?: number | null;
   backup_creado_en: string | null;
   secciones: string[];
   estado: 'en_proceso' | 'completada' | 'fallida';
@@ -290,7 +293,7 @@ export class AdminBackups implements OnInit, OnDestroy {
       datos.append('archivo', archivo);
       const b = await firstValueFrom(this.http.post<Backup>(`${this.api}/importar`, datos, { params: this.params() }));
       await this.cargar(false);
-      this.aviso.set(`Backup importado como #${b.id}: elige qué restaurar.`);
+      this.aviso.set(`Backup importado como #${b.numero ?? b.id}: elige qué restaurar.`);
       this.abrirRestaurar(b);
     } catch (err) {
       this.error.set(mensajeError(err, 'No se pudo importar el backup.'));
@@ -300,7 +303,7 @@ export class AdminBackups implements OnInit, OnDestroy {
   }
 
   protected async borrar(b: Backup): Promise<void> {
-    if (!confirm(`¿Borrar el backup #${b.id}? Su archivo se elimina y no se podrá restaurar.`)) return;
+    if (!confirm(`¿Borrar el backup #${b.numero ?? b.id}? Su archivo se elimina y no se podrá restaurar.`)) return;
     try {
       await firstValueFrom(this.http.delete(`${this.api}/${b.id}`, { params: this.params() }));
       await this.cargar(false);

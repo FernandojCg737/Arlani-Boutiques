@@ -40,6 +40,8 @@ class VentaResumen(BaseModel):
 
 class VentaDetalleFila(BaseModel):
     id: int
+    # Numero de la venta en su tienda (el que se muestra).
+    numero: int | None = None
     fecha: datetime
     cliente_nombre: str
     sucursal_nombre: str
@@ -139,6 +141,7 @@ class ReporteProductosOut(BaseModel):
 # ----------------------------------------------------------------- reservas --
 class ReservaDetalleFila(BaseModel):
     id: int
+    numero: int | None = None
     fecha_creacion: datetime
     cliente_nombre: str
     sucursal_nombre: str

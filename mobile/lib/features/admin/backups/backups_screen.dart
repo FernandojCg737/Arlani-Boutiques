@@ -125,7 +125,7 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
 
   Future<void> _restaurar(Map<String, dynamic> b) async {
     final secciones = (b['secciones'] as List).cast<String>();
-    final s = await _elegirSecciones('Restaurar backup #${b['id']}', secciones, secciones.where((x) => x != 'historial').toSet(),
+    final s = await _elegirSecciones('Restaurar backup #${b['numero'] ?? b['id']}', secciones, secciones.where((x) => x != 'historial').toSet(),
         nota: 'Antes de restaurar se hace un backup automático de cómo está todo ahora. Nada de lo actual se borra.');
     if (s != null) await _hacer(() => _dio.post('/backups/${b['id']}/restaurar', data: {'secciones': s}));
   }
@@ -146,7 +146,7 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
           data: FormData.fromMap({'archivo': await MultipartFile.fromFile(archivo.path!, filename: archivo.name)}));
       await _cargar();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup importado como #${r.data['id']}.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup importado como #${r.data['numero'] ?? r.data['id']}.')));
       await _restaurar(r.data as Map<String, dynamic>);
     } catch (e) {
       setState(() => _error = extractErrorMessage(e));
@@ -223,7 +223,7 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
                           AdminCard(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Row(children: [
-                                Expanded(child: Text('#${b['id']} · ${fechaTexto(b['creado_en'])}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                                Expanded(child: Text('#${b['numero'] ?? b['id']} · ${fechaTexto(b['creado_en'])}', style: const TextStyle(fontWeight: FontWeight.w800))),
                                 NeutralBadge(b['estado'] == 'en_proceso' ? 'EN PROCESO' : b['estado'] == 'completado' ? 'COMPLETADO' : 'FALLÓ'),
                               ]),
                               Text('${_origen(b)}${b['creado_por'] != null ? ' · ${b['creado_por']}' : ''}', style: const TextStyle(fontSize: 12)),
@@ -238,7 +238,7 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
                                     TextButton(onPressed: () => _restaurar(b), child: const Text('RESTAURAR')),
                                   TextButton(
                                     onPressed: () async {
-                                      if (await confirmarDialogo(context, '¿Borrar el backup #${b['id']}?', si: 'Borrar', peligro: true)) {
+                                      if (await confirmarDialogo(context, '¿Borrar el backup #${b['numero'] ?? b['id']}?', si: 'Borrar', peligro: true)) {
                                         await _hacer(() => _dio.delete('/backups/${b['id']}'));
                                       }
                                     },
@@ -285,10 +285,10 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
                               Expanded(child: Text(fechaTexto(r['creado_en']), style: const TextStyle(fontWeight: FontWeight.w800))),
                               NeutralBadge(r['estado'] == 'en_proceso' ? 'EN PROCESO' : r['estado'] == 'completada' ? 'COMPLETADA' : 'FALLÓ'),
                             ]),
-                            Text('Desde el backup #${r['backup_id'] ?? '—'} · ${r['hecho_por'] ?? ''}', style: const TextStyle(fontSize: 12)),
+                            Text('Desde el backup #${r['backup_numero'] ?? r['backup_id'] ?? '—'} · ${r['hecho_por'] ?? ''}', style: const TextStyle(fontSize: 12)),
                             Text((r['secciones'] as List).map((s) => _nombres[s] ?? s).join(' · '), style: const TextStyle(fontSize: 12)),
                             if (r['resumen'] != null) Text(_totales(r['resumen'] as Map<String, dynamic>), style: const TextStyle(fontSize: 12)),
-                            if (r['backup_previo_id'] != null) Text('Para volver atrás: backup #${r['backup_previo_id']}', style: const TextStyle(fontSize: 12)),
+                            if (r['backup_previo_id'] != null) Text('Para volver atrás: backup #${r['backup_previo_numero'] ?? r['backup_previo_id']}', style: const TextStyle(fontSize: 12)),
                             if (r['error'] != null) Text(r['error'].toString(), style: const TextStyle(color: Color(0xFFB3261E), fontSize: 12)),
                           ]),
                         ),

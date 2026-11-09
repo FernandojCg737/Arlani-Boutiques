@@ -31,6 +31,7 @@ class DetalleVenta {
 class Venta {
   const Venta({
     required this.id,
+    this.numero,
     this.origen = 'online',
     required this.tipo,
     required this.sucursalNombre,
@@ -51,6 +52,7 @@ class Venta {
   });
 
   final int id;
+  final int? numero;
   // offline: hecha en "Sin conexion" y sincronizada despues.
   final String origen;
   final String tipo; // venta_presencial | venta_digital
@@ -91,6 +93,7 @@ class Venta {
   factory Venta.fromJson(Map<String, dynamic> json) {
     return Venta(
       id: json['id'] as int,
+      numero: json['numero'] as int?,
       origen: json['origen'] as String? ?? 'online',
       tipo: json['tipo'] as String,
       sucursalNombre: json['sucursal_nombre'] as String,

@@ -213,7 +213,7 @@ def _datos_ventas(
 
     detalle = db.execute(
         text(
-            "SELECT v.id, v.fecha, u.nombre, s.nombre, v.tipo, p.metodo, p.estado, v.total "
+            "SELECT v.id, v.fecha, u.nombre, s.nombre, v.tipo, p.metodo, p.estado, v.total, v.numero "
             "FROM venta v JOIN pago p ON p.venta_id=v.id JOIN sucursal s ON s.id=v.sucursal_id "
             "JOIN cliente c ON c.id=v.cliente_id JOIN usuario u ON u.id=c.id "
             f"WHERE {_WHERE_VENTAS} ORDER BY v.fecha DESC LIMIT 500"
@@ -228,7 +228,7 @@ def _datos_ventas(
         top_productos=[SerieCategoria(etiqueta=r[0], total=_dec(r[2]), cantidad=int(r[1])) for r in top_productos],
         detalle=[
             VentaDetalleFila(
-                id=r[0], fecha=r[1], cliente_nombre=r[2], sucursal_nombre=r[3], tipo=r[4],
+                id=r[0], numero=r[8], fecha=r[1], cliente_nombre=r[2], sucursal_nombre=r[3], tipo=r[4],
                 metodo_pago=r[5], estado_pago=r[6], total=_dec(r[7]),
             )
             for r in detalle
@@ -265,9 +265,9 @@ def exportar_ventas(
 ) -> Response:
     desde, hasta = _rango_fechas(fecha_desde, fecha_hasta)
     datos = _datos_ventas(db, desde, hasta, sucursal_id, tipo, metodo)
-    headers = ["ID", "Fecha", "Cliente", "Sucursal", "Tipo", "Metodo de pago", "Estado de pago", "Total (Bs)"]
+    headers = ["N°", "Fecha", "Cliente", "Sucursal", "Tipo", "Metodo de pago", "Estado de pago", "Total (Bs)"]
     filas = [
-        [d.id, d.fecha.strftime("%d/%m/%Y %H:%M"), d.cliente_nombre, d.sucursal_nombre, d.tipo, d.metodo_pago,
+        [d.numero or d.id, d.fecha.strftime("%d/%m/%Y %H:%M"), d.cliente_nombre, d.sucursal_nombre, d.tipo, d.metodo_pago,
          d.estado_pago, float(d.total)]
         for d in datos.detalle
     ]
@@ -645,7 +645,7 @@ def _datos_reservas(db: Session, desde: datetime, hasta: datetime, sucursal_id: 
 
     detalle = db.execute(
         text(
-            "SELECT r.id, r.fecha_creacion, u.nombre, s.nombre, r.horario_atencion, r.estado "
+            "SELECT r.id, r.fecha_creacion, u.nombre, s.nombre, r.horario_atencion, r.estado, r.numero "
             "FROM reserva r JOIN sucursal s ON s.id=r.sucursal_id JOIN cliente c ON c.id=r.cliente_id "
             f"JOIN usuario u ON u.id=c.id WHERE {where} ORDER BY r.fecha_creacion DESC LIMIT 500"
         ),
@@ -660,7 +660,7 @@ def _datos_reservas(db: Session, desde: datetime, hasta: datetime, sucursal_id: 
         ),
         detalle=[
             ReservaDetalleFila(
-                id=r[0], fecha_creacion=r[1], cliente_nombre=r[2], sucursal_nombre=r[3], horario_atencion=r[4],
+                id=r[0], numero=r[6], fecha_creacion=r[1], cliente_nombre=r[2], sucursal_nombre=r[3], horario_atencion=r[4],
                 estado=r[5],
             )
             for r in detalle
@@ -695,10 +695,10 @@ def exportar_reservas(
 ) -> Response:
     desde, hasta = _rango_fechas(fecha_desde, fecha_hasta)
     datos = _datos_reservas(db, desde, hasta, sucursal_id, estado)
-    headers = ["ID", "Fecha de creacion", "Cliente", "Sucursal", "Horario de atencion", "Estado"]
+    headers = ["N°", "Fecha de creacion", "Cliente", "Sucursal", "Horario de atencion", "Estado"]
     filas = [
         [
-            d.id, d.fecha_creacion.strftime("%d/%m/%Y %H:%M"), d.cliente_nombre, d.sucursal_nombre,
+            d.numero or d.id, d.fecha_creacion.strftime("%d/%m/%Y %H:%M"), d.cliente_nombre, d.sucursal_nombre,
             d.horario_atencion.strftime("%d/%m/%Y %H:%M"), d.estado,
         ]
         for d in datos.detalle

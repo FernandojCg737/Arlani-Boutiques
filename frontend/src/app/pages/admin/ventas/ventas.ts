@@ -21,6 +21,8 @@ interface DetalleVentaItem {
 }
 
 interface VentaItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   tipo: string;
   sucursal_id: number;
@@ -117,6 +119,8 @@ interface DetalleReservaItem {
 }
 
 interface ReservaItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
   id: number;
   cliente_nombre: string;
   cliente_email: string;
@@ -141,6 +145,9 @@ interface DetalleDevolucionItem {
 }
 
 interface DevolucionItem {
+  // Numero propio de la tienda (#1, #2...): el que se muestra.
+  numero?: number | null;
+  venta_numero?: number | null;
   id: number;
   venta_id: number;
   empleado_nombre: string;
@@ -279,7 +286,7 @@ export class AdminVentas implements OnInit {
   }
 
   protected async cobrarReserva(r: ReservaItem): Promise<void> {
-    if (!confirm(`Cobrar en efectivo la reserva #${r.id} de ${r.cliente_nombre}?`)) return;
+    if (!confirm(`Cobrar en efectivo la reserva #${r.numero ?? r.id} de ${r.cliente_nombre}?`)) return;
     this.procesando.set(r.id);
     this.error.set('');
     try {
@@ -478,7 +485,7 @@ export class AdminVentas implements OnInit {
   }
 
   protected async aprobarPago(venta: VentaItem): Promise<void> {
-    if (!confirm(`¿Aprobar el pago (${this.nombreMetodo(venta)}) de la venta #${venta.id}? Esto descuenta el stock.`)) return;
+    if (!confirm(`¿Aprobar el pago (${this.nombreMetodo(venta)}) de la venta #${venta.numero ?? venta.id}? Esto descuenta el stock.`)) return;
     this.procesando.set(venta.id);
     this.error.set('');
     try {
@@ -496,7 +503,7 @@ export class AdminVentas implements OnInit {
   protected async contraEntrega(venta: VentaItem, accion: 'cobrar' | 'anular'): Promise<void> {
     let motivo: string | null = null;
     if (accion === 'cobrar') {
-      if (!confirm(`¿Confirmas que cobraste Bs ${venta.total} de la venta #${venta.id} al entregarla?`)) return;
+      if (!confirm(`¿Confirmas que cobraste Bs ${venta.total} de la venta #${venta.numero ?? venta.id} al entregarla?`)) return;
     } else {
       motivo = prompt('¿Por qué se anula? (el stock vuelve a la sucursal)', 'No se pudo entregar.');
       if (motivo === null) return;
@@ -614,7 +621,7 @@ export class AdminVentas implements OnInit {
   }
 
   protected async eliminarVenta(venta: VentaItem): Promise<void> {
-    if (!confirm(`Eliminar por completo la venta #${venta.id} de ${venta.cliente_nombre}? Esto no se puede deshacer.`))
+    if (!confirm(`Eliminar por completo la venta #${venta.numero ?? venta.id} de ${venta.cliente_nombre}? Esto no se puede deshacer.`))
       return;
     this.procesando.set(venta.id);
     this.error.set('');
@@ -935,7 +942,7 @@ export class AdminVentas implements OnInit {
   }
 
   protected async completarDevolucion(dev: DevolucionItem): Promise<void> {
-    if (!confirm(`Completar la devolucion #${dev.id}? Esto reingresa el stock y reembolsa ${dev.monto_reembolso} Bs.`))
+    if (!confirm(`Completar la devolucion #${dev.numero ?? dev.id}? Esto reingresa el stock y reembolsa ${dev.monto_reembolso} Bs.`))
       return;
     this.procesando.set(dev.id);
     this.error.set('');
@@ -1006,8 +1013,8 @@ export class AdminVentas implements OnInit {
   protected async eliminarDevolucion(dev: DevolucionItem): Promise<void> {
     const aviso =
       dev.estado === 'completada'
-        ? `¿Estás seguro de ELIMINAR la devolución #${dev.id}?\n\nADVERTENCIA: Esta devolución ya fue completada. Al eliminarla, se revertirá el reingreso de stock en inventario y la venta #${dev.venta_id} volverá a estar 'pagada'.`
-        : `¿Estás seguro de eliminar el registro de devolución #${dev.id}?`;
+        ? `¿Estás seguro de ELIMINAR la devolución #${dev.numero ?? dev.id}?\n\nADVERTENCIA: Esta devolución ya fue completada. Al eliminarla, se revertirá el reingreso de stock en inventario y la venta #${dev.venta_numero ?? dev.venta_id} volverá a estar 'pagada'.`
+        : `¿Estás seguro de eliminar el registro de devolución #${dev.numero ?? dev.id}?`;
     if (!confirm(aviso)) return;
 
     this.procesando.set(dev.id);

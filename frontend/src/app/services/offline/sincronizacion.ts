@@ -11,6 +11,8 @@ interface ResultadoServidor {
   mensaje: string | null;
   venta_id: number | null;
   reserva_id: number | null;
+  venta_numero?: number | null;
+  reserva_numero?: number | null;
   no_pagados?: NoPagado[] | null;
   total_cobrado?: string | null;
 }
@@ -251,6 +253,8 @@ export class Sincronizacion {
       mensaje: r.mensaje,
       venta_id: r.venta_id ?? op.venta_id,
       reserva_id: r.reserva_id ?? op.reserva_id,
+      venta_numero: r.venta_numero ?? op.venta_numero ?? null,
+      reserva_numero: r.reserva_numero ?? op.reserva_numero ?? null,
       no_pagados: r.no_pagados ?? null,
       total_cobrado: r.total_cobrado ?? null,
     });

@@ -4,6 +4,7 @@ class CalificacionAdmin {
   const CalificacionAdmin({
     required this.id,
     required this.ventaId,
+    this.ventaNumero,
     required this.estrellas,
     this.comentario,
     required this.fecha,
@@ -15,6 +16,7 @@ class CalificacionAdmin {
 
   final int id;
   final int ventaId;
+  final int? ventaNumero;
   final int estrellas;
   final String? comentario;
   final DateTime fecha;
@@ -27,6 +29,7 @@ class CalificacionAdmin {
     return CalificacionAdmin(
       id: json['id'] as int,
       ventaId: json['venta_id'] as int,
+      ventaNumero: json['venta_numero'] as int?,
       estrellas: json['estrellas'] as int,
       comentario: json['comentario'] as String?,
       fecha: DateTime.parse(json['fecha'] as String),

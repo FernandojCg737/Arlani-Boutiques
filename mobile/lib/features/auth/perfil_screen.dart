@@ -174,7 +174,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
         // (p. ej. el de una devolucion): se cierra solo.
         persist: false,
         duration: const Duration(seconds: 5),
-        content: Text('Pedimos tu cambio #${nuevo.id} a ${nuevo.tiendaNombre}. Te avisamos cuando lo revisen.'),
+        content: Text('Pedimos tu cambio #${nuevo.numero ?? nuevo.id} a ${nuevo.tiendaNombre}. Te avisamos cuando lo revisen.'),
         action: SnackBarAction(label: 'Ver', onPressed: () => setState(() => _tab = _Tab.cambios)),
       ),
     );
@@ -503,7 +503,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             vacio: 'Todavia no tienes compras.',
             cargando: _cargandoCompras,
             items: (_compras ?? []).take(3).map((v) {
-              return _MiniItem(texto: '#${v.id} · ${v.total.toStringAsFixed(2)} Bs', estado: v.estadoPago);
+              return _MiniItem(texto: '#${v.numero ?? v.id} · ${v.total.toStringAsFixed(2)} Bs', estado: v.estadoPago);
             }).toList(),
           ),
       ],
@@ -566,7 +566,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                         runSpacing: 4,
                         children: [
                           Text(
-                            'Compra #${v.id} · ${v.total.toStringAsFixed(2)} Bs',
+                            'Compra #${v.numero ?? v.id} · ${v.total.toStringAsFixed(2)} Bs',
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _tinta),
                           ),
                           if (v.origen == 'offline') const _EtiquetaSinConexion(),
@@ -1460,7 +1460,7 @@ class _SolicitarDevolucionSheetState extends ConsumerState<_SolicitarDevolucionS
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Compra #${widget.venta.id} · Plazo de 24 horas',
+                        'Compra #${widget.venta.numero ?? widget.venta.id} · Plazo de 24 horas',
                         style: const TextStyle(fontSize: 12, color: AppColors.grayTextDark),
                       ),
                     ],
