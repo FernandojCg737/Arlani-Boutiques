@@ -68,9 +68,21 @@
                 </label>
               }
             </div>
-            <button type="button" class="backups-btn" [disabled]="creando()" (click)="crear()">
-              {{ creando() ? 'Iniciando…' : 'Crear backup' }}
-            </button>
+            <div class="backups-botones">
+              <button type="button" class="backups-btn" [disabled]="creando()" (click)="crear()">
+                {{ creando() ? 'Iniciando…' : 'Crear backup' }}
+              </button>
+              <button type="button" class="backups-btn backups-btn--secundario" [disabled]="importando()"
+                      (click)="archivoImportar.click()">
+                {{ importando() ? 'Importando…' : 'Importar backup' }}
+              </button>
+              <input #archivoImportar type="file" accept=".zip,application/zip" hidden
+                     (change)="importar(archivoImportar)" />
+            </div>
+            <small class="backups-ayuda backups-ayuda--importar">
+              Importar sube un .zip descargado antes con «Descargar» y lo restaura desde ahí.
+              Solo se aceptan los backups {{ e.sistema ? 'del sistema completo' : 'de esta tienda' }}, sin modificar.
+            </small>
           </section>
         }
 

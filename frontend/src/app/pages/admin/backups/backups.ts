@@ -23,7 +23,7 @@ interface Backup {
   id: number;
   alcance: string;
   secciones: string[];
-  origen: 'manual' | 'programado' | 'antes_de_restaurar';
+  origen: 'manual' | 'programado' | 'antes_de_restaurar' | 'importado';
   programacion_nombre: string | null;
   estado: 'en_proceso' | 'completado' | 'fallido';
   tamano_bytes: number | null;
@@ -136,6 +136,7 @@ export class AdminBackups implements OnInit, OnDestroy {
 
   protected readonly seleccion = signal<string[]>([]);
   protected readonly creando = signal(false);
+  protected readonly importando = signal(false);
 
   protected readonly restaurando = signal<Backup | null>(null);
   protected readonly seccionesRestaurar = signal<string[]>([]);
@@ -231,6 +232,7 @@ export class AdminBackups implements OnInit, OnDestroy {
   protected origen(b: Backup): string {
     if (b.origen === 'manual') return 'Manual';
     if (b.origen === 'antes_de_restaurar') return 'Automático antes de restaurar';
+    if (b.origen === 'importado') return 'Importado desde un archivo';
     return `Programado${b.programacion_nombre ? ': ' + b.programacion_nombre : ''}`;
   }
 
@@ -267,6 +269,33 @@ export class AdminBackups implements OnInit, OnDestroy {
       URL.revokeObjectURL(enlace.href);
     } catch (err) {
       this.error.set(mensajeError(err, 'No se pudo descargar el backup.'));
+    }
+  }
+
+  // Sube un ZIP descargado antes: queda como un backup más y se abre
+  // directamente el diálogo para restaurarlo.
+  protected async importar(input: HTMLInputElement): Promise<void> {
+    const archivo = input.files?.[0];
+    input.value = '';
+    if (!archivo) return;
+    if (!archivo.name.toLowerCase().endsWith('.zip')) {
+      this.error.set('Elige el archivo .zip de un backup descargado de Arlani.');
+      return;
+    }
+    this.importando.set(true);
+    this.error.set('');
+    this.aviso.set('');
+    try {
+      const datos = new FormData();
+      datos.append('archivo', archivo);
+      const b = await firstValueFrom(this.http.post<Backup>(`${this.api}/importar`, datos, { params: this.params() }));
+      await this.cargar(false);
+      this.aviso.set(`Backup importado como #${b.id}: elige qué restaurar.`);
+      this.abrirRestaurar(b);
+    } catch (err) {
+      this.error.set(mensajeError(err, 'No se pudo importar el backup.'));
+    } finally {
+      this.importando.set(false);
     }
   }
 

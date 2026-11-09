@@ -10,7 +10,7 @@ app/core/backups.py); la pantalla consulta su estado.
 
 from datetime import date, datetime, time, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -250,6 +250,38 @@ def descargar(
     db.commit()
     nombre = f"arlani-backup-{backup_id}-{fila['creado_en']:%Y%m%d-%H%M}.zip"
     return Response(contenido, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+@router.post("/importar", response_model=BackupOut, status_code=status.HTTP_201_CREATED)
+def importar(
+    request: Request,
+    archivo: UploadFile = File(...),
+    empresa_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(require_permiso(PERMISO)),
+) -> BackupOut:
+    """Sube un ZIP descargado antes (Descargar) y lo deja como un backup mas,
+    listo para restaurar. Solo se aceptan ZIP de este sistema sin cambios
+    (firma) y del mismo ambito: una tienda solo importa sus propios backups."""
+    empresa = _ambito(db, usuario, empresa_id)
+    _exigir_plan(db, usuario, empresa)
+    contenido = archivo.file.read(motor.MAX_IMPORTAR + 1)
+    if len(contenido) > motor.MAX_IMPORTAR:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "El archivo supera los 300 MB.")
+    try:
+        backup_id, meta = motor.importar_backup(db.connection(), contenido, empresa, usuario.id)
+    except motor.ImportacionInvalida as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
+    original = str(meta.get("creado_en") or "")[:16].replace("T", " ")
+    _registrar(
+        db, usuario, "IMPORTAR", "backup", backup_id,
+        f"Importó desde un archivo el backup #{meta.get('backup_id')} ({original} UTC) {_donde(empresa)} como backup #{backup_id}",
+        request, empresa,
+    )
+    db.commit()
+    return next(b for b in listar(empresa_id, db, usuario) if b.id == backup_id)
 
 
 @router.delete("/{backup_id}", status_code=status.HTTP_204_NO_CONTENT)

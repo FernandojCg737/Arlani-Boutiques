@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,6 +28,7 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
   List<Map<String, dynamic>> _programas = [];
   List<Map<String, dynamic>> _restauraciones = [];
   bool _cargando = true;
+  bool _importando = false;
   String? _error;
   Timer? _sondeo;
 
@@ -128,6 +130,38 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
     if (s != null) await _hacer(() => _dio.post('/backups/${b['id']}/restaurar', data: {'secciones': s}));
   }
 
+  /// Sube el .zip de un backup descargado antes: queda como un backup mas y
+  /// se ofrece restaurarlo de inmediato. El servidor solo acepta los ZIP de
+  /// esta tienda, sin modificar.
+  Future<void> _importar() async {
+    final elegido = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip']);
+    final archivo = elegido?.files.single;
+    if (archivo == null || archivo.path == null) return;
+    setState(() {
+      _importando = true;
+      _error = null;
+    });
+    try {
+      final r = await _dio.post('/backups/importar',
+          data: FormData.fromMap({'archivo': await MultipartFile.fromFile(archivo.path!, filename: archivo.name)}));
+      await _cargar();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup importado como #${r.data['id']}.')));
+      await _restaurar(r.data as Map<String, dynamic>);
+    } catch (e) {
+      setState(() => _error = extractErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _importando = false);
+    }
+  }
+
+  String _origen(Map<String, dynamic> b) => switch (b['origen']) {
+        'manual' => 'Manual',
+        'programado' => 'Programado: ${b['programacion_nombre'] ?? ''}',
+        'importado' => 'Importado desde un archivo',
+        _ => 'Automático antes de restaurar',
+      };
+
   Future<void> _programar([Map<String, dynamic>? p]) async {
     final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(
       builder: (_) => _Programacion(dio: _dio, programa: p, secciones: _nombres),
@@ -173,6 +207,17 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
                     RefreshIndicator(
                       onRefresh: _cargar,
                       child: ListView(padding: const EdgeInsets.only(bottom: 90), children: [
+                        if (disponible)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                            child: OutlinedButton.icon(
+                              onPressed: _importando ? null : _importar,
+                              icon: _importando
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.upload_file),
+                              label: Text(_importando ? 'IMPORTANDO…' : 'IMPORTAR BACKUP (.ZIP)'),
+                            ),
+                          ),
                         if (_backups.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('Todavía no hay backups.')),
                         for (final b in _backups)
                           AdminCard(
@@ -181,8 +226,7 @@ class _BackupsScreenState extends ConsumerState<BackupsScreen> {
                                 Expanded(child: Text('#${b['id']} · ${fechaTexto(b['creado_en'])}', style: const TextStyle(fontWeight: FontWeight.w800))),
                                 NeutralBadge(b['estado'] == 'en_proceso' ? 'EN PROCESO' : b['estado'] == 'completado' ? 'COMPLETADO' : 'FALLÓ'),
                               ]),
-                              Text('${b['origen'] == 'manual' ? 'Manual' : b['origen'] == 'programado' ? 'Programado: ${b['programacion_nombre'] ?? ''}' : 'Automático antes de restaurar'}'
-                                  '${b['creado_por'] != null ? ' · ${b['creado_por']}' : ''}', style: const TextStyle(fontSize: 12)),
+                              Text('${_origen(b)}${b['creado_por'] != null ? ' · ${b['creado_por']}' : ''}', style: const TextStyle(fontSize: 12)),
                               Text((b['secciones'] as List).map((s) => _nombres[s] ?? s).join(' · '), style: const TextStyle(fontSize: 12)),
                               if (b['tamano_bytes'] != null)
                                 Text('${((b['tamano_bytes'] as num) / 1048576).toStringAsFixed(1)} MB · ${b['imagenes'] ?? 0} imágenes',

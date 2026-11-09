@@ -18,14 +18,23 @@ Si una fila que vuelve necesita otra que ya no existe (p. ej. una venta de un
 producto borrado), esa tambien vuelve desde el backup. Los triggers del
 sistema (comisiones, notificaciones, caja) se apagan mientras se restaura:
 lo que vuelve es el registro, no se cobra ni se avisa de nuevo.
+
+Importar: el ZIP descargado se puede volver a subir y queda como un backup
+mas (origen "importado"). Como el restaurador escribe las filas tal cual, el
+meta.json lleva una firma HMAC (clave del servidor) sobre el hash de
+datos.json y de cada imagen: un ZIP editado a mano no se acepta, y una tienda
+solo puede importar los backups de su propia tienda.
 """
 
+import hashlib
+import hmac
 import io
 import json
 import logging
 import zipfile
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
 from typing import NamedTuple
 
 import requests
@@ -233,7 +242,8 @@ def _tamano(bytes_: int) -> str:
     return f"{bytes_ / 1024:.0f} KB" if bytes_ < 1024 * 1024 else f"{bytes_ / 1024 / 1024:.1f} MB"
 
 
-_ORIGEN = {"manual": "Backup manual", "programado": "Backup programado", "antes_de_restaurar": "Backup automático antes de restaurar"}
+_ORIGEN = {"manual": "Backup manual", "programado": "Backup programado", "antes_de_restaurar": "Backup automático antes de restaurar",
+           "importado": "Backup importado"}
 
 
 # ================================================================ almacenamiento
@@ -337,19 +347,25 @@ def generar_backup(backup_id: int) -> None:
 
         buffer = io.BytesIO()
         imagenes = 0
+        hashes: dict[str, str] = {}
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("datos.json", json.dumps(datos, ensure_ascii=False, default=str))
+            datos_json = json.dumps(datos, ensure_ascii=False, default=str).encode()
+            z.writestr("datos.json", datos_json)
             for ruta in sorted(_imagenes_de(datos)):
                 resp = requests.get(_prefijo_publico() + ruta, timeout=30)
                 if resp.ok:
                     # Las imagenes ya vienen comprimidas.
                     z.writestr(f"imagenes/{ruta}", resp.content, compress_type=zipfile.ZIP_STORED)
+                    hashes[ruta] = hashlib.sha256(resp.content).hexdigest()
                     imagenes += 1
             meta = {
                 "backup_id": backup_id, "alcance": fila["alcance"], "empresa_id": fila["empresa_id"],
                 "secciones": sorted(secciones), "creado_en": fila["creado_en"].isoformat(),
                 "version_base": version, "conteos": {k: len(v) for k, v in datos.items()},
+                # Para poder importarlo despues (ver leer_importacion).
+                "datos_sha256": hashlib.sha256(datos_json).hexdigest(), "imagenes_sha256": hashes,
             }
+            meta["firma"] = firmar(meta)
             z.writestr("meta.json", json.dumps(meta, ensure_ascii=False))
         contenido = buffer.getvalue()
 
@@ -403,6 +419,119 @@ def crear_backup(conn: Connection, empresa_id: int | None, secciones: list[str],
         {"e": empresa_id, "a": "sistema" if empresa_id is None else "tienda", "s": secciones, "o": origen,
          "p": programacion_id, "at": atrasado, "u": usuario_id},
     ).scalar_one()
+
+
+# ==================================================================== importar
+
+# Lo mas grande que se acepta subir (y descomprimido, por si es un ZIP bomba).
+MAX_IMPORTAR = 300 * 1024 * 1024
+MAX_DESCOMPRIMIDO = 1024 * 1024 * 1024
+
+
+class ImportacionInvalida(ValueError):
+    """El ZIP no se puede importar (el mensaje es para el usuario)."""
+
+
+def _clave_firma() -> bytes:
+    return hashlib.sha256(b"arlani-backup:" + settings.SECRET_KEY.encode()).digest()
+
+
+def firmar(meta: dict) -> str:
+    """HMAC-SHA256 del meta.json (sin la firma), con la clave del servidor."""
+    cuerpo = json.dumps({k: v for k, v in meta.items() if k != "firma"}, sort_keys=True, ensure_ascii=False,
+                        separators=(",", ":"))
+    return hmac.new(_clave_firma(), cuerpo.encode(), hashlib.sha256).hexdigest()
+
+
+def _versiones_conocidas() -> set[str] | None:
+    """Revisiones de Alembic que conoce este backend (todas <= la actual)."""
+    try:
+        from alembic.script import ScriptDirectory
+
+        carpeta = Path(__file__).resolve().parents[2] / "migrations"
+        return {r.revision for r in ScriptDirectory(str(carpeta)).walk_revisions()}
+    except Exception:  # noqa: BLE001 - sin la lista no se bloquea la importacion
+        logger.exception("No se pudieron leer las migraciones")
+        return None
+
+
+def leer_importacion(contenido: bytes, empresa_id: int | None) -> tuple[dict, list[str]]:
+    """Valida un ZIP subido y devuelve su meta.json y las secciones que trae.
+
+    Se exige: que sea un backup de Arlani, que la firma y los hashes coincidan
+    (nadie lo edito), que sea del mismo ambito (esa tienda o el sistema) y que
+    no venga de una version de la base mas nueva que la actual."""
+    try:
+        z = zipfile.ZipFile(io.BytesIO(contenido))
+    except zipfile.BadZipFile:
+        raise ImportacionInvalida("El archivo no es un ZIP válido.")
+    with z:
+        if sum(i.file_size for i in z.infolist()) > MAX_DESCOMPRIMIDO:
+            raise ImportacionInvalida("El ZIP es demasiado grande para importarlo.")
+        nombres = set(z.namelist())
+        if not {"meta.json", "datos.json"} <= nombres:
+            raise ImportacionInvalida("Ese ZIP no es un backup de Arlani Boutiques (le falta meta.json o datos.json).")
+        try:
+            meta = json.loads(z.read("meta.json"))
+        except ValueError:
+            raise ImportacionInvalida("El meta.json del backup está dañado.")
+        if not isinstance(meta, dict):
+            raise ImportacionInvalida("El meta.json del backup está dañado.")
+        firma = meta.get("firma")
+        if not isinstance(firma, str) or not hmac.compare_digest(firma, firmar(meta)):
+            raise ImportacionInvalida(
+                "El backup no tiene una firma válida: fue modificado, es de otro servidor o se hizo antes de que "
+                "existiera la importación. Solo se pueden importar los ZIP descargados de este sistema, sin cambios."
+            )
+        if hashlib.sha256(z.read("datos.json")).hexdigest() != meta.get("datos_sha256"):
+            raise ImportacionInvalida("Los datos del backup fueron modificados: no se puede importar.")
+        hashes = meta.get("imagenes_sha256") or {}
+        for nombre in nombres:
+            if nombre.startswith("imagenes/") and not nombre.endswith("/"):
+                if hashes.get(nombre[len("imagenes/"):]) != hashlib.sha256(z.read(nombre)).hexdigest():
+                    raise ImportacionInvalida("Una imagen del backup fue modificada o agregada: no se puede importar.")
+
+    if empresa_id is None:
+        if meta.get("alcance") != "sistema":
+            raise ImportacionInvalida("Ese ZIP es el backup de una tienda: impórtalo eligiendo esa tienda.")
+    elif meta.get("alcance") != "tienda" or meta.get("empresa_id") != empresa_id:
+        raise ImportacionInvalida("Ese backup es de otra tienda o del sistema completo: aquí solo se importan los backups de esta tienda.")
+    permitidas = SECCIONES if empresa_id is not None else SECCIONES_SISTEMA
+    secciones = [s for s in permitidas if s in (meta.get("secciones") or [])]
+    if not secciones:
+        raise ImportacionInvalida("El backup no trae ninguna sección que se pueda restaurar.")
+    conocidas = _versiones_conocidas()
+    if conocidas is not None and meta.get("version_base") not in conocidas:
+        raise ImportacionInvalida("El backup es de una versión del sistema más nueva que la actual: no se puede importar.")
+    return meta, secciones
+
+
+def importar_backup(conn: Connection, contenido: bytes, empresa_id: int | None, usuario_id: int) -> tuple[int, dict]:
+    """Registra el ZIP subido como un backup completado (origen "importado") y
+    lo guarda en el almacenamiento: desde ahi se restaura como cualquier otro.
+    Lanza ImportacionInvalida si el ZIP no pasa las validaciones."""
+    meta, secciones = leer_importacion(contenido, empresa_id)
+    backup_id = crear_backup(conn, empresa_id, secciones, "importado", usuario_id)
+    _asegurar_bucket()
+    carpeta = f"tiendas/{empresa_id}" if empresa_id else "sistema"
+    base = f"{carpeta}/importado-{backup_id}-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.zip"
+    partes = [contenido[i:i + TAMANO_PARTE] for i in range(0, len(contenido), TAMANO_PARTE)] or [b""]
+    archivos = [base] if len(partes) == 1 else [f"{base}.parte{n + 1}" for n in range(len(partes))]
+    try:
+        for ruta, parte in zip(archivos, partes):
+            _subir(ruta, parte, "application/zip")
+    except Exception:
+        borrar_archivos(archivos)
+        raise
+    conn.execute(
+        text(
+            """UPDATE backup SET estado = 'completado', archivos = CAST(:a AS JSONB), tamano_bytes = :t,
+                      conteos = CAST(:c AS JSONB), imagenes = :im, completado_en = now() WHERE id = :i"""
+        ),
+        {"a": json.dumps(archivos), "t": len(contenido), "c": json.dumps(meta.get("conteos") or {}),
+         "im": len(meta.get("imagenes_sha256") or {}), "i": backup_id},
+    )
+    return backup_id, meta
 
 
 # ================================================================= restauracion

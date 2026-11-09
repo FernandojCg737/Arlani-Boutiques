@@ -103,6 +103,8 @@ dependencies:
   workmanager: ^0.10.10
   flutter_local_notifications: ^22.3.3
   livekit_client: ^2.13.2
+  # CU21: elegir el .zip de un backup descargado para importarlo.
+  file_picker: ^10.2.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

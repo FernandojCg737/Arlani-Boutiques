@@ -116,6 +116,22 @@
   }
 }
 
+.backups-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.backups-btn--secundario {
+  background: #fff;
+  color: var(--brand-dark);
+  border: 1px solid var(--brand-dark);
+}
+
+.backups-ayuda.backups-ayuda--importar {
+  margin: 10px 0 0;
+}
+
 .backups-sub {
   display: block;
   margin-top: 3px;
